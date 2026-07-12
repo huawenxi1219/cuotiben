@@ -16,8 +16,8 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Flet
-      run: pip install flet
+    - name: Install Flet and dependencies
+      run: pip install flet requests
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
