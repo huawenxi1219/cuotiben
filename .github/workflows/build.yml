@@ -32,8 +32,8 @@ jobs:
         export FLUTTER_ROOT="$FLUTTER_HOME"
         yes | flet build apk --verbose
 
-    - name: Upload APK
+    - name: Upload APK (any location)
       uses: actions/upload-artifact@v4
       with:
         name: app-release
-        path: build/apk/app-release.apk
+        path: build/**/*.apk
