@@ -22,15 +22,15 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.22.0'   # 稳定版，与 Flet 兼容
+        flutter-version: '3.22.0'
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Build APK with Flet
+    - name: Build APK with Flet (bypass prompt)
       run: |
-        export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT
-        flet build apk --verbose
+        export FLUTTER_ROOT="$FLUTTER_HOME"
+        yes | flet build apk --verbose
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
