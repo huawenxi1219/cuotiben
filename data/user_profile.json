@@ -1,0 +1,36 @@
+{
+  "name": "学生",
+  "grade": "高三",
+  "weak_subjects": {
+    "语文": 0.15000000000000002,
+    "数学": 0.1,
+    "英语": 0.15000000000000002,
+    "地理": 0.05
+  },
+  "weak_knowledge": {
+    "二次函数-最值": 0.15,
+    "定语从句-关系代词": 0.15,
+    "非谓语动词-动名词": 0.15
+  },
+  "error_types": {
+    "概念不清": 3
+  },
+  "learning_preferences": {
+    "prefer_explanation_first": true,
+    "prefer_step_by_step": true
+  },
+  "recent_focus": [
+    "非谓语动词-动名词",
+    "定语从句-关系代词",
+    "二次函数-最值"
+  ],
+  "total_errors": 9,
+  "total_chats": 32,
+  "chat_subjects": {
+    "数学": 6,
+    "物理": 2,
+    "总AI": 7
+  },
+  "last_updated": "2026-07-04 12:09:45",
+  "content_lib_usage": {}
+}
