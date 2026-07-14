@@ -28,7 +28,7 @@ jobs:
           pip install flet requests
       - name: Build APK with Flet
         run: |
-          flet build apk --org com.cuotiben --app-name "错题助手"
+          flet build apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
