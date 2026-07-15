@@ -25,13 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flet==0.27.6 requests
-      - name: Install Flutter SDK
-        run: |
-          wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.22.2-stable.tar.xz
-          tar xf flutter_linux_3.22.2-stable.tar.xz
-          echo "$PWD/flutter/bin" >> $GITHUB_PATH
-          echo "FLET_FLUTTER_SDK_DIR=$PWD/flutter" >> $GITHUB_ENV
+          pip install --no-cache-dir flet==0.27.6 requests
       - name: Build APK with Flet
         run: |
           flet build apk
