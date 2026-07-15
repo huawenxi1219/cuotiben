@@ -28,7 +28,7 @@ jobs:
           pip install flet requests
       - name: Build APK with Flet
         run: |
-          echo y | flet build apk
+          echo y | flet build apk --android-manifest android/AndroidManifest.xml
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
