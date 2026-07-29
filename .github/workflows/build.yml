@@ -9,28 +9,39 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies (force reinstall)
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --force-reinstall --no-cache-dir flet==0.28.3 requests
+          pip install flet requests
+
+      - name: Clean previous builds (if any)
+        run: |
+          rm -rf build/
+          rm -rf __pycache__/
+
       - name: Build APK with Flet
         run: |
           flet build apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: build/**/*.apk
+          path: build/apk/**/*.apk
