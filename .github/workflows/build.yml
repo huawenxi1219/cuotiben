@@ -30,20 +30,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flet requests
-          # 如果你的项目有 requirements.txt，可以启用下面这行
-          # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Clean previous builds (if any)
         run: |
           rm -rf build/
           rm -rf __pycache__/
 
-      - name: Build APK with Flet (debug)
+      - name: Build APK with Flet
         run: |
-          flet build apk --debug --verbose
+          flet build apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk
+          name: app-debug
           path: build/apk/**/*.apk
