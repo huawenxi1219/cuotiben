@@ -21,6 +21,12 @@ jobs:
         with:
           cmdline-tools-version: 11076708
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.3'
+          channel: 'stable'
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
