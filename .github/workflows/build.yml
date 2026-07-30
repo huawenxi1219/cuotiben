@@ -45,7 +45,6 @@ jobs:
       - name: List generated APK files
         run: |
           find build/ -name "*.apk" -type f
-          echo "===== 上面是实际存在的 APK 文件 ====="
 
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v1
@@ -54,7 +53,7 @@ jobs:
           name: Release v1.0.${{ github.run_number }}
           draft: false
           prerelease: false
-          fail_on_no_files: false   # 关键：找不到文件也不报错
-          files: build/**/*.apk     # 匹配所有 APK
+          fail_on_unmatched_files: false   # ✅ 正确参数名
+          files: build/**/*.apk            # 匹配所有 APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
