@@ -6,6 +6,8 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 授予创建 Release 的权限
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
