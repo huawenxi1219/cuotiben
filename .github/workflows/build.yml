@@ -7,7 +7,7 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # 授予创建 Release 的权限
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,6 +42,11 @@ jobs:
         run: |
           echo "y" | flet build apk
 
+      # === 新增：列出所有生成的 APK 文件，确认路径 ===
+      - name: List generated APK files
+        run: |
+          find build/ -name "*.apk" -type f
+
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v1
         with:
@@ -49,6 +54,6 @@ jobs:
           name: Release v1.0.${{ github.run_number }}
           draft: false
           prerelease: false
-          files: build/apk/**/*.apk
+          files: build/**/*.apk   # 改为更宽松的匹配路径
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
