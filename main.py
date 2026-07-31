@@ -11,6 +11,14 @@ import threading
 import string
 import sys
 import base64
+import sys
+import traceback
+
+def global_exception_handler(exc_type, exc_value, exc_tb):
+    print("===== 全局异常捕获 =====")
+    traceback.print_exception(exc_type, exc_value, exc_tb)
+
+sys.excepthook = global_exception_handler
 from datetime import datetime, timedelta
 
 # ==================== 调试开关 ====================
@@ -1218,6 +1226,7 @@ def build_sentence_page(subject, page):
     ], spacing=8, expand=True)
 
 def main(page: ft.Page):
+    print("===== App 启动 =====")
     init_data_paths(page)   # 自动适配手机端路径
     init_vocabulary()
     init_content_lib()
