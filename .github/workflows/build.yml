@@ -38,14 +38,18 @@ jobs:
           rm -rf build/
           rm -rf __pycache__/
 
-      # ===== 关键：显式复制 android 目录到工作区 =====
-      - name: Copy AndroidManifest
+      # ===== 核心修改：强制复制 android 到 build 目录 =====
+      - name: Copy AndroidManifest into build
         run: |
           if [ -d "android" ]; then
-            cp -r android/ ./android_copy
-            ls -la android_copy/
+            mkdir -p build/apk/debug/
+            cp -r android/* build/apk/debug/
+            cp -r android/* build/apk/
+            cp -r android/* build/
+            echo "AndroidManifest copied to build directories."
+            find build/ -name "AndroidManifest.xml"
           else
-            echo "android directory not found"
+            echo "android directory not found! Exiting."
             exit 1
           fi
 
@@ -53,18 +57,11 @@ jobs:
         run: |
           echo "y" | flet build apk
 
-      # ===== 将复制的 android 合并到 build 输出（如果 flet 没有自动包含） =====
-      - name: Merge AndroidManifest
+      # ===== 再次确认 AndroidManifest.xml 是否在最终输出中 =====
+      - name: Verify AndroidManifest in build
         run: |
-          # 查找 build 目录下的中间产物位置（通常是 build/apk/ 或 build/flutter/）
-          # 直接复制到 build/apk/debug/ 目录，让打包工具识别
-          if [ -d "android_copy" ]; then
-            cp -r android_copy/* build/apk/debug/ 2>/dev/null || true
-            cp -r android_copy/* build/apk/ 2>/dev/null || true
-            cp -r android_copy/* build/ 2>/dev/null || true
-          fi
-          # 检查最终 APK 是否包含 AndroidManifest.xml
-          find build/ -name "AndroidManifest.xml" || echo "Not found"
+          echo "Searching for AndroidManifest.xml in build folder:"
+          find build/ -name "AndroidManifest.xml" || echo "NOT FOUND"
 
       - name: List generated APK
         run: |
@@ -78,6 +75,6 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
-          files: build/**/*.apk
+          files: build/apk/debug/*.apk   # 只上传 debug 版本，避免 404
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
