@@ -38,9 +38,9 @@ jobs:
           rm -rf build/
           rm -rf __pycache__/
 
-      - name: Build APK with explicit main and target
+      - name: Build APK
         run: |
-          echo "y" | flet build apk --main main.py --target-platform android-arm64
+          echo "y" | flet build apk
 
       - name: List generated APK
         run: |
