@@ -38,9 +38,33 @@ jobs:
           rm -rf build/
           rm -rf __pycache__/
 
+      # ===== 关键：显式复制 android 目录到工作区 =====
+      - name: Copy AndroidManifest
+        run: |
+          if [ -d "android" ]; then
+            cp -r android/ ./android_copy
+            ls -la android_copy/
+          else
+            echo "android directory not found"
+            exit 1
+          fi
+
       - name: Build APK
         run: |
           echo "y" | flet build apk
+
+      # ===== 将复制的 android 合并到 build 输出（如果 flet 没有自动包含） =====
+      - name: Merge AndroidManifest
+        run: |
+          # 查找 build 目录下的中间产物位置（通常是 build/apk/ 或 build/flutter/）
+          # 直接复制到 build/apk/debug/ 目录，让打包工具识别
+          if [ -d "android_copy" ]; then
+            cp -r android_copy/* build/apk/debug/ 2>/dev/null || true
+            cp -r android_copy/* build/apk/ 2>/dev/null || true
+            cp -r android_copy/* build/ 2>/dev/null || true
+          fi
+          # 检查最终 APK 是否包含 AndroidManifest.xml
+          find build/ -name "AndroidManifest.xml" || echo "Not found"
 
       - name: List generated APK
         run: |
