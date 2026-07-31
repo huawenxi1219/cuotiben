@@ -38,30 +38,9 @@ jobs:
           rm -rf build/
           rm -rf __pycache__/
 
-      # ===== 核心修改：强制复制 android 到 build 目录 =====
-      - name: Copy AndroidManifest into build
-        run: |
-          if [ -d "android" ]; then
-            mkdir -p build/apk/debug/
-            cp -r android/* build/apk/debug/
-            cp -r android/* build/apk/
-            cp -r android/* build/
-            echo "AndroidManifest copied to build directories."
-            find build/ -name "AndroidManifest.xml"
-          else
-            echo "android directory not found! Exiting."
-            exit 1
-          fi
-
       - name: Build APK
         run: |
           echo "y" | flet build apk
-
-      # ===== 再次确认 AndroidManifest.xml 是否在最终输出中 =====
-      - name: Verify AndroidManifest in build
-        run: |
-          echo "Searching for AndroidManifest.xml in build folder:"
-          find build/ -name "AndroidManifest.xml" || echo "NOT FOUND"
 
       - name: List generated APK
         run: |
@@ -75,6 +54,6 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
-          files: build/apk/debug/*.apk   # 只上传 debug 版本，避免 404
+          files: build/**/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
