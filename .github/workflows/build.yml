@@ -6,6 +6,8 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,17 +33,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet requests
 
-      - name: Clean previous builds (if any)
+      - name: Clean previous builds
         run: |
           rm -rf build/
           rm -rf __pycache__/
 
-      - name: Build APK with Flet
+      - name: Build APK
         run: |
-          flet build apk
+          echo "y" | flet build apk
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: List generated APK
+        run: |
+          find build/ -name "*.apk" -type f
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: release-apk
-          path: build/apk/**/*.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+          files: build/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

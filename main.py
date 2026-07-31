@@ -3465,4 +3465,8 @@ def main(page: ft.Page):
         raise
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.getenv("PORT", 8000)), host="0.0.0.0")
+=======
+    ft.app(target=main)
+>>>>>>> e339c05a28f7de74647da00bda92a766c202286d
