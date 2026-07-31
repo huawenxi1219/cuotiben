@@ -33,27 +33,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet requests
 
-      - name: Clean previous builds (if any)
+      - name: Clean previous builds
         run: |
           rm -rf build/
           rm -rf __pycache__/
 
-      - name: Build APK with Flet
+      - name: Build APK with explicit main and target
         run: |
-          echo "y" | flet build apk
+          echo "y" | flet build apk --main main.py --target-platform android-arm64
 
-      - name: List generated APK files
+      - name: List generated APK
         run: |
           find build/ -name "*.apk" -type f
 
-      - name: Create Release and Upload APK
+      - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Release v1.0.${{ github.run_number }}
           draft: false
           prerelease: false
-          fail_on_unmatched_files: false   # ✅ 正确参数名
-          files: build/**/*.apk            # 匹配所有 APK
+          fail_on_unmatched_files: false
+          files: build/**/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
