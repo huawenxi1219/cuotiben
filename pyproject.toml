@@ -1,6 +1,14 @@
+<<<<<<< HEAD
 [tool.flet]
 project_name = "智能错题笔记助手"
 
 [tool.flet.android.permission]
 "android.permission.INTERNET" = true
+=======
+[tool.flet]
+project_name = "智能错题笔记助手"
+
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
+>>>>>>> ebcd26b59c98e394bd65f37b472b1db4880e5b78
 "android.permission.CAMERA" = true
