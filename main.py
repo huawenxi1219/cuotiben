@@ -1189,6 +1189,8 @@ def build_sentence_page(subject, page):
 
 # ==================== main 函数（完整功能 + 全局异常捕获） ====================
 def main(page: ft.Page):
+    page.add(ft.Text("应用启动成功！"))
+    # 你原来的其他代码...                ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
     try:
         init_vocabulary()
         init_content_lib()
