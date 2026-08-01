@@ -29,37 +29,8 @@ jobs:
         run: |
           pip install flet==0.28.3 requests
 
-      - name: 创建 AndroidManifest.xml（手动声明权限）
-        run: |
-          mkdir -p android/app/src/main
-          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.example.cuotiben">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.CAMERA" />
-              <application
-                  android:label="智能错题笔记助手"
-                  android:icon="@mipmap/ic_launcher"
-                  android:usesCleartextTraffic="true">
-                  <activity android:name=".MainActivity"
-                      android:exported="true"
-                      android:configChanges="orientation|screenSize|keyboardHidden">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-          echo "✅ AndroidManifest.xml 已创建"
-
       - name: 打包 APK
-        run: |
-          flet build apk \
-            --android-permissions "android.permission.INTERNET" \
-            --android-permissions "android.permission.CAMERA"
+        run: flet build apk
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
