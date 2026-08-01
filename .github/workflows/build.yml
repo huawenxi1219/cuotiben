@@ -29,7 +29,7 @@ jobs:
         run: |
           pip install flet==0.28.3 requests
 
-      - name: 创建 Android 权限配置文件
+      - name: 创建 AndroidManifest.xml（手动声明权限）
         run: |
           mkdir -p android/app/src/main
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
@@ -38,8 +38,6 @@ jobs:
               package="com.example.cuotiben">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.CAMERA" />
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
               <application
                   android:label="智能错题笔记助手"
                   android:icon="@mipmap/ic_launcher"
@@ -61,9 +59,7 @@ jobs:
         run: |
           flet build apk \
             --android-permissions "android.permission.INTERNET" \
-            --android-permissions "android.permission.CAMERA" \
-            --android-permissions "android.permission.READ_EXTERNAL_STORAGE" \
-            --android-permissions "android.permission.WRITE_EXTERNAL_STORAGE"
+            --android-permissions "android.permission.CAMERA"
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
