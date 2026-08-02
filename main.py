@@ -13,6 +13,10 @@ import sys
 import base64
 from datetime import datetime, timedelta
 import traceback
+# ==================== 用户自定义数据路径持久化 ====================
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".config")
+os.makedirs(CONFIG_DIR, exist_ok=True)
+DATA_PATH_CONFIG_FILE = os.path.join(CONFIG_DIR, "data_path.txt")
 
 # ==================== 调试开关 ====================
 DEBUG = True
@@ -70,7 +74,13 @@ def update_data_dir(new_path: str):
 
     for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
         os.makedirs(d, exist_ok=True)
-
+        # 保存用户路径到配置文件
+    try:
+        with open(DATA_PATH_CONFIG_FILE, "w", encoding="utf-8") as f:
+            f.write(new_path)
+        print(f"✅ 数据路径已保存: {new_path}")
+    except Exception as e:
+        print(f"保存数据路径失败: {e}")
 # ==================== API 自动重试装饰器 ====================
 def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
     def decorator(func):
@@ -1189,7 +1199,17 @@ def build_sentence_page(subject, page):
 
 # ==================== main 函数（完整功能 + 全局异常捕获） ====================
 def main(page: ft.Page):
-    page.add(ft.Text("应用启动成功！"))
+    # 尝试加载用户自定义数据路径
+    global DATA_DIR
+    if os.path.exists(DATA_PATH_CONFIG_FILE):
+        try:
+            with open(DATA_PATH_CONFIG_FILE, "r", encoding="utf-8") as f:
+                saved_path = f.read().strip()
+                if saved_path and os.path.exists(saved_path):
+                    update_data_dir(saved_path)
+                    print(f"已加载数据路径: {saved_path}")
+        except Exception as e:
+            print(f"加载数据路径失败: {e}")
     # 你原来的其他代码...                ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
     try:
         init_vocabulary()
