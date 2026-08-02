@@ -22,7 +22,14 @@ DATA_PATH_CONFIG_FILE = os.path.join(CONFIG_DIR, "data_path.txt")
 DEBUG = True
 
 # ==================== 路径配置（手机端自动适配） ====================
-BASE_DIR = os.getcwd()
+# ==================== 路径配置 ====================
+import sys
+if getattr(sys, 'frozen', False):
+    # 手机APK环境：固定读取 Download/data
+    BASE_DIR = "/storage/emulated/0/Download"
+else:
+    # 电脑开发环境：读取当前目录下的 data
+    BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
