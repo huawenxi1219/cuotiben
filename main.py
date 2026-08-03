@@ -702,8 +702,14 @@ DOC_EXTS = [".pdf", ".doc", ".docx", ".txt", ".md", ".ppt", ".pptx", ".xls", ".x
 def load_ai_config():
     if not os.path.exists(AI_CONFIG_FILE):
         return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
-    with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
+            return json.loads(content)
+    except json.JSONDecodeError:
+        return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
 
 def save_ai_config(config):
     with open(AI_CONFIG_FILE, "w", encoding="utf-8") as f:
