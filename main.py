@@ -20,21 +20,12 @@ DATA_PATH_CONFIG_FILE = os.path.join(CONFIG_DIR, "data_path.txt")
 
 # ==================== 调试开关 ====================
 DEBUG = True
-
-# ==================== 路径配置（手机端自动适配） ====================
 # ==================== 路径配置 ====================
 import sys
+
 if getattr(sys, 'frozen', False):
-    # 手机APK环境：固定读取 Download/data
-    BASE_DIR = "/storage/emulated/0/Download"
-else:
-    # 电脑开发环境：读取当前目录下的 data
-    # ==================== 路径配置（使用 APP 私有目录） ====================
-if getattr(sys, 'frozen', False):
-    # 手机 APK：使用 APP 私有目录
     DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 else:
-    # 电脑开发环境：使用当前目录下的 data
     DATA_DIR = os.path.join(os.getcwd(), "data")
 
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -55,6 +46,19 @@ CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
 NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+required_files = [
+    ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+    TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+    NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+]
+for filepath in required_files:
+    if not os.path.exists(filepath):
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("")
 
 for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
     os.makedirs(d, exist_ok=True)
