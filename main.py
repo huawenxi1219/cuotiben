@@ -29,8 +29,16 @@ if getattr(sys, 'frozen', False):
     BASE_DIR = "/storage/emulated/0/Download"
 else:
     # 电脑开发环境：读取当前目录下的 data
-    BASE_DIR = os.getcwd()
-DATA_DIR = os.path.join(BASE_DIR, "data")
+    # ==================== 路径配置（使用 APP 私有目录） ====================
+if getattr(sys, 'frozen', False):
+    # 手机 APK：使用 APP 私有目录
+    DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+else:
+    # 电脑开发环境：使用当前目录下的 data
+    DATA_DIR = os.path.join(os.getcwd(), "data")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -47,6 +55,19 @@ CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
 NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+required_files = [
+    ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+    TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+    NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+]
+for filepath in required_files:
+    if not os.path.exists(filepath):
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("")
 _jsonl_lock = threading.Lock()
 TARGET_VOCAB_COUNT = 3500
 
