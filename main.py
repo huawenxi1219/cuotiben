@@ -1237,6 +1237,40 @@ def build_sentence_page(subject, page):
 
 # ==================== main 函数（完整功能 + 全局异常捕获） ====================
 def main(page: ft.Page):
+        # ========== 请求所有文件访问权限（Android 11+） ==========
+    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+        # 检查是否有所有文件访问权限
+        try:
+            # 尝试在外部存储根目录创建一个临时文件，检测是否可写
+            test_path = "/storage/emulated/0/.permission_test"
+            with open(test_path, "w") as f:
+                f.write("test")
+            os.remove(test_path)
+            has_permission = True
+        except:
+            has_permission = False
+
+        if not has_permission:
+            # 显示提示并跳转到系统设置
+            def open_settings(e):
+                page.launch_url("app-settings:")
+                # 或者直接打开应用详情页
+                # page.launch_url("package:com.flet.cuotiben")
+
+            dlg = ft.AlertDialog(
+                title=ft.Text("需要存储权限"),
+                content=ft.Text(
+                    "APP需要「所有文件访问权限」才能读取您选择的任意文件夹。\n\n"
+                    "请点击「去授权」→ 选择「允许管理所有文件」→ 返回APP。",
+                    size=16
+                ),
+                actions=[
+                    ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                    ft.ElevatedButton("去授权", on_click=lambda e: (page.close(dlg), open_settings(e))),
+                ]
+            )
+            page.open(dlg)
+            page.update()
     # 尝试加载用户自定义数据路径
     global DATA_DIR
     if os.path.exists(DATA_PATH_CONFIG_FILE):
