@@ -13,14 +13,8 @@ import sys
 import base64
 from datetime import datetime, timedelta
 import traceback
-# ==================== 用户自定义数据路径持久化 ====================
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".config")
-os.makedirs(CONFIG_DIR, exist_ok=True)
-DATA_PATH_CONFIG_FILE = os.path.join(CONFIG_DIR, "data_path.txt")
 
-# ==================== 调试开关 ====================
-DEBUG = True
-# ==================== 路径配置 ====================
+# ==================== 路径配置（固定使用 APP 私有目录） ====================
 import sys
 
 if getattr(sys, 'frozen', False):
@@ -47,9 +41,11 @@ NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 
+# 确保所有目录存在
 for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
     os.makedirs(d, exist_ok=True)
 
+# 确保所有 JSONL 文件存在（APP 自己创建，确保权限属于 APP）
 required_files = [
     ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
     TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
@@ -60,59 +56,12 @@ for filepath in required_files:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("")
 
-for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-    os.makedirs(d, exist_ok=True)
-
-required_files = [
-    ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
-    TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
-    NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
-]
-for filepath in required_files:
-    if not os.path.exists(filepath):
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write("")
 _jsonl_lock = threading.Lock()
 TARGET_VOCAB_COUNT = 3500
 
-# ==================== 确保数据目录存在 ====================
-for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-    os.makedirs(d, exist_ok=True)
+# ==================== 调试开关 ====================
+DEBUG = True
 
-# ==================== update_data_dir 函数 ====================
-def update_data_dir(new_path: str):
-    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
-    global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
-    global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
-    global VOCAB_FILE, SENTENCES_FILE
-
-    DATA_DIR = new_path
-    IMAGES_DIR = os.path.join(DATA_DIR, "images")
-    VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
-    DOCS_DIR = os.path.join(DATA_DIR, "documents")
-    ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
-    NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
-    RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
-    REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
-    TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
-    AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
-    USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
-    CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
-    CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
-    CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
-    NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
-
-    for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-        os.makedirs(d, exist_ok=True)
-        # 保存用户路径到配置文件
-    try:
-        with open(DATA_PATH_CONFIG_FILE, "w", encoding="utf-8") as f:
-            f.write(new_path)
-        print(f"✅ 数据路径已保存: {new_path}")
-    except Exception as e:
-        print(f"保存数据路径失败: {e}")
 # ==================== API 自动重试装饰器 ====================
 def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
     def decorator(func):
@@ -1235,54 +1184,8 @@ def build_sentence_page(subject, page):
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
 
-# ==================== main 函数（完整功能 + 全局异常捕获） ====================
+# ==================== main 函数 ====================
 def main(page: ft.Page):
-        # ========== 请求所有文件访问权限（Android 11+） ==========
-    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-        # 检查是否有所有文件访问权限
-        try:
-            # 尝试在外部存储根目录创建一个临时文件，检测是否可写
-            test_path = "/storage/emulated/0/.permission_test"
-            with open(test_path, "w") as f:
-                f.write("test")
-            os.remove(test_path)
-            has_permission = True
-        except:
-            has_permission = False
-
-        if not has_permission:
-            # 显示提示并跳转到系统设置
-            def open_settings(e):
-                page.launch_url("app-settings:")
-                # 或者直接打开应用详情页
-                # page.launch_url("package:com.flet.cuotiben")
-
-            dlg = ft.AlertDialog(
-                title=ft.Text("需要存储权限"),
-                content=ft.Text(
-                    "APP需要「所有文件访问权限」才能读取您选择的任意文件夹。\n\n"
-                    "请点击「去授权」→ 选择「允许管理所有文件」→ 返回APP。",
-                    size=16
-                ),
-                actions=[
-                    ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
-                    ft.ElevatedButton("去授权", on_click=lambda e: (page.close(dlg), open_settings(e))),
-                ]
-            )
-            page.open(dlg)
-            page.update()
-    # 尝试加载用户自定义数据路径
-    global DATA_DIR
-    if os.path.exists(DATA_PATH_CONFIG_FILE):
-        try:
-            with open(DATA_PATH_CONFIG_FILE, "r", encoding="utf-8") as f:
-                saved_path = f.read().strip()
-                if saved_path and os.path.exists(saved_path):
-                    update_data_dir(saved_path)
-                    print(f"已加载数据路径: {saved_path}")
-        except Exception as e:
-            print(f"加载数据路径失败: {e}")
-    # 你原来的其他代码...                ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
     try:
         init_vocabulary()
         init_content_lib()
@@ -1393,29 +1296,23 @@ def main(page: ft.Page):
             page.update()
             threading.Thread(target=lambda: (time.sleep(2), setattr(target_text, 'value', ''), page.update()), daemon=True).start()
 
-        # ---------- 文件夹选择 ----------
-        sync_status_text = ft.Text("", size=14)
-        sync_folder_picker = ft.FilePicker(on_result=lambda e: on_sync_folder_selected(e))
-        page.overlay.append(sync_folder_picker)
+        # ---------- 首页 ----------
+        home_msg = ft.Text("", size=16)
+        subj_dd = ft.Dropdown(
+            label="科目",
+            options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
+            value="数学",
+            width=150,
+        )
+        original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3)
+        mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2)
+        answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2)
+        idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2)
+        tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False)
 
-        def on_sync_folder_selected(e: ft.FilePickerResultEvent):
-            if e.path:
-                update_data_dir(e.path)
-                try:
-                    page.client_storage.set("data_path", e.path)
-                except:
-                    pass
-                sync_status_text.value = f"✅ 已切换到：{e.path}"
-                sync_status_text.color = "green"
-                page.update()
-                refresh_review_view()
-                refresh_tasks()
-                refresh_recycle()
-                nonlocal main_subject_page
-                main_subject_page = build_subject_page()
-                subject_page_content.content = main_subject_page
-                page.update()
-                show_toast(f"数据已切换到 {e.path}")
+        progress_status = ft.Text("", size=14)
+        progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
+        progress_row = ft.Row([progress_bar, progress_status], spacing=10, visible=False)
 
         # ---------- 自定义图片选择器 ----------
         def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
@@ -1495,24 +1392,6 @@ def main(page: ft.Page):
                 progress_row,
                 complete_btn,
             ], spacing=8), selected_files, reset
-
-        # ---------- 首页 ----------
-        home_msg = ft.Text("", size=16)
-        subj_dd = ft.Dropdown(
-            label="科目",
-            options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
-            value="数学",
-            width=150,
-        )
-        original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3)
-        mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2)
-        answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2)
-        idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2)
-        tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False)
-
-        progress_status = ft.Text("", size=14)
-        progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
-        progress_row = ft.Row([progress_bar, progress_status], spacing=10, visible=False)
 
         def on_picker_complete(selected_files):
             if selected_files:
@@ -3517,13 +3396,7 @@ def main(page: ft.Page):
                                                                                                  on_click=save_skill),
             ft.Divider(),
             ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text("所有数据（错题、笔记、单词等）都保存在此文件夹中", size=13, color=ft.Colors.GREY_600),
-            ft.Row([
-                ft.Text(f"📂 {DATA_DIR}", size=14, expand=True),
-                ft.ElevatedButton("📂 切换文件夹", on_click=lambda e: sync_folder_picker.get_directory_path(),
-                                  icon=ft.Icons.FOLDER_OPEN),
-            ], spacing=10),
-            sync_status_text,
+            ft.Text(f"📂 {DATA_DIR}", size=14),
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
         current_page = ft.Container(expand=True)
