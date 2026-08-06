@@ -14,14 +14,11 @@ import base64
 from datetime import datetime, timedelta
 import traceback
 
-# ==================== 路径配置（固定使用 APP 私有目录） ====================
-import sys
+# ==================== 路径配置（外部存储固定目录） ====================
+# 固定使用外部存储的“智能错题助手”目录
+DATA_DIR = "/storage/emulated/0/智能错题助手"
 
-if getattr(sys, 'frozen', False):
-    DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-else:
-    DATA_DIR = os.path.join(os.getcwd(), "data")
-
+# 确保目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
 
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -41,11 +38,11 @@ NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 
-# 确保所有目录存在
+# 确保所有子目录存在
 for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
     os.makedirs(d, exist_ok=True)
 
-# 确保所有 JSONL 文件存在（APP 自己创建，确保权限属于 APP）
+# 确保所有 JSONL 文件存在
 required_files = [
     ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
     TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
@@ -1184,8 +1181,38 @@ def build_sentence_page(subject, page):
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
 
-# ==================== main 函数 ====================
+# ==================== main 函数（包含权限请求） ====================
 def main(page: ft.Page):
+    # ========== 请求存储权限（Android 11+） ==========
+    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+        try:
+            test_path = "/storage/emulated/0/.permission_test"
+            with open(test_path, "w") as f:
+                f.write("test")
+            os.remove(test_path)
+            has_permission = True
+        except:
+            has_permission = False
+
+        if not has_permission:
+            def open_settings(e):
+                page.launch_url("app-settings:")
+
+            dlg = ft.AlertDialog(
+                title=ft.Text("需要存储权限"),
+                content=ft.Text(
+                    "APP需要「所有文件访问权限」才能读取数据目录。\n\n"
+                    "请点击「去授权」→ 选择「允许管理所有文件」→ 返回APP。",
+                    size=16
+                ),
+                actions=[
+                    ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                    ft.ElevatedButton("去授权", on_click=lambda e: (page.close(dlg), open_settings(e))),
+                ]
+            )
+            page.open(dlg)
+            page.update()
+
     try:
         init_vocabulary()
         init_content_lib()
@@ -3396,7 +3423,8 @@ def main(page: ft.Page):
                                                                                                  on_click=save_skill),
             ft.Divider(),
             ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text(f"📂 {DATA_DIR}", size=14),
+            ft.Text("所有数据（错题、笔记、单词等）保存在：", size=13, color=ft.Colors.GREY_600),
+            ft.Text(f"📂 {DATA_DIR}", size=14, selectable=True),
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
         current_page = ft.Container(expand=True)
