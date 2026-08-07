@@ -18,9 +18,6 @@ import traceback
 # 固定使用外部存储的“智能错题助手”目录
 DATA_DIR = "/storage/emulated/0/智能错题助手"
 
-# 确保目录存在
-os.makedirs(DATA_DIR, exist_ok=True)
-
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -1212,8 +1209,46 @@ def main(page: ft.Page):
             )
             page.open(dlg)
             page.update()
+            # 注意：不能 return，因为用户授权后需要继续执行，我们将在 try 中处理
 
     try:
+        # ---------- 确保数据目录存在（若权限不足则引导授权） ----------
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+        except PermissionError:
+            def open_settings_dir(e):
+                page.launch_url("app-settings:")
+
+            def retry_create(e):
+                page.close(dlg)
+                try:
+                    os.makedirs(DATA_DIR, exist_ok=True)
+                    page.snack_bar = ft.SnackBar(ft.Text("✅ 数据目录已创建，请重启应用"))
+                    page.snack_bar.open = True
+                    page.update()
+                    page.go(page.route)  # 刷新
+                except:
+                    page.snack_bar = ft.SnackBar(ft.Text("❌ 仍失败，请检查存储权限"))
+                    page.snack_bar.open = True
+                    page.update()
+
+            dlg = ft.AlertDialog(
+                title=ft.Text("需要存储权限"),
+                content=ft.Text(
+                    "APP需要「所有文件访问权限」来创建数据目录。\n\n"
+                    "请点击「去授权」→ 选择「允许管理所有文件」→ 返回后点击「重试」。",
+                    size=16
+                ),
+                actions=[
+                    ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                    ft.ElevatedButton("去授权", on_click=lambda e: (page.close(dlg), open_settings_dir(e))),
+                    ft.ElevatedButton("重试", on_click=retry_create),
+                ]
+            )
+            page.open(dlg)
+            page.update()
+            return  # 停止执行，等待用户操作后重启
+
         init_vocabulary()
         init_content_lib()
 
