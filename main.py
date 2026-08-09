@@ -1180,46 +1180,4131 @@ def build_sentence_page(subject, page):
 def main(page: ft.Page):
     global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
 
-    # ========== 1. 确定数据目录 ==========
-    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-        DATA_DIR = page.app_data_dir
-    else:
-        DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
-    # ========== 2. 初始化所有路径 ==========
-    IMAGES_DIR = os.path.join(DATA_DIR, "images")
-    VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
-    DOCS_DIR = os.path.join(DATA_DIR, "documents")
-    ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
-    NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
-    RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
-    REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
-    TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
-    AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
-    USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
-    CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
-    CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
-    CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
-    NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 
-    # ========== 3. 创建目录和空文件 ==========
-    for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-        os.makedirs(d, exist_ok=True)
-    required_files = [
-        ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
-        TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
-        NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
-    ]
-    for filepath in required_files:
-        if not os.path.exists(filepath):
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write("")
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
 
-    init_vocabulary()
-    init_content_lib()
+        init_vocabulary()
+        init_content_lib()
 
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raiseILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
+def main(page: ft.Page):
+    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+
+    try:
+        # ----- 1. 确定数据目录（保证不为 None） -----
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            # 如果 app_data_dir 为空，降级到当前工作目录（也是私有目录）
+            DATA_DIR = page.app_data_dir or os.getcwd()
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # ----- 2. 初始化所有路径 -----
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # ----- 3. 创建目录和空文件 -----
+        for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        required_files = [
+            ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+            TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+            NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+        ]
+        for filepath in required_files:
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("")
+
+        init_vocabulary()
+        init_content_lib()
+
+        # ----- 4. 数据迁移（从旧公共目录到新目录，自动复制） -----
+        old_data_dir = "/storage/emulated/0/智能错题助手"
+        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
+            # 检查新目录是否有数据，没有则复制
+            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
+            if not has_data:
+                try:
+                    print("[迁移] 复制旧数据...")
+                    for item in os.listdir(old_data_dir):
+                        src = os.path.join(old_data_dir, item)
+                        dst = os.path.join(DATA_DIR, item)
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src, dst)
+                    # 修正路径（绝对路径转相对路径）
+                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
+                        if os.path.exists(jsonl_file):
+                            data = load_jsonl(jsonl_file)
+                            changed = False
+                            for entry in data:
+                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
+                                    if media_key in entry:
+                                        new_list = []
+                                        for p in entry[media_key]:
+                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
+                                                rel = os.path.relpath(p, old_data_dir)
+                                                new_list.append(rel)
+                                                changed = True
+                                            else:
+                                                new_list.append(p)
+                                        entry[media_key] = new_list
+                            if changed:
+                                save_jsonl(jsonl_file, data)
+                    print("[迁移] ✅ 完成")
+                except Exception as e:
+                    print(f"[迁移] 失败：{e}")
+
+        # ----- 5. 继续执行你原来的窗口设置和界面构建 -----
+        # （从你原来的 is_mobile = ... 开始，一直到 page.add 的代码，全部放在这里）
+
+    except Exception as e:
+        import traceback
+        page.controls.clear()
+        page.add(
+            ft.Text("❌ 启动错误", size=24, color="red"),
+            ft.Text(f"错误信息：{str(e)}", size=16, selectable=True),
+            ft.Text(f"堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
+        )
+        page.update()
+        raise
     # ========== 4. 数据迁移（从旧公共目录到新私有目录） ==========
     old_data_dir = "/storage/emulated/0/智能错题助手"
     if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
