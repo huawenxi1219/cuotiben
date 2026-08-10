@@ -1217,7 +1217,28 @@ def main(page: ft.Page):
 
         init_vocabulary()
         init_content_lib()
-
+        # ----- 从 assets 复制初始数据（仅当目标文件不存在） -----
+        assets_dir = None
+        for path in [
+            os.path.join(os.getcwd(), "assets"),
+            os.path.join(sys._MEIPASS, "assets") if hasattr(sys, '_MEIPASS') else None,
+            os.path.join(os.path.dirname(sys.argv[0]), "assets") if hasattr(sys, 'argv') else None,
+        ]:
+            if path and os.path.isdir(path):
+                assets_dir = path
+                break
+        if assets_dir:
+            # 只复制我们需要的文件（白名单）
+            needed_files = ["vocabulary.jsonl", "ai_config.json", "custom_skill.txt", "sentences.jsonl"]
+            for filename in needed_files:
+                src = os.path.join(assets_dir, filename)
+                dst = os.path.join(DATA_DIR, filename)
+                if os.path.exists(src) and not os.path.exists(dst):
+                    try:
+                        shutil.copy2(src, dst)
+                        print(f"[初始化] ✅ 复制 {filename} 成功")
+                    except Exception as e:
+                        print(f"[初始化] ⚠️ 复制 {filename} 失败: {e}")
         # ========== 4. 自动迁移旧数据（如果存在） ==========
         old_data_dir = "/storage/emulated/0/智能错题助手"
         if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
