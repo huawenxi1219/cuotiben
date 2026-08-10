@@ -1175,14 +1175,13 @@ def build_sentence_page(subject, page):
         ft.Divider(height=1),
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
-
-# ==================== main 函数（包含完整界面） ====================
+# ==================== main 函数 ====================
 def main(page: ft.Page):
     global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
 
     try:
         # ========== 1. 数据目录（使用当前工作目录，Android 上为应用私有目录） ==========
-        DATA_DIR = os.getcwd()   # 无需权限，稳定可靠
+        DATA_DIR = os.getcwd()
 
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -1217,64 +1216,35 @@ def main(page: ft.Page):
 
         init_vocabulary()
         init_content_lib()
-        # ----- 从 assets 复制初始数据（仅当目标文件不存在） -----
-        assets_dir = None
-        for path in [
+
+        # ========== 4. 从 assets 复制初始数据（仅当目标文件不存在） ==========
+        import sys
+        assets_path = None
+        possible_paths = [
             os.path.join(os.getcwd(), "assets"),
             os.path.join(sys._MEIPASS, "assets") if hasattr(sys, '_MEIPASS') else None,
             os.path.join(os.path.dirname(sys.argv[0]), "assets") if hasattr(sys, 'argv') else None,
-        ]:
-            if path and os.path.isdir(path):
-                assets_dir = path
+        ]
+        for p in possible_paths:
+            if p and os.path.isdir(p):
+                assets_path = p
                 break
-        if assets_dir:
-            # 只复制我们需要的文件（白名单）
-            needed_files = ["vocabulary.jsonl", "ai_config.json", "custom_skill.txt", "sentences.jsonl"]
+        
+        if assets_path:
+            print(f"[初始化] 找到 assets 目录: {assets_path}")
+            # 需要复制的文件列表
+            needed_files = ["vocabulary.jsonl", "ai_config.json", "sentences.jsonl"]
             for filename in needed_files:
-                src = os.path.join(assets_dir, filename)
+                src = os.path.join(assets_path, filename)
                 dst = os.path.join(DATA_DIR, filename)
                 if os.path.exists(src) and not os.path.exists(dst):
                     try:
                         shutil.copy2(src, dst)
-                        print(f"[初始化] ✅ 复制 {filename} 成功")
+                        print(f"[初始化] ✅ 复制 {filename} 成功 -> {dst}")
                     except Exception as e:
                         print(f"[初始化] ⚠️ 复制 {filename} 失败: {e}")
-        # ========== 4. 自动迁移旧数据（如果存在） ==========
-        old_data_dir = "/storage/emulated/0/智能错题助手"
-        if os.path.exists(old_data_dir) and os.path.isdir(old_data_dir):
-            # 检查新目录是否已有数据（避免重复迁移）
-            has_data = any(os.path.exists(os.path.join(DATA_DIR, f)) for f in ["errors.jsonl", "vocabulary.jsonl", "notes.jsonl"])
-            if not has_data:
-                try:
-                    print("[迁移] 复制旧数据...")
-                    for item in os.listdir(old_data_dir):
-                        src = os.path.join(old_data_dir, item)
-                        dst = os.path.join(DATA_DIR, item)
-                        if os.path.isdir(src):
-                            shutil.copytree(src, dst, dirs_exist_ok=True)
-                        else:
-                            shutil.copy2(src, dst)
-                    # 修正图片路径（绝对→相对）
-                    for jsonl_file in [ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE]:
-                        if os.path.exists(jsonl_file):
-                            data = load_jsonl(jsonl_file)
-                            changed = False
-                            for entry in data:
-                                for media_key in ["original_media", "answer_media", "idea_media", "media", "question_media"]:
-                                    if media_key in entry:
-                                        new_list = []
-                                        for p in entry[media_key]:
-                                            if p.startswith("/storage/emulated/0/智能错题助手/"):
-                                                new_list.append(os.path.relpath(p, old_data_dir))
-                                                changed = True
-                                            else:
-                                                new_list.append(p)
-                                        entry[media_key] = new_list
-                            if changed:
-                                save_jsonl(jsonl_file, data)
-                    print("[迁移] ✅ 完成")
-                except Exception as e:
-                    print(f"[迁移] 失败（不影响使用）: {e}")
+        else:
+            print("[初始化] ⚠️ 未找到 assets 目录，跳过复制")
 
         # ========== 5. 窗口设置 ==========
         is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
