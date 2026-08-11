@@ -1240,8 +1240,11 @@ def main(page: ft.Page):
     global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
 
     try:
-        # ========== 1. 数据目录（使用当前工作目录，Android 上为应用私有目录） ==========
-        DATA_DIR = os.getcwd()
+        # ========== 1. 数据目录 ==========
+        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            DATA_DIR = "/storage/emulated/0/Android/data/com.flet.cuotiben/files"
+        else:
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -3599,7 +3602,7 @@ def main(page: ft.Page):
             # 添加数据目录
             lines.append(f"\n📁 数据目录: {DATA_DIR}")
             # 检查 assets 是否存在
-            assets_dir = os.path.join(DATA_DIR, "assets") if not hasattr(sys, '_MEIPASS') else None
+            assets_dir = os.path.join(os.getcwd(), "assets") if not hasattr(sys, '_MEIPASS') else None
             if assets_dir and os.path.isdir(assets_dir):
                 files = os.listdir(assets_dir)
                 lines.append(f"📦 assets 目录存在，包含: {', '.join(files) if files else '空'}")
