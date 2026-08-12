@@ -1242,7 +1242,7 @@ def main(page: ft.Page):
     try:
         # ========== 1. 数据目录 ==========
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-            DATA_DIR = "/storage/emulated/0/Android/data/com.flet.cuotiben/files"
+            DATA_DIR = page.get_upload_dir()
         else:
             DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
