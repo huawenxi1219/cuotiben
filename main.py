@@ -1242,9 +1242,12 @@ def main(page: ft.Page):
     try:
         # ========== 1. 数据目录 ==========
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-          DATA_DIR = "/storage/emulated/0/Android/data/com.flet.cuotiben/files"
+            DATA_DIR = "/storage/emulated/0/Android/data/com.flet.cuotiben/files"
         else:
-          DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+            DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
+
+        # 确保数据目录本身存在（带 /files）
+        os.makedirs(DATA_DIR, exist_ok=True)
 
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -1264,7 +1267,7 @@ def main(page: ft.Page):
         VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
         SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 
-        # ========== 3. 创建目录和空文件 ==========
+        # ========== 3. 创建子目录和空文件 ==========
         for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
             os.makedirs(d, exist_ok=True)
         required_files = [
