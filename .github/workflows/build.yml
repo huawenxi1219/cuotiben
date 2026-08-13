@@ -2,9 +2,9 @@ name: Build Flet APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]   # 改成你的默认分支，如果还是 main 就改回 main
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -25,9 +25,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: 构建 APK（拆分架构，减小体积）
+      - name: 构建 APK（自动同意 Flutter 安装）
         run: |
-          flet build apk --split-per-abi
+          FLET_YES=1 flet build apk --split-per-abi
 
       - name: 上传 APK（自动保留1天）
         uses: actions/upload-artifact@v4
