@@ -20,23 +20,14 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 安装 Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.29.0'   # 使用当前最新稳定版
-          channel: 'stable'
-
-      - name: 验证 Flutter
-        run: flutter --version
-
-      - name: 安装 Python 依赖
+      - name: 安装 Flet
         run: |
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: 构建 APK（拆分架构）
+      - name: 构建 APK（自动回答所有交互）
         run: |
-          flet build apk --split-per-abi
+          yes | flet build apk --split-per-abi
 
       - name: 上传 APK（自动保留1天）
         uses: actions/upload-artifact@v4
