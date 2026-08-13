@@ -1246,9 +1246,6 @@ def main(page: ft.Page):
         else:
             DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
-        # 确保数据目录本身存在（带 /files）
-        os.makedirs(DATA_DIR, exist_ok=True)
-
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
         VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
