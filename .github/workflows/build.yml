@@ -10,14 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # 权限必须给，否则无法创建 Release
 
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # 需要获取所有历史以创建 tag
 
       - name: 设置 Python
         uses: actions/setup-python@v5
@@ -33,18 +29,9 @@ jobs:
         run: |
           yes | flet build apk --split-per-abi
 
-      - name: 创建 Tag
-        id: tag
-        run: |
-          TAG="build-$(date +'%Y%m%d-%H%M%S')"
-          git tag $TAG
-          git push origin $TAG
-          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-
-      - name: 发布到 Release
-        uses: softprops/action-gh-release@v2
+      - name: 上传 APK（自动保留1天）
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.tag.outputs.tag_name }}
-          files: build/apk/*.apk
-          prerelease: true
-          generate_release_notes: false
+          name: flet-apk-${{ github.run_number }}
+          path: build/apk/*.apk
+          retention-days: 1

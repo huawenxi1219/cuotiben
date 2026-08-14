@@ -14,7 +14,7 @@ import base64
 from datetime import datetime, timedelta
 import traceback
 
-# ==================== 路径配置（将在 main 中初始化） ====================
+# ==================== 路径配置 ====================
 DATA_DIR = None
 IMAGES_DIR = None
 VIDEOS_DIR = None
@@ -35,13 +35,10 @@ SENTENCES_FILE = None
 
 _jsonl_lock = threading.Lock()
 TARGET_VOCAB_COUNT = 3500
-
-# ==================== 调试开关 ====================
 DEBUG = True
 
 # ==================== 诊断工具 ====================
 def diagnose_data_files():
-    """检查所有数据文件，返回诊断报告"""
     report = {}
     files_to_check = {
         "错题本": ERRORS_FILE,
@@ -80,7 +77,6 @@ def diagnose_data_files():
     return report
 
 def repair_jsonl_file(filepath):
-    """尝试修复 JSONL 文件：备份并过滤掉格式错误的行"""
     if not os.path.exists(filepath):
         return False
     backup = filepath + ".bak"
@@ -98,7 +94,7 @@ def repair_jsonl_file(filepath):
         f.writelines(new_lines)
     return True
 
-# ==================== API 自动重试装饰器 ====================
+# ==================== API 自动重试 ====================
 def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -122,10 +118,6 @@ def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.e
     return decorator
 
 def init_vocabulary():
-    # 确保 VOCAB_FILE 所在目录存在
-    vocab_dir = os.path.dirname(VOCAB_FILE)
-    if not os.path.exists(vocab_dir):
-        os.makedirs(vocab_dir, exist_ok=True)
     if not os.path.exists(VOCAB_FILE):
         with open(VOCAB_FILE, "w", encoding="utf-8") as f:
             pass
@@ -141,12 +133,10 @@ def load_jsonl(filepath):
                         try:
                             data.append(json.loads(line))
                         except:
-                            pass  # 跳过损坏的行
+                            pass
     return data
 
 def save_jsonl(filepath, data_list):
-    # 确保目录存在
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with _jsonl_lock:
         with open(filepath, "w", encoding="utf-8") as f:
             for item in data_list:
@@ -159,7 +149,6 @@ def load_custom_skill():
     return ""
 
 def save_custom_skill(text):
-    os.makedirs(os.path.dirname(CUSTOM_SKILL_FILE), exist_ok=True)
     with open(CUSTOM_SKILL_FILE, "w", encoding="utf-8") as f:
         f.write(text)
 
@@ -175,7 +164,6 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
     if manual_tags.strip():
         user_tags = [tag.strip() for tag in manual_tags.split(",") if tag.strip()]
     data = load_jsonl(ERRORS_FILE)
-    # 存储相对路径（相对于 DATA_DIR）
     def to_rel(paths):
         rels = []
         for p in paths:
@@ -373,8 +361,6 @@ CONTENT_LIB_FILES = {
 }
 
 def init_content_lib():
-    # 确保 CONTENT_LIB_DIR 存在
-    os.makedirs(CONTENT_LIB_DIR, exist_ok=True)
     defaults = {
         "语文": {"subject": "语文", "poems": [], "classical_chinese": [], "writing_templates": []},
         "数学": {"subject": "数学", "formulas": [], "question_types": [], "common_mistakes": []},
@@ -701,7 +687,6 @@ def copy_file_to_lib(src_path, target_dir, allowed_exts):
     new_name = str(int(time.time() * 1000)) + ext
     dst = os.path.join(target_dir, new_name)
     shutil.copy(src_path, dst)
-    # 返回相对路径
     return os.path.relpath(dst, DATA_DIR)
 
 IMG_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
@@ -1249,27 +1234,15 @@ def main(page: ft.Page):
     global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
 
     try:
-        # ========== 1. 数据目录 ==========
+        # ========== 1. 数据目录（使用应用私有目录，系统自动创建） ==========
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-            DATA_DIR = "/storage/emulated/0/Android/data/com.flet.cuotiben/files"
+            # 使用应用内部存储目录，系统自动创建，无需权限
+            DATA_DIR = os.path.join(page.get_files_dir(), "data")
         else:
             DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
-        # 确保 DATA_DIR 存在，如果不存在则尝试创建
-        if not os.path.exists(DATA_DIR):
-            try:
-                os.makedirs(DATA_DIR, exist_ok=True)
-            except PermissionError:
-                # 如果无法创建，显示友好提示，引导用户手动创建
-                page.controls.clear()
-                page.add(
-                    ft.Text("❌ 无法创建数据目录", size=24, color="red"),
-                    ft.Text(f"请手动在手机文件管理器中创建以下目录：", size=16),
-                    ft.Text(f"{DATA_DIR}", size=14, selectable=True),
-                    ft.Text("然后重新打开应用。", size=16, color="blue")
-                )
-                page.update()
-                return
+        # 确保数据目录存在（内部存储目录系统已创建，但子目录需要自己建）
+        os.makedirs(DATA_DIR, exist_ok=True)
 
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -1298,8 +1271,6 @@ def main(page: ft.Page):
             NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
         ]
         for filepath in required_files:
-            # 确保文件所在目录存在
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
             if not os.path.exists(filepath):
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write("")
