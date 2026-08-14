@@ -10,10 +10,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 设置 Python
         uses: actions/setup-python@v5
@@ -29,9 +33,18 @@ jobs:
         run: |
           yes | flet build apk --split-per-abi
 
-      - name: 上传 APK（自动保留1天）
-        uses: actions/upload-artifact@v4
+      - name: 创建 Tag
+        id: tag
+        run: |
+          TAG="build-$(date +'%Y%m%d-%H%M%S')"
+          git tag $TAG
+          git push origin $TAG
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+
+      - name: 发布到 Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: flet-apk-${{ github.run_number }}
-          path: build/apk/*.apk
-          retention-days: 1
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          files: build/apk/*.apk
+          # 如果你想去掉黄色标签，删除下面这行
+          prerelease: true
