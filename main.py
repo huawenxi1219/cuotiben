@@ -122,6 +122,10 @@ def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.e
     return decorator
 
 def init_vocabulary():
+    # 确保 VOCAB_FILE 所在目录存在
+    vocab_dir = os.path.dirname(VOCAB_FILE)
+    if not os.path.exists(vocab_dir):
+        os.makedirs(vocab_dir, exist_ok=True)
     if not os.path.exists(VOCAB_FILE):
         with open(VOCAB_FILE, "w", encoding="utf-8") as f:
             pass
@@ -141,6 +145,8 @@ def load_jsonl(filepath):
     return data
 
 def save_jsonl(filepath, data_list):
+    # 确保目录存在
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with _jsonl_lock:
         with open(filepath, "w", encoding="utf-8") as f:
             for item in data_list:
@@ -153,6 +159,7 @@ def load_custom_skill():
     return ""
 
 def save_custom_skill(text):
+    os.makedirs(os.path.dirname(CUSTOM_SKILL_FILE), exist_ok=True)
     with open(CUSTOM_SKILL_FILE, "w", encoding="utf-8") as f:
         f.write(text)
 
@@ -366,6 +373,8 @@ CONTENT_LIB_FILES = {
 }
 
 def init_content_lib():
+    # 确保 CONTENT_LIB_DIR 存在
+    os.makedirs(CONTENT_LIB_DIR, exist_ok=True)
     defaults = {
         "语文": {"subject": "语文", "poems": [], "classical_chinese": [], "writing_templates": []},
         "数学": {"subject": "数学", "formulas": [], "question_types": [], "common_mistakes": []},
@@ -1246,6 +1255,22 @@ def main(page: ft.Page):
         else:
             DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
+        # 确保 DATA_DIR 存在，如果不存在则尝试创建
+        if not os.path.exists(DATA_DIR):
+            try:
+                os.makedirs(DATA_DIR, exist_ok=True)
+            except PermissionError:
+                # 如果无法创建，显示友好提示，引导用户手动创建
+                page.controls.clear()
+                page.add(
+                    ft.Text("❌ 无法创建数据目录", size=24, color="red"),
+                    ft.Text(f"请手动在手机文件管理器中创建以下目录：", size=16),
+                    ft.Text(f"{DATA_DIR}", size=14, selectable=True),
+                    ft.Text("然后重新打开应用。", size=16, color="blue")
+                )
+                page.update()
+                return
+
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
         VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
@@ -1273,6 +1298,8 @@ def main(page: ft.Page):
             NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
         ]
         for filepath in required_files:
+            # 确保文件所在目录存在
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
             if not os.path.exists(filepath):
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write("")
