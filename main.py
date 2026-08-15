@@ -1228,21 +1228,32 @@ def build_sentence_page(subject, page):
         ft.Divider(height=1),
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
-
 # ==================== main 函数 ====================
 def main(page: ft.Page):
     global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE, CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
 
     try:
-        # ========== 1. 数据目录（使用应用私有目录，系统自动创建） ==========
+        # ========== 1. 数据目录 ==========
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-            # 使用应用内部存储目录，系统自动创建，无需权限
-            DATA_DIR = os.path.join(page.get_files_dir(), "data")
+            DATA_DIR = "/storage/emulated/0/Android/data/com.flet.cuotiben/files"
         else:
             DATA_DIR = os.path.join(os.getcwd(), "智能错题助手")
 
-        # 确保数据目录存在（内部存储目录系统已创建，但子目录需要自己建）
-        os.makedirs(DATA_DIR, exist_ok=True)
+        # 尝试创建目录（如果不存在）
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+        except PermissionError:
+            # 如果创建失败，显示引导页面（不闪退）
+            page.controls.clear()
+            page.add(
+                ft.Text("⚠️ 无法自动创建数据目录", size=24, color="orange"),
+                ft.Text("请手动在手机文件管理器中创建以下文件夹：", size=16),
+                ft.Text(DATA_DIR, size=14, selectable=True),
+                ft.Text("创建完成后，将你的单词本文件 (vocabulary.jsonl) 复制进去，然后重启应用。", size=16),
+                ft.Text("路径示例：内部存储 → Android → data → com.flet.cuotiben → files", size=14, color="gray")
+            )
+            page.update()
+            return  # 停止执行，等待用户手动操作
 
         # ========== 2. 子目录和文件路径 ==========
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -3703,4 +3714,5 @@ def main(page: ft.Page):
         raise
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(target=main)    
+    
