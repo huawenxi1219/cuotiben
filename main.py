@@ -13,7 +13,6 @@ import sys
 import base64
 from datetime import datetime, timedelta
 import traceback
-
 # ==================== 用户自定义数据路径持久化 ====================
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".config")
 os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -510,7 +509,7 @@ def generate_review_cards(subject="数学", count=3, difficulty="中等"):
                         if fixed.endswith('"') or fixed.endswith('}'):
                             pass
                         elif fixed.endswith('...'):
-                            fixed = fixed[:-3] + '"}' 
+                            fixed = fixed[:-3] + '"}'
                         try:
                             cards = json.loads(fixed)
                             print("[复习] ✅ 修复后解析成功")
