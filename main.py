@@ -1,3 +1,12 @@
+def main(page: ft.Page):
+    # ===== 紧急调试：强行加文字 =====
+    page.title = "Debug"
+    page.clean()  # 清空所有
+    page.add(ft.Text("进入 main 函数了！", size=30, color="green"))
+    page.update()
+    # ===== 下面的代码先全部注释掉！ =====
+    # ... 原本所有的逻辑全部注释 ...
+    return  # 临时直接返回
 # -*- coding: utf-8 -*-
 import flet as ft
 import json
