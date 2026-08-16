@@ -29,9 +29,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: 构建 APK
+      - name: 构建 APK（胖包，不拆分架构）
         run: |
-          yes | flet build apk --split-per-abi
+          yes | flet build apk
 
       - name: 创建 Tag
         id: tag
@@ -47,4 +47,3 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag_name }}
           files: build/apk/*.apk
           generate_release_notes: false
-          # 不写 prerelease: true，就是正式版
