@@ -14,12 +14,10 @@ import base64
 from datetime import datetime, timedelta
 import traceback
 
-# ==================== 调试开关 ====================
-DEBUG = True
+# ==================== 固定数据目录（外部存储） ====================
+DATA_DIR = "/storage/emulated/0/智能错题助手"
+os.makedirs(DATA_DIR, exist_ok=True)  # 先尝试创建，权限问题在 main 中处理
 
-# ==================== 路径配置（手机端自动适配） ====================
-BASE_DIR = os.getcwd()
-DATA_DIR = os.path.join(BASE_DIR, "data")
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -36,40 +34,27 @@ CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
 NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+# 确保子目录存在
+for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+# 确保数据文件存在（空文件）
+required_files = [
+    ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+    TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+    NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+]
+for filepath in required_files:
+    if not os.path.exists(filepath):
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("")
+
 _jsonl_lock = threading.Lock()
 TARGET_VOCAB_COUNT = 3500
 
-# ==================== 确保数据目录存在 ====================
-for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-    os.makedirs(d, exist_ok=True)
-
-# ==================== update_data_dir 函数 ====================
-def update_data_dir(new_path: str):
-    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
-    global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
-    global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
-    global VOCAB_FILE, SENTENCES_FILE
-
-    DATA_DIR = new_path
-    IMAGES_DIR = os.path.join(DATA_DIR, "images")
-    VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
-    DOCS_DIR = os.path.join(DATA_DIR, "documents")
-    ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
-    NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
-    RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
-    REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
-    TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
-    AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
-    USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
-    CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
-    CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
-    CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
-    NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
-
-    for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-        os.makedirs(d, exist_ok=True)
+# ==================== 调试开关 ====================
+DEBUG = True
 
 # ==================== API 自动重试装饰器 ====================
 def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
@@ -660,8 +645,14 @@ DOC_EXTS = [".pdf", ".doc", ".docx", ".txt", ".md", ".ppt", ".pptx", ".xls", ".x
 def load_ai_config():
     if not os.path.exists(AI_CONFIG_FILE):
         return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
-    with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
+            return json.loads(content)
+    except json.JSONDecodeError:
+        return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
 
 def save_ai_config(config):
     with open(AI_CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -1187,10 +1178,33 @@ def build_sentence_page(subject, page):
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
 
-# ==================== main 函数（完整功能 + 全局异常捕获） ====================
+# ==================== main 函数（含权限引导） ====================
 def main(page: ft.Page):
-    page.add(ft.Text("应用启动成功！"))
-    # 你原来的其他代码...                ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+    # ---------- 确保数据目录存在（若权限不足则引导） ----------
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+    except PermissionError:
+        page.clean()
+        page.add(
+            ft.Text("⚠️ 需要存储权限", size=24, color=ft.Colors.RED),
+            ft.Text(
+                "APP需要「所有文件访问权限」来创建数据目录。\n"
+                "请进入系统设置开启权限后，点击下方按钮重试。",
+                size=16
+            ),
+            ft.ElevatedButton(
+                "去设置开启权限",
+                on_click=lambda e: page.launch_url("app-settings:")
+            ),
+            ft.ElevatedButton(
+                "重试",
+                on_click=lambda e: page.go(page.route)  # 刷新页面重新执行 main
+            )
+        )
+        page.update()
+        return  # 停止执行，等待用户操作
+
+    # 目录创建成功，继续初始化
     try:
         init_vocabulary()
         init_content_lib()
@@ -1301,29 +1315,23 @@ def main(page: ft.Page):
             page.update()
             threading.Thread(target=lambda: (time.sleep(2), setattr(target_text, 'value', ''), page.update()), daemon=True).start()
 
-        # ---------- 文件夹选择 ----------
-        sync_status_text = ft.Text("", size=14)
-        sync_folder_picker = ft.FilePicker(on_result=lambda e: on_sync_folder_selected(e))
-        page.overlay.append(sync_folder_picker)
+        # ---------- 首页 ----------
+        home_msg = ft.Text("", size=16)
+        subj_dd = ft.Dropdown(
+            label="科目",
+            options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
+            value="数学",
+            width=150,
+        )
+        original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3)
+        mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2)
+        answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2)
+        idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2)
+        tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False)
 
-        def on_sync_folder_selected(e: ft.FilePickerResultEvent):
-            if e.path:
-                update_data_dir(e.path)
-                try:
-                    page.client_storage.set("data_path", e.path)
-                except:
-                    pass
-                sync_status_text.value = f"✅ 已切换到：{e.path}"
-                sync_status_text.color = "green"
-                page.update()
-                refresh_review_view()
-                refresh_tasks()
-                refresh_recycle()
-                nonlocal main_subject_page
-                main_subject_page = build_subject_page()
-                subject_page_content.content = main_subject_page
-                page.update()
-                show_toast(f"数据已切换到 {e.path}")
+        progress_status = ft.Text("", size=14)
+        progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
+        progress_row = ft.Row([progress_bar, progress_status], spacing=10, visible=False)
 
         # ---------- 自定义图片选择器 ----------
         def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
@@ -1403,24 +1411,6 @@ def main(page: ft.Page):
                 progress_row,
                 complete_btn,
             ], spacing=8), selected_files, reset
-
-        # ---------- 首页 ----------
-        home_msg = ft.Text("", size=16)
-        subj_dd = ft.Dropdown(
-            label="科目",
-            options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
-            value="数学",
-            width=150,
-        )
-        original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3)
-        mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2)
-        answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2)
-        idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2)
-        tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False)
-
-        progress_status = ft.Text("", size=14)
-        progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
-        progress_row = ft.Row([progress_bar, progress_status], spacing=10, visible=False)
 
         def on_picker_complete(selected_files):
             if selected_files:
@@ -3426,12 +3416,7 @@ def main(page: ft.Page):
             ft.Divider(),
             ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
             ft.Text("所有数据（错题、笔记、单词等）都保存在此文件夹中", size=13, color=ft.Colors.GREY_600),
-            ft.Row([
-                ft.Text(f"📂 {DATA_DIR}", size=14, expand=True),
-                ft.ElevatedButton("📂 切换文件夹", on_click=lambda e: sync_folder_picker.get_directory_path(),
-                                  icon=ft.Icons.FOLDER_OPEN),
-            ], spacing=10),
-            sync_status_text,
+            ft.Text(f"📂 {DATA_DIR}", size=14, selectable=True),
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
         current_page = ft.Container(expand=True)
