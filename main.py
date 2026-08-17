@@ -1164,6 +1164,7 @@ def build_sentence_page(subject, page):
 
 # ==================== main 函数 ====================
 def main(page: ft.Page):
+    page.add(ft.Text("🟢 启动中..."))
     # ---------- 确保数据目录存在（若权限不足则引导） ----------
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
