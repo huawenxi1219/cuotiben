@@ -16,6 +16,7 @@ import traceback
 
 # ==================== 固定数据目录（外部存储） ====================
 DATA_DIR = "/storage/emulated/0/智能错题助手"
+
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -32,21 +33,6 @@ CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
 NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
-
-# 确保子目录存在
-for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-    os.makedirs(d, exist_ok=True)
-
-# 确保数据文件存在（空文件）
-required_files = [
-    ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
-    TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
-    NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
-]
-for filepath in required_files:
-    if not os.path.exists(filepath):
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write("")
 
 _jsonl_lock = threading.Lock()
 TARGET_VOCAB_COUNT = 3500
@@ -1176,7 +1162,7 @@ def build_sentence_page(subject, page):
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
 
-# ==================== main 函数（含权限引导） ====================
+# ==================== main 函数 ====================
 def main(page: ft.Page):
     # ---------- 确保数据目录存在（若权限不足则引导） ----------
     try:
@@ -1196,13 +1182,25 @@ def main(page: ft.Page):
             ),
             ft.ElevatedButton(
                 "重试",
-                on_click=lambda e: page.go(page.route)  # 刷新页面重新执行 main
+                on_click=lambda e: page.go(page.route)
             )
         )
         page.update()
-        return  # 停止执行，等待用户操作
+        return
 
-    # 目录创建成功，继续初始化
+    # ---------- 创建所有子目录和必需的文件（权限已通过） ----------
+    for d in [IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+        os.makedirs(d, exist_ok=True)
+    required_files = [
+        ERRORS_FILE, NOTES_FILE, RECYCLE_FILE, REVIEW_CARDS_FILE,
+        TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE,
+        NEW_WORDS_FILE, VOCAB_FILE, SENTENCES_FILE
+    ]
+    for filepath in required_files:
+        if not os.path.exists(filepath):
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write("")
+
     try:
         init_vocabulary()
         init_content_lib()
@@ -3413,7 +3411,7 @@ def main(page: ft.Page):
                                                                                                  on_click=save_skill),
             ft.Divider(),
             ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text("所有数据（错题、笔记、单词等）都保存在此文件夹中", size=13, color=ft.Colors.GREY_600),
+            ft.Text("所有数据（错题、笔记、单词等）保存在：", size=13, color=ft.Colors.GREY_600),
             ft.Text(f"📂 {DATA_DIR}", size=14, selectable=True),
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
