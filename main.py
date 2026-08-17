@@ -16,8 +16,6 @@ import traceback
 
 # ==================== 固定数据目录（外部存储） ====================
 DATA_DIR = "/storage/emulated/0/智能错题助手"
-os.makedirs(DATA_DIR, exist_ok=True)  # 先尝试创建，权限问题在 main 中处理
-
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
