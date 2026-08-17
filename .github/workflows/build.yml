@@ -29,9 +29,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: 构建 APK（胖包，不拆分架构）
+      - name: 构建 APK
         run: |
           yes | flet build apk
+
+      - name: 上传 APK 作为 Artifacts（即使 Release 失败也能下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/apk/*.apk
 
       - name: 创建 Tag
         id: tag
@@ -47,3 +53,4 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag_name }}
           files: build/apk/*.apk
           generate_release_notes: false
+        continue-on-error: true   # 即使 Release 失败也不影响整体状态
