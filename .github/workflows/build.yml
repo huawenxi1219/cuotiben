@@ -3,8 +3,6 @@ name: Build Flet APK
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -33,12 +31,6 @@ jobs:
         run: |
           yes | flet build apk
 
-      - name: 上传 APK 作为 Artifacts（即使 Release 失败也能下载）
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: build/apk/*.apk
-
       - name: 创建 Tag
         id: tag
         run: |
@@ -47,10 +39,10 @@ jobs:
           git push origin $TAG
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
 
-      - name: 发布到 Release（正式版）
+      - name: 发布到 Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
           files: build/apk/*.apk
           generate_release_notes: false
-        continue-on-error: true   # 即使 Release 失败也不影响整体状态
+        continue-on-error: false
