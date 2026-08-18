@@ -32,8 +32,17 @@ jobs:
       - name: 打包 APK
         run: flet build apk
 
-      - name: 上传 APK
-        uses: actions/upload-artifact@v4
+      - name: 创建 Tag
+        id: tag
+        run: |
+          TAG="build-$(date +'%Y%m%d-%H%M%S')"
+          git tag $TAG
+          git push origin $TAG
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+
+      - name: 发布到 Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-release
-          path: build/apk/*.apk
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          files: build/apk/*.apk
+          generate_release_notes: false
