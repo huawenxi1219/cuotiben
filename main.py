@@ -1194,6 +1194,17 @@ def build_sentence_page(subject, page):
 
 # ==================== main 函数（完整功能 + 全局异常捕获） ====================
 def main(page: ft.Page):
+        # ========== 强制请求存储权限 ==========
+    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+        from flet import PermissionHandler, PermissionType
+        ph = PermissionHandler()
+        page.overlay.append(ph)
+        page.update()
+        result = ph.request_permission(PermissionType.STORAGE)
+        if not result:
+            page.snack_bar = ft.SnackBar(ft.Text("⚠️ 请授予存储权限后重试"))
+            page.snack_bar.open = True
+            page.update()
     page.add(ft.Text("应用启动成功！"))
     # 你原来的其他代码...                ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
     try:
