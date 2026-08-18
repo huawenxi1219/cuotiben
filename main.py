@@ -18,8 +18,13 @@ import traceback
 DEBUG = True
 
 # ==================== 路径配置（手机端自动适配） ====================
-BASE_DIR = os.getcwd()
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# ==================== 数据路径（外部存储） ====================
+import sys
+if getattr(sys, 'frozen', False):
+    DATA_DIR = "/storage/emulated/0/智能错题笔记"
+else:
+    DATA_DIR = os.path.join(os.getcwd(), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
