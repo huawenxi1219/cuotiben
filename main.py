@@ -1206,42 +1206,57 @@ def main(page: ft.Page):
     # ========== 先显示一个启动文字，确保页面有内容 ==========
     page.add(ft.Text("应用启动成功！"))
 
-    # ========== 存储权限检测（放在 try 内部，避免未捕获异常导致空白） ==========
-    try:
-        if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-            # 尝试在外部存储根目录写入测试文件，检测权限
-            try:
-                test_path = "/storage/emulated/0/.permission_test"
-                with open(test_path, "w") as f:
-                    f.write("test")
-                os.remove(test_path)
-                has_permission = True
-            except:
-                has_permission = False
+    # ========== 存储权限检测 ==========
+    def has_storage_permission():
+        try:
+            test_path = "/storage/emulated/0/.permission_test"
+            with open(test_path, "w") as f:
+                f.write("test")
+            os.remove(test_path)
+            return True
+        except:
+            return False
 
-            if not has_permission:
-                def open_settings(e):
+    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+        if not has_storage_permission():
+            def open_settings(e):
+                try:
                     page.launch_url("app-settings:")
+                except:
+                    try:
+                        page.launch_url("package:com.flet.cuotiben")
+                    except:
+                        page.snack_bar = ft.SnackBar(ft.Text("请手动进入系统设置 -> 应用 -> 智能错题笔记助手 -> 权限 -> 开启存储权限"))
+                        page.snack_bar.open = True
+                        page.update()
+
+            def show_permission_dialog():
+                def retry_check(e):
+                    page.close(dlg)
+                    if has_storage_permission():
+                        page.snack_bar = ft.SnackBar(ft.Text("✅ 权限已开启，请重启应用"))
+                        page.snack_bar.open = True
+                        page.update()
+                    else:
+                        show_permission_dialog()
 
                 dlg = ft.AlertDialog(
                     title=ft.Text("需要存储权限"),
                     content=ft.Text(
-                        "APP需要「所有文件访问权限」来保存数据到 /storage/emulated/0/智能错题笔记/\n"
-                        "请点击「去设置」开启权限后返回APP。",
+                        "APP需要「所有文件访问权限」来保存数据到 /storage/emulated/0/智能错题笔记/\n\n"
+                        "请点击「去设置」开启权限，然后返回点击「重试」。",
                         size=16
                     ),
                     actions=[
                         ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
                         ft.ElevatedButton("去设置", on_click=lambda e: (page.close(dlg), open_settings(e))),
+                        ft.ElevatedButton("重试", on_click=retry_check),
                     ]
                 )
                 page.open(dlg)
                 page.update()
-                # 不 return，让后续代码继续执行（但可能因为权限不足而写入失败，后续会有 SnackBar 提示）
-    except Exception as e:
-        # 如果权限检测过程中出现异常，在页面显示提示
-        page.add(ft.Text(f"⚠️ 权限检测异常: {e}", color=ft.Colors.RED))
-        page.update()
+
+            show_permission_dialog()
 
     # ========== 原有的 try 块（包含所有功能初始化） ==========
     try:
@@ -3524,6 +3539,5 @@ def main(page: ft.Page):
         )
         page.update()
         raise
-
 if __name__ == "__main__":
     ft.app(target=main)
