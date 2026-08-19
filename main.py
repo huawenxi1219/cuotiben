@@ -1200,10 +1200,10 @@ def build_sentence_page(subject, page):
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
 def main(page: ft.Page):
-    # 先显示一个启动文字，让页面有内容
-    page.add(ft.Text("应用启动中..."))
+    # ========== 调试文字：步骤0 ==========
+    page.add(ft.Text("步骤0: main 函数开始"))
 
-    # 用于重新尝试创建目录的函数
+    # ========== 确保数据目录存在 ==========
     def ensure_data_dir():
         try:
             os.makedirs(DATA_DIR, exist_ok=True)
@@ -1212,58 +1212,55 @@ def main(page: ft.Page):
             print(f"创建数据目录失败: {e}")
             return False
 
-    # 显示权限引导对话框
-    def show_permission_dialog():
-        def retry_click(e):
-            # 重试时关闭对话框，重新尝试创建
-            page.close(dlg)
-            if ensure_data_dir():
-                # 如果创建成功，显示提示并继续加载
-                page.snack_bar = ft.SnackBar(ft.Text("✅ 数据目录创建成功，正在加载应用..."))
-                page.snack_bar.open = True
-                page.update()
-                # 重新加载整个页面（重新运行 main）
-                page.go(page.route)
-            else:
-                # 如果还是失败，再次弹窗
-                show_permission_dialog()
+    page.add(ft.Text("步骤1: 开始检查目录"))
 
-        dlg = ft.AlertDialog(
-            title=ft.Text("需要存储权限"),
-            content=ft.Text(
-                "APP需要「所有文件访问权限」来保存数据到 /storage/emulated/0/智能错题笔记/\n\n"
-                "请按照以下步骤操作：\n"
-                "1. 点击「去设置」打开系统设置\n"
-                "2. 找到「智能错题笔记助手」\n"
-                "3. 开启「存储」或「所有文件访问权限」\n"
-                "4. 返回APP，点击「重试」",
-                size=16
-            ),
-            actions=[
-                ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
-                ft.ElevatedButton("去设置", on_click=lambda e: page.launch_url("app-settings:")),
-                ft.ElevatedButton("重试", on_click=retry_click),
-            ]
-        )
-        page.open(dlg)
-        page.update()
-
-    # 首先尝试创建目录
     if not ensure_data_dir():
-        # 如果第一次创建失败，显示权限引导对话框
+        page.add(ft.Text("步骤2: 目录创建失败，进入权限弹窗逻辑"))
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+            def show_permission_dialog():
+                def retry_click(e):
+                    page.close(dlg)
+                    if ensure_data_dir():
+                        page.snack_bar = ft.SnackBar(ft.Text("✅ 数据目录创建成功，正在加载..."))
+                        page.snack_bar.open = True
+                        page.update()
+                        page.go(page.route)
+                    else:
+                        show_permission_dialog()
+
+                dlg = ft.AlertDialog(
+                    title=ft.Text("需要存储权限"),
+                    content=ft.Text(
+                        "APP需要「所有文件访问权限」来保存数据到 /storage/emulated/0/智能错题笔记/\n\n"
+                        "请点击「去设置」手动开启存储权限，然后返回点击「重试」。",
+                        size=16
+                    ),
+                    actions=[
+                        ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                        ft.ElevatedButton("去设置", on_click=lambda e: page.launch_url("app-settings:")),
+                        ft.ElevatedButton("重试", on_click=retry_click),
+                    ]
+                )
+                page.open(dlg)
+                page.update()
+
             show_permission_dialog()
+            # 注意：这里不return，以便用户点击重试后继续加载
         else:
-            # 非手机环境（如电脑），直接报错
             page.controls.clear()
             page.add(ft.Text("❌ 无法创建数据目录，请检查权限", color=ft.Colors.RED))
             page.update()
             return
+    else:
+        page.add(ft.Text("步骤2: 目录创建成功，继续加载"))
 
-    # 权限检查通过或用户已授权后，继续原有的初始化流程
-    # 注意：原有的 try 块需要保留，但我们要确保目录已创建
+    page.add(ft.Text("步骤3: 进入 try 块，开始初始化"))
+
+    # ========== 原有的 try 块（包含所有功能初始化） ==========
     try:
+        page.add(ft.Text("步骤3.1: 调用 init_vocabulary"))
         init_vocabulary()
+        page.add(ft.Text("步骤3.2: 调用 init_content_lib"))
         init_content_lib()
 
         is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
