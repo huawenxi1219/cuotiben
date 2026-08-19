@@ -1256,12 +1256,13 @@ def main(page: ft.Page):
 
     page.add(ft.Text("步骤3: 进入 try 块，开始初始化"))
 
-    # ========== 原有的 try 块（包含所有功能初始化） ==========
+    # ========== 原有的 try 块 ==========
     try:
         page.add(ft.Text("步骤3.1: 调用 init_vocabulary"))
         init_vocabulary()
         page.add(ft.Text("步骤3.2: 调用 init_content_lib"))
         init_content_lib()
+        page.add(ft.Text("步骤4: init_content_lib 执行完成，继续后续代码"))
 
         is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
         if not is_mobile:
@@ -3531,13 +3532,10 @@ def main(page: ft.Page):
         page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
 
     except Exception as e:
-        page.controls.clear()
-        page.add(
-            ft.Text("❌ 应用启动失败", size=24, color=ft.Colors.RED),
-            ft.Text(f"错误：{str(e)}", size=16, selectable=True),
-            ft.Text(f"详细堆栈：\n{traceback.format_exc()}", size=12, selectable=True)
-        )
+        # 捕获异常，不清除页面，而是追加错误信息
+        page.add(ft.Text(f"❌ 发生错误：{str(e)}", color=ft.Colors.RED))
+        page.add(ft.Text(f"详细堆栈：\n{traceback.format_exc()}", size=12, selectable=True))
         page.update()
-        raise
+        # 不 raise，让应用继续显示调试信息
 if __name__ == "__main__":
     ft.app(target=main)
