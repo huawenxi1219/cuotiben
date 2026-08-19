@@ -120,9 +120,13 @@ def load_jsonl(filepath):
 
 def save_jsonl(filepath, data_list):
     with _jsonl_lock:
-        with open(filepath, "w", encoding="utf-8") as f:
-            for item in data_list:
-                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                for item in data_list:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        except Exception as e:
+            print(f"[错误] 保存 {filepath} 失败: {e}")
+            raise
 
 def load_custom_skill():
     if os.path.exists(CUSTOM_SKILL_FILE):
@@ -504,7 +508,7 @@ def generate_review_cards(subject="数学", count=3, difficulty="中等"):
                         if fixed.endswith('"') or fixed.endswith('}'):
                             pass
                         elif fixed.endswith('...'):
-                            fixed = fixed[:-3] + '"}'
+                            fixed = fixed[:-3] + '"'
                         try:
                             cards = json.loads(fixed)
                             print("[复习] ✅ 修复后解析成功")
@@ -881,9 +885,13 @@ def add_word_to_vocab(word_data):
         print(f"[添加] 单词 {word} 已存在，跳过")
         return False
     existing.append(word_data)
-    save_jsonl(VOCAB_FILE, existing)
-    print(f"[添加] ✅ 已添加单词: {word}")
-    return True
+    try:
+        save_jsonl(VOCAB_FILE, existing)
+        print(f"[添加] ✅ 已添加单词: {word}")
+        return True
+    except Exception as e:
+        print(f"[添加] ❌ 保存单词 {word} 失败: {e}")
+        return False
 
 def build_sentence_page(subject, page):
     CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
@@ -1194,19 +1202,37 @@ def build_sentence_page(subject, page):
 
 # ==================== main 函数（完整功能 + 全局异常捕获） ====================
 def main(page: ft.Page):
-        # ========== 强制请求存储权限 ==========
+    # ========== 强制请求存储权限 ==========
     if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-        from flet import PermissionHandler, PermissionType
-        ph = PermissionHandler()
-        page.overlay.append(ph)
-        page.update()
-        result = ph.request_permission(PermissionType.STORAGE)
-        if not result:
-            page.snack_bar = ft.SnackBar(ft.Text("⚠️ 请授予存储权限后重试"))
-            page.snack_bar.open = True
+        try:
+            test_path = "/storage/emulated/0/.permission_test"
+            with open(test_path, "w") as f:
+                f.write("test")
+            os.remove(test_path)
+            has_permission = True
+        except:
+            has_permission = False
+
+        if not has_permission:
+            def open_settings(e):
+                page.launch_url("app-settings:")
+            dlg = ft.AlertDialog(
+                title=ft.Text("需要存储权限"),
+                content=ft.Text(
+                    "APP需要「所有文件访问权限」来保存数据到 /storage/emulated/0/智能错题笔记/\n"
+                    "请点击「去设置」开启权限后返回APP。",
+                    size=16
+                ),
+                actions=[
+                    ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                    ft.ElevatedButton("去设置", on_click=lambda e: (page.close(dlg), open_settings(e))),
+                ]
+            )
+            page.open(dlg)
             page.update()
+            # 不 return，后续如果权限不足会报错，但至少用户能看到提示
+
     page.add(ft.Text("应用启动成功！"))
-    # 你原来的其他代码...                ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
     try:
         init_vocabulary()
         init_content_lib()
@@ -2407,8 +2433,11 @@ def main(page: ft.Page):
                 new_data = generate_word_info(word)
                 if new_data:
                     existing.append(new_data)
-                    save_jsonl(VOCAB_FILE, existing)
-                    return True
+                    try:
+                        save_jsonl(VOCAB_FILE, existing)
+                        return True
+                    except:
+                        return False
                 return False
 
             def _open_word_detail(word_data):
@@ -2596,8 +2625,11 @@ def main(page: ft.Page):
                     return
                 new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "", "forms": "", "grammar": {}}
                 existing.append(new_entry)
-                save_jsonl(VOCAB_FILE, existing)
-                show_message(mine_msg, f"已添加 {word}，可编辑详情", "green")
+                try:
+                    save_jsonl(VOCAB_FILE, existing)
+                    show_message(mine_msg, f"已添加 {word}，可编辑详情", "green")
+                except Exception as e:
+                    show_message(mine_msg, f"保存失败: {e}", "red")
                 add_word_input.value = ""
                 _render_list(search_field.value)
                 page.update()
