@@ -10,6 +10,7 @@ import requests
 import threading
 import string
 import sys
+import flet_permission_handler as fph
 import base64
 from datetime import datetime, timedelta
 import traceback
@@ -1200,6 +1201,21 @@ def build_sentence_page(subject, page):
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
 def main(page: ft.Page):
+        # ========== 使用 flet_permission_handler 请求权限 ==========
+    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+        # 检查是否已有权限，没有则请求
+        ph = fph.PermissionHandler()
+        page.overlay.append(ph)
+        page.update()
+        
+        # 请求存储权限（会弹出系统弹窗）
+        status = ph.request_sync(fph.Permission.STORAGE)  # 同步请求
+        if status == fph.PermissionStatus.GRANTED:
+            page.snack_bar = ft.SnackBar(ft.Text("✅ 存储权限已授予"))
+        else:
+            page.snack_bar = ft.SnackBar(ft.Text("⚠️ 存储权限被拒绝，数据可能无法保存"))
+        page.snack_bar.open = True
+        page.update()
     # ========== 调试文字：步骤0 ==========
     page.add(ft.Text("步骤0: main 函数开始"))
 
