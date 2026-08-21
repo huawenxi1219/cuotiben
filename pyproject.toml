@@ -1,5 +1,6 @@
 [tool.flet]
 project_name = "智能错题笔记助手"
+version = "1.0.0"
 
 [tool.flet.android.permission]
 "android.permission.INTERNET" = true

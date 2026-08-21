@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install flet==0.28.3 requests flet-permission-handler
+          pip install flet==0.28.3 requests
 
       - name: 打包 APK
         run: flet build apk
