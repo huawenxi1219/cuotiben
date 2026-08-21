@@ -1209,7 +1209,7 @@ def main(page: ft.Page):
     if not ensure_data_dir():
         page.add(ft.Text("步骤2: 目录创建失败，进入权限弹窗逻辑"))
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
-            def show_permission_dialog():
+            def show_first_permission_dialog():
                 def retry_click(e):
                     page.close(dlg)
                     if ensure_data_dir():
@@ -1218,7 +1218,7 @@ def main(page: ft.Page):
                         page.update()
                         page.go(page.route)
                     else:
-                        show_permission_dialog()
+                        show_first_permission_dialog()
 
                 dlg = ft.AlertDialog(
                     title=ft.Text("需要存储权限"),
@@ -1236,7 +1236,7 @@ def main(page: ft.Page):
                 page.open(dlg)
                 page.update()
 
-            show_permission_dialog()
+            show_first_permission_dialog()
         else:
             page.controls.clear()
             page.add(ft.Text("❌ 无法创建数据目录，请检查权限", color=ft.Colors.RED))
@@ -1254,32 +1254,7 @@ def main(page: ft.Page):
         init_content_lib()
         page.add(ft.Text("步骤4: init_content_lib 执行完成，继续后续代码"))
 
-        # ========== 使用 Flet 内置 PermissionHandler 请求权限 ==========
-        page.add(ft.Text("步骤4.5: 初始化 PermissionHandler 并请求权限"))
-        from flet import PermissionHandler, PermissionType
-
-        # 定义 PermissionStatus 常量（0.28.3 的 PermissionHandler 返回 int）
-        GRANTED = 1
-        DENIED = 2
-        PERMANENTLY_DENIED = 3
-
-        ph = PermissionHandler()
-        page.overlay.append(ph)
-        page.update()
-
-        async def request_storage_permission():
-            status = await ph.request(PermissionType.STORAGE)
-            if status == GRANTED:
-                page.snack_bar = ft.SnackBar(ft.Text("✅ 存储权限已授予"))
-                page.snack_bar.open = True
-                page.update()
-            else:
-                page.snack_bar = ft.SnackBar(ft.Text("⚠️ 存储权限被拒绝，请手动在设置中开启"))
-                page.snack_bar.open = True
-                page.update()
-            # 继续加载 UI
-            load_ui()
-
+        # ========== 定义 load_ui 函数（在权限检测之前定义） ==========
         def load_ui():
             page.add(ft.Text("步骤5: 开始设置页面窗口和主题"))
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
@@ -3496,6 +3471,7 @@ def main(page: ft.Page):
                 def close_dlg(e):
                     page.close(dlg)
 
+                # 确保 dlg 在此处定义（修复未定义错误）
                 dlg = ft.AlertDialog(
                     title=ft.Text("📊 知识框架"),
                     content=ft.Container(
@@ -3560,8 +3536,60 @@ def main(page: ft.Page):
             page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
             page.add(ft.Text("步骤7: UI 加载完成"))
 
-        # 启动权限请求，完成后加载 UI
-        page.run_task(request_storage_permission)
+        # ========== 权限检测（手动引导方式） ==========
+        def check_permission():
+            try:
+                test_path = "/storage/emulated/0/.permission_test"
+                with open(test_path, "w") as f:
+                    f.write("test")
+                os.remove(test_path)
+                return True
+            except:
+                return False
+
+        page.add(ft.Text("步骤4.5: 检测存储权限"))
+
+        if not check_permission():
+            def open_settings(e):
+                page.launch_url("app-settings:")
+
+            # ★★★ 这里是修改点：将 retry_permission 移到 show_permission_dialog 内部 ★★★
+            def show_permission_dialog():
+                # 内部定义 retry_permission，可以访问外层的 dlg
+                def retry_permission(e):
+                    page.close(dlg)
+                    if check_permission():
+                        page.snack_bar = ft.SnackBar(ft.Text("✅ 权限已授予，正在加载..."))
+                        page.snack_bar.open = True
+                        page.update()
+                        load_ui()
+                    else:
+                        page.snack_bar = ft.SnackBar(ft.Text("❌ 权限仍未开启，请手动设置"))
+                        page.snack_bar.open = True
+                        page.update()
+                        show_permission_dialog()  # 重新弹出对话框
+
+                dlg = ft.AlertDialog(
+                    title=ft.Text("需要存储权限"),
+                    content=ft.Text(
+                        "APP需要「所有文件访问权限」来保存数据。\n\n"
+                        "请点击「去设置」→ 应用 → 智能错题笔记助手 → 权限 → 开启存储权限。\n"
+                        "开启后返回点击「重试」。",
+                        size=16
+                    ),
+                    actions=[
+                        ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                        ft.ElevatedButton("去设置", on_click=lambda e: (page.close(dlg), open_settings(e))),
+                        ft.ElevatedButton("重试", on_click=lambda e: (page.close(dlg), retry_permission(e))),
+                    ]
+                )
+                page.open(dlg)
+                page.update()
+
+            show_permission_dialog()
+        else:
+            page.add(ft.Text("步骤4.6: 已有权限，直接加载 UI"))
+            load_ui()
 
     except Exception as e:
         page.add(ft.Text(f"❌ 发生错误：{str(e)}", color=ft.Colors.RED))
