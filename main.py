@@ -1199,7 +1199,7 @@ def main(page: ft.Page):
 
     try:
         # ========== 设置数据目录为应用内部存储 ==========
-        storage_dir = page.get_storage_path()
+        storage_dir = os.getcwd()
         print(f"内部存储路径: {storage_dir}")
 
         global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
