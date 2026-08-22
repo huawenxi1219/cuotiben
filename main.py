@@ -1192,8 +1192,8 @@ def build_sentence_page(subject, page):
     ], spacing=8, expand=True)
     # ==================== main 函数（完整，包含权限请求） ====================
 def main(page: ft.Page):
-    # ========== 调试文字：步骤0 ==========
-    page.add(ft.Text("步骤0: main 函数开始"))
+    # ========== 调试信息改为 print ==========
+    print("步骤0: main 函数开始")
 
     # ========== 确保数据目录存在 ==========
     def ensure_data_dir():
@@ -1204,10 +1204,10 @@ def main(page: ft.Page):
             print(f"创建数据目录失败: {e}")
             return False
 
-    page.add(ft.Text("步骤1: 开始检查目录"))
+    print("步骤1: 开始检查目录")
 
     if not ensure_data_dir():
-        page.add(ft.Text("步骤2: 目录创建失败，进入权限弹窗逻辑"))
+        print("步骤2: 目录创建失败，进入权限弹窗逻辑")
         if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
             def show_first_permission_dialog():
                 def retry_click(e):
@@ -1243,21 +1243,21 @@ def main(page: ft.Page):
             page.update()
             return
     else:
-        page.add(ft.Text("步骤2: 目录创建成功，继续加载"))
+        print("步骤2: 目录创建成功，继续加载")
 
-    page.add(ft.Text("步骤3: 进入 try 块，开始初始化"))
+    print("步骤3: 进入 try 块，开始初始化")
 
     try:
-        page.add(ft.Text("步骤3.1: 调用 init_vocabulary"))
+        print("步骤3.1: 调用 init_vocabulary")
         init_vocabulary()
-        page.add(ft.Text("步骤3.2: 调用 init_content_lib"))
+        print("步骤3.2: 调用 init_content_lib")
         init_content_lib()
-        page.add(ft.Text("步骤4: init_content_lib 执行完成，继续后续代码"))
+        print("步骤4: init_content_lib 执行完成，继续后续代码")
 
-        # ========== 定义 load_ui 函数（在权限检测之前定义） ==========
+        # ========== 定义 load_ui 函数 ==========
         def load_ui():
-            page.controls.clear()   # ← 添加这一行，清空所有调试文字
-            page.add(ft.Text("步骤5: 开始设置页面窗口和主题"))
+            page.controls.clear()   # ★ 清空所有之前的调试文字
+            print("步骤5: 开始设置页面窗口和主题")
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
             if not is_mobile:
                 page.window.width = 900
@@ -1274,7 +1274,7 @@ def main(page: ft.Page):
             page.theme_mode = ft.ThemeMode.LIGHT
 
             # ---------- 主题 ----------
-            page.add(ft.Text("步骤5.1: 设置主题"))
+            print("步骤5.1: 设置主题")
             page.theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
@@ -1328,10 +1328,10 @@ def main(page: ft.Page):
                 body_small=ft.TextStyle(size=12, weight=ft.FontWeight.NORMAL, color=ft.Colors.GREY_400),
                 label_large=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, color=ft.Colors.BLUE_400),
             )
-            page.add(ft.Text("步骤5.2: 主题设置完成"))
+            print("步骤5.2: 主题设置完成")
 
             # ---------- 全局变量 ----------
-            page.add(ft.Text("步骤6: 创建全局变量和辅助函数"))
+            print("步骤6: 创建全局变量和辅助函数")
             main_subject_page = None
             subject_page_content = ft.Container(expand=True)
 
@@ -1367,7 +1367,7 @@ def main(page: ft.Page):
                 page.update()
                 threading.Thread(target=lambda: (time.sleep(2), setattr(target_text, 'value', ''), page.update()), daemon=True).start()
 
-            page.add(ft.Text("步骤6.1: 开始创建文件选择器"))
+            print("步骤6.1: 开始创建文件选择器")
 
             # ---------- 文件夹选择 ----------
             sync_status_text = ft.Text("", size=14)
@@ -1393,7 +1393,7 @@ def main(page: ft.Page):
                     page.update()
                     show_toast(f"数据已切换到 {e.path}")
 
-            page.add(ft.Text("步骤6.2: 开始创建图片选择器"))
+            print("步骤6.2: 开始创建图片选择器")
 
             # ---------- 自定义图片选择器 ----------
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
@@ -1474,7 +1474,7 @@ def main(page: ft.Page):
                     complete_btn,
                 ], spacing=8), selected_files, reset
 
-            page.add(ft.Text("步骤6.3: 开始构建首页"))
+            print("步骤6.3: 开始构建首页")
 
             # ---------- 首页 ----------
             home_msg = ft.Text("", size=16)
@@ -1630,7 +1630,7 @@ def main(page: ft.Page):
                 home_msg,
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
 
-            page.add(ft.Text("步骤6.4: 开始构建 AI 聊天"))
+            print("步骤6.4: 开始构建 AI 聊天")
 
             # ==================== AI聊天 ====================
             AI_SUBJECTS = [("总AI", "🤖"), ("数学", "📐"), ("语文", "📜"), ("英语", "📝"),
@@ -1857,7 +1857,7 @@ def main(page: ft.Page):
                     chat_status,
                 ], spacing=10, expand=True)
 
-            page.add(ft.Text("步骤6.5: 开始构建智能复习"))
+            print("步骤6.5: 开始构建智能复习")
 
             # ==================== 智能复习 ====================
             review_subject_dropdown = ft.Dropdown(
@@ -2422,7 +2422,7 @@ def main(page: ft.Page):
             ], spacing=15, expand=True)
             refresh_review_view()
 
-            page.add(ft.Text("步骤6.6: 开始构建单词本"))
+            print("步骤6.6: 开始构建单词本")
 
             # ==================== 英语单词本 ====================
             mine_msg = ft.Text("", size=16)
@@ -3472,7 +3472,6 @@ def main(page: ft.Page):
                 def close_dlg(e):
                     page.close(dlg)
 
-                # 确保 dlg 在此处定义（修复未定义错误）
                 dlg = ft.AlertDialog(
                     title=ft.Text("📊 知识框架"),
                     content=ft.Container(
@@ -3535,11 +3534,12 @@ def main(page: ft.Page):
             )
             switch_page(0)
             page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
-            page.add(ft.Text("步骤7: UI 加载完成"))
+            print("步骤7: UI 加载完成")
 
         # ========== 权限检测（手动引导方式） ==========
         def check_permission():
             try:
+                # ★ 修改为使用 DATA_DIR 内的文件，而不是根目录
                 test_path = os.path.join(DATA_DIR, ".permission_test")
                 with open(test_path, "w") as f:
                     f.write("test")
@@ -3548,15 +3548,14 @@ def main(page: ft.Page):
             except:
                 return False
 
-        page.add(ft.Text("步骤4.5: 检测存储权限"))
+        print("步骤4.5: 检测存储权限")
 
         if not check_permission():
             def open_settings(e):
                 page.launch_url("app-settings:")
 
-            # ★★★ 这里是修改点：将 retry_permission 移到 show_permission_dialog 内部 ★★★
+            # 权限弹窗
             def show_permission_dialog():
-                # 内部定义 retry_permission，可以访问外层的 dlg
                 def retry_permission(e):
                     page.close(dlg)
                     if check_permission():
@@ -3568,7 +3567,7 @@ def main(page: ft.Page):
                         page.snack_bar = ft.SnackBar(ft.Text("❌ 权限仍未开启，请手动设置"))
                         page.snack_bar.open = True
                         page.update()
-                        show_permission_dialog()  # 重新弹出对话框
+                        show_permission_dialog()  # 重新弹出
 
                 dlg = ft.AlertDialog(
                     title=ft.Text("需要存储权限"),
@@ -3589,10 +3588,11 @@ def main(page: ft.Page):
 
             show_permission_dialog()
         else:
-            page.add(ft.Text("步骤4.6: 已有权限，直接加载 UI"))
+            print("步骤4.6: 已有权限，直接加载 UI")
             load_ui()
 
     except Exception as e:
+        page.controls.clear()
         page.add(ft.Text(f"❌ 发生错误：{str(e)}", color=ft.Colors.RED))
         page.add(ft.Text(f"详细堆栈：\n{traceback.format_exc()}", size=12, selectable=True))
         page.update()
