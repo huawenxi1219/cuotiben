@@ -3539,7 +3539,7 @@ def main(page: ft.Page):
         # ========== 权限检测（手动引导方式） ==========
         def check_permission():
             try:
-                test_path = "/storage/emulated/0/.permission_test"
+                test_path = os.path.join(DATA_DIR, ".permission_test")
                 with open(test_path, "w") as f:
                     f.write("test")
                 os.remove(test_path)
