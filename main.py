@@ -1256,6 +1256,7 @@ def main(page: ft.Page):
 
         # ========== 定义 load_ui 函数（在权限检测之前定义） ==========
         def load_ui():
+            page.controls.clear()   # ← 添加这一行，清空所有调试文字
             page.add(ft.Text("步骤5: 开始设置页面窗口和主题"))
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
             if not is_mobile:
