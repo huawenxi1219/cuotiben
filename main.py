@@ -1192,44 +1192,55 @@ def build_sentence_page(subject, page):
     ], spacing=8, expand=True)
     # ==================== main 函数（完整，包含权限请求） ====================
 def main(page: ft.Page):
-    # ========== 使用应用内部存储（无需权限） ==========
-    storage_dir = page.get_storage_path()
-    global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
-    global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
-    global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
-    global VOCAB_FILE, SENTENCES_FILE
+    # ========== 显示启动标记（便于调试） ==========
+    page.add(ft.Text("⏳ 应用启动中..."))
+    page.update()
+    print("=== main 函数开始 ===")
 
-    DATA_DIR = os.path.join(storage_dir, "智能错题笔记")
-    IMAGES_DIR = os.path.join(DATA_DIR, "images")
-    VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
-    DOCS_DIR = os.path.join(DATA_DIR, "documents")
-    ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
-    NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
-    RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
-    REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
-    TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
-    AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
-    USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
-    CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
-    CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
-    CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
-    NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-    VOCAB_FILE = NEW_WORDS_FILE
-    SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
-
-    for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
-        os.makedirs(d, exist_ok=True)
-
-    print("数据目录:", DATA_DIR)
-
-    # ========== 初始化 ==========
     try:
+        # ========== 设置数据目录为应用内部存储 ==========
+        storage_dir = page.get_storage_path()
+        print(f"内部存储路径: {storage_dir}")
+
+        global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
+        global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
+        global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
+        global VOCAB_FILE, SENTENCES_FILE
+
+        DATA_DIR = os.path.join(storage_dir, "智能错题笔记")
+        IMAGES_DIR = os.path.join(DATA_DIR, "images")
+        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+        DOCS_DIR = os.path.join(DATA_DIR, "documents")
+        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
+        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
+        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
+        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
+        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
+        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
+        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
+        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
+        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
+        VOCAB_FILE = NEW_WORDS_FILE
+        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
+
+        # 创建所有目录
+        for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
+            os.makedirs(d, exist_ok=True)
+        print("数据目录已创建:", DATA_DIR)
+
+        # ========== 初始化数据文件 ==========
         init_vocabulary()
         init_content_lib()
 
         # ========== 定义 load_ui 函数 ==========
         def load_ui():
-            print("步骤5: 开始设置页面窗口和主题")
+            page.controls.clear()
+            page.add(ft.Text("📱 加载界面中..."))
+            page.update()
+            print("=== load_ui 开始 ===")
+
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
             if not is_mobile:
                 page.window.width = 900
@@ -2624,7 +2635,7 @@ def main(page: ft.Page):
                 title_text = "📖 单词本" if mode == "vocab" else "📘 生词表"
                 _render_list()
 
-                # ---------- 添加导入按钮（仅单词本） ----------
+                # ---------- 导入词汇按钮（仅单词本） ----------
                 if mode == "vocab":
                     import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
                     page.overlay.append(import_picker)
@@ -2640,10 +2651,10 @@ def main(page: ft.Page):
                             try:
                                 import shutil
                                 shutil.copy(file_path, VOCAB_FILE)
-                                page.snack_bar = ft.SnackBar(ft.Text("✅ 词汇导入成功，请返回重新进入单词本"))
+                                page.snack_bar = ft.SnackBar(ft.Text("✅ 词汇导入成功！请返回重新进入单词本"))
                                 page.snack_bar.open = True
                                 page.update()
-                                # 重新加载当前页面以刷新列表
+                                # 刷新列表
                                 _render_list(search_field.value)
                             except Exception as ex:
                                 page.snack_bar = ft.SnackBar(ft.Text(f"❌ 导入失败: {str(ex)}"))
@@ -3533,9 +3544,11 @@ def main(page: ft.Page):
 
     except Exception as e:
         page.controls.clear()
-        page.add(ft.Text(f"❌ 发生错误：{str(e)}", color=ft.Colors.RED))
-        page.add(ft.Text(f"详细堆栈：\n{traceback.format_exc()}", size=12, selectable=True))
+        page.add(ft.Text(f"❌ 启动出错: {str(e)}", color=ft.Colors.RED))
+        page.add(ft.Text(f"详细错误:\n{traceback.format_exc()}", size=12, selectable=True))
         page.update()
+        print("=== 启动异常 ===")
+        traceback.print_exc()
 
 if __name__ == "__main__":
     ft.app(target=main)
