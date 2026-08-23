@@ -1192,15 +1192,15 @@ def build_sentence_page(subject, page):
     ], spacing=8, expand=True)
     # ==================== main 函数（完整，包含权限请求） ====================
 def main(page: ft.Page):
-    # ========== 显示启动标记（便于调试） ==========
+    # ========== 显示启动标记 ==========
     page.add(ft.Text("⏳ 应用启动中..."))
     page.update()
     print("=== main 函数开始 ===")
 
     try:
-        # ========== 设置数据目录为应用内部存储 ==========
-        storage_dir = os.getcwd()
-        print(f"内部存储路径: {storage_dir}")
+        # ========== 设置数据目录为应用工作目录（无需权限） ==========
+        storage_dir = os.getcwd()  # 在 Android 上为应用私有目录
+        print(f"工作目录: {storage_dir}")
 
         global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
         global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
@@ -1225,16 +1225,15 @@ def main(page: ft.Page):
         VOCAB_FILE = NEW_WORDS_FILE
         SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 
-        # 创建所有目录
         for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
             os.makedirs(d, exist_ok=True)
         print("数据目录已创建:", DATA_DIR)
 
-        # ========== 初始化数据文件 ==========
+        # ========== 初始化 ==========
         init_vocabulary()
         init_content_lib()
 
-        # ========== 定义 load_ui 函数 ==========
+        # ========== 定义 load_ui ==========
         def load_ui():
             page.controls.clear()
             page.add(ft.Text("📱 加载界面中..."))
@@ -1371,7 +1370,7 @@ def main(page: ft.Page):
                     page.update()
                     show_toast(f"数据已切换到 {e.path}")
 
-            # ---------- 自定义图片选择器 ----------
+            # ---------- 自定义图片选择器（修改：缩略图、相册、隐藏完成按钮） ----------
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
@@ -1385,12 +1384,27 @@ def main(page: ft.Page):
                 def refresh_file_list():
                     file_list.controls.clear()
                     for idx, f_path in enumerate(selected_files):
-                        name = os.path.basename(f_path)
-                        icon_text = "🖼️" if os.path.splitext(f_path)[1].lower() in IMG_EXTS else "📄"
-                        row = ft.Row([
-                            ft.Text(f"{icon_text} {name}", size=14, expand=True),
-                            ft.IconButton(icon=ft.Icons.CLOSE, icon_size=16, on_click=lambda e, i=idx: remove_file(i)),
-                        ], spacing=4)
+                        # 缩略图
+                        try:
+                            img = ft.Image(
+                                src=f_path,
+                                width=60,
+                                height=60,
+                                fit=ft.ImageFit.COVER,
+                                border_radius=8,
+                            )
+                        except:
+                            img = ft.Text("🖼️", size=40)
+                        del_btn = ft.IconButton(
+                            icon=ft.Icons.CLOSE,
+                            icon_size=16,
+                            on_click=lambda e, i=idx: remove_file(i),
+                        )
+                        row = ft.Row(
+                            [img, del_btn],
+                            spacing=4,
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        )
                         file_list.controls.append(row)
                     complete_btn.disabled = len(selected_files) == 0
                     page.update()
@@ -1418,22 +1432,19 @@ def main(page: ft.Page):
                         selected_files.pop(idx)
                         refresh_file_list()
 
+                # 修改 pick_files：直接进入相册（系统图片选择器）
                 def pick_files(e):
-                    exts = {
-                        'image': ['jpg', 'jpeg', 'png'],
-                        'video': ['mp4', 'mov', 'avi'],
-                        'document': ['pdf', 'doc', 'docx', 'txt'],
-                        'all': ['jpg', 'jpeg', 'png', 'mp4', 'pdf', 'doc', 'docx', 'txt']
-                    }
-                    picker.pick_files(file_type=ft.FilePickerFileType.CUSTOM,
-                                      allowed_extensions=exts.get(allowed_types, exts['all']),
-                                      allow_multiple=True)
+                    picker.pick_files(
+                        file_type=ft.FilePickerFileType.IMAGE,
+                        allow_multiple=True
+                    )
 
                 complete_btn = ft.ElevatedButton(
                     "✅ 完成上传",
                     icon=ft.Icons.DONE,
                     on_click=lambda e: on_complete(selected_files) if on_complete else None,
                     disabled=True,
+                    visible=False,   # 隐藏该按钮
                 )
 
                 def reset():
@@ -1450,7 +1461,7 @@ def main(page: ft.Page):
                     complete_btn,
                 ], spacing=8), selected_files, reset
 
-            # ---------- 首页 ----------
+            # ---------- 首页（修改：必填项放在最上面） ----------
             home_msg = ft.Text("", size=16)
             subj_dd = ft.Dropdown(
                 label="科目",
@@ -1588,18 +1599,23 @@ def main(page: ft.Page):
                 show_toast(f"✅ {subj} 错题已保存！", "green")
                 refresh_review_view()
 
+            # 首页布局（修改：必填项放上面）
             home_page = ft.Column([
                 ft.Text("📸 拍照录题", size=24),
                 ft.Row([subj_dd], spacing=15) if not is_mobile else ft.Column([subj_dd]),
                 original_input,
-                picker_col1,
-                progress_row,
                 mistake_input,
+                ft.Divider(),
+                ft.Text("🔄 可选补充", size=16),
                 answer_input,
-                picker_col2,
                 idea_input,
-                picker_col3,
                 tags_input,
+                ft.Divider(),
+                ft.Text("📎 附件上传", size=16),
+                picker_col1,
+                picker_col2,
+                picker_col3,
+                progress_row,
                 ft.ElevatedButton("💾 保存错题", on_click=submit_error),
                 home_msg,
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
@@ -2460,10 +2476,11 @@ def main(page: ft.Page):
                     if example:
                         content_children.append(ft.Text(f"例句：{example}", size=14, italic=True, color=ft.Colors.GREY_700))
 
+                    # [修改] 变形：换行显示
                     if forms:
                         forms_words = [f.strip() for f in forms.replace(',', ' ').split() if f.strip()]
                         if forms_words:
-                            forms_row = ft.Row(spacing=8)
+                            forms_row = ft.Row(spacing=8, wrap=True)  # 加 wrap=True
                             forms_row.controls.append(ft.Text("变形：", size=14, weight=ft.FontWeight.BOLD))
                             for fw in forms_words:
                                 target_word_data = next(
@@ -2551,11 +2568,13 @@ def main(page: ft.Page):
                         )
                     )
 
+                    # [修改] 对话框高度自适应
                     dialog = ft.AlertDialog(
                         title=ft.Text(""),
                         content=ft.Container(
                             content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                            width=400, height=450,
+                            width=400,
+                            height=None,  # 自适应高度
                             padding=10,
                         ),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dialog))],
@@ -2635,7 +2654,7 @@ def main(page: ft.Page):
                 title_text = "📖 单词本" if mode == "vocab" else "📘 生词表"
                 _render_list()
 
-                # ---------- 导入词汇按钮（仅单词本） ----------
+                # ---------- 导入词汇按钮 ----------
                 if mode == "vocab":
                     import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
                     page.overlay.append(import_picker)
@@ -2654,7 +2673,6 @@ def main(page: ft.Page):
                                 page.snack_bar = ft.SnackBar(ft.Text("✅ 词汇导入成功！请返回重新进入单词本"))
                                 page.snack_bar.open = True
                                 page.update()
-                                # 刷新列表
                                 _render_list(search_field.value)
                             except Exception as ex:
                                 page.snack_bar = ft.SnackBar(ft.Text(f"❌ 导入失败: {str(ex)}"))
@@ -2768,7 +2786,7 @@ def main(page: ft.Page):
                 subject_page_content.content = full_page
                 page.update()
 
-            # ★ 错题本 ★
+            # ★ 错题本（修改：缩略图、长按放大、状态标记） ★
             def build_error_list_page(subject):
                 import traceback
                 import re
@@ -2913,6 +2931,57 @@ def main(page: ft.Page):
                         tag_text = "、".join(tags) if tags else "未分类"
                         bg_color = "#F8F9FA"
 
+                        # ---- 状态圆点 ----
+                        status = item.get("status", "未看")
+                        status_color = {
+                            "未看": "#9E9E9E",
+                            "已看": "#4CAF50",
+                            "重要": "#F44336",
+                            "已掌握": "#2196F3",
+                        }.get(status, "#9E9E9E")
+                        status_dot = ft.Container(
+                            width=12,
+                            height=12,
+                            border_radius=6,
+                            bgcolor=status_color,
+                            tooltip=status,
+                        )
+
+                        # ---- 缩略图 ----
+                        thumb_img = None
+                        if q_media and os.path.exists(q_media[0]):
+                            try:
+                                thumb_img = ft.Image(
+                                    src=q_media[0],
+                                    width=80,
+                                    height=80,
+                                    fit=ft.ImageFit.COVER,
+                                    border_radius=8,
+                                )
+                            except:
+                                thumb_img = None
+
+                        # 长按放大（0.3秒）
+                        if thumb_img:
+                            def on_long_press(e, path=q_media[0]):
+                                dlg = ft.AlertDialog(
+                                    title=ft.Text("图片预览"),
+                                    content=ft.Container(
+                                        content=ft.Image(src=path, width=400, height=400, fit=ft.ImageFit.CONTAIN),
+                                        width=420,
+                                        height=420,
+                                    ),
+                                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
+                                )
+                                page.open(dlg)
+                                page.update()
+                            thumb_container = ft.GestureDetector(
+                                content=thumb_img,
+                                on_long_press=on_long_press,
+                            )
+                        else:
+                            thumb_container = ft.Container()
+
                         def make_show_detail_card(item_data=item):
                             def show(e):
                                 detail_children = []
@@ -3043,6 +3112,7 @@ def main(page: ft.Page):
                                 page.update()
                             return show
 
+                        # 编辑对话框（含状态下拉）
                         def make_show_detail(item_data=item):
                             def show(e):
                                 orig_val = item_data.get("original", "")
@@ -3052,11 +3122,22 @@ def main(page: ft.Page):
                                 q_val = item_data.get("question", "")
                                 time_val = item_data.get("time", "")
                                 ts_int = item_data.get("timestamp", 0)
+                                current_status = item_data.get("status", "未看")
 
                                 orig_input = ft.TextField(label="题目 🔒（锁定中）", value=orig_val, multiline=True, min_lines=2, disabled=True)
                                 mis_input = ft.TextField(label="错因", value=mis_val, multiline=True, min_lines=2)
                                 ans_input = ft.TextField(label="答案", value=ans_val, multiline=True, min_lines=2)
                                 idea_input = ft.TextField(label="我的理解 ✏️（可编辑）", value=idea_val, multiline=True, min_lines=2)
+                                status_dropdown = ft.Dropdown(
+                                    label="标记状态",
+                                    options=[
+                                        ft.dropdown.Option("未看"),
+                                        ft.dropdown.Option("已看"),
+                                        ft.dropdown.Option("重要"),
+                                        ft.dropdown.Option("已掌握"),
+                                    ],
+                                    value=current_status,
+                                )
                                 unlock_btn = ft.TextButton("🔓 解锁题目", icon=ft.Icons.LOCK_OPEN)
 
                                 def toggle_unlock(e):
@@ -3083,6 +3164,7 @@ def main(page: ft.Page):
                                             d["mistake"] = mis_input.value
                                             d["answer"] = ans_input.value
                                             d["idea"] = idea_input.value
+                                            d["status"] = status_dropdown.value   # 保存状态
                                             d["update_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
                                             break
                                     save_jsonl(ERRORS_FILE, all_items)
@@ -3112,7 +3194,8 @@ def main(page: ft.Page):
                                         mis_input,
                                         ans_input,
                                         idea_input,
-                                    ], scroll=ft.ScrollMode.AUTO, width=400, height=400),
+                                        status_dropdown,  # 新增
+                                    ], scroll=ft.ScrollMode.AUTO, width=400, height=450),
                                     actions=[
                                         ft.TextButton("🗑️ 删除", on_click=delete_item),
                                         ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
@@ -3150,9 +3233,11 @@ def main(page: ft.Page):
                         container = ft.Container(
                             content=ft.Column([
                                 ft.Row([
+                                    status_dot,   # 状态圆点
                                     ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                                     tag_display,
                                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                thumb_container,  # 缩略图（长按放大）
                                 ft.Text(detail_text, size=14, max_lines=2, color=ft.Colors.BLACK87),
                             ], spacing=4),
                             padding=12,
@@ -3490,6 +3575,7 @@ def main(page: ft.Page):
                 page.open(dlg)
                 page.update()
 
+            # [修改] 个人中心：显示数据目录
             mine_page = ft.Column([
                 ft.Text("⚙️ 个人中心", size=24),
                 today_plan_card,
@@ -3508,10 +3594,11 @@ def main(page: ft.Page):
                 ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
                 ft.Text("所有数据（错题、笔记、单词等）都保存在此文件夹中", size=13, color=ft.Colors.GREY_600),
                 ft.Row([
-                    ft.Text(f"📂 {DATA_DIR}", size=14, expand=True),
+                    ft.Text(f"📂 {DATA_DIR}", size=14, expand=True, selectable=True),  # 可复制
                     ft.ElevatedButton("📂 切换文件夹", on_click=lambda e: sync_folder_picker.get_directory_path(),
                                       icon=ft.Icons.FOLDER_OPEN),
                 ], spacing=10),
+                ft.Text("长按路径可复制", size=12, color=ft.Colors.GREY_600),
                 sync_status_text,
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
@@ -3539,7 +3626,7 @@ def main(page: ft.Page):
             page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
             print("步骤7: UI 加载完成")
 
-        # ========== 直接加载 UI，不再检测权限 ==========
+        # ========== 直接加载 UI ==========
         load_ui()
 
     except Exception as e:
