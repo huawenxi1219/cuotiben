@@ -1370,7 +1370,7 @@ def main(page: ft.Page):
                     page.update()
                     show_toast(f"数据已切换到 {e.path}")
 
-            # ---------- 自定义图片选择器（修改：缩略图、相册、隐藏完成按钮） ----------
+            # ---------- 自定义图片选择器（缩略图、相册、隐藏完成按钮） ----------
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
@@ -1384,7 +1384,6 @@ def main(page: ft.Page):
                 def refresh_file_list():
                     file_list.controls.clear()
                     for idx, f_path in enumerate(selected_files):
-                        # 缩略图
                         try:
                             img = ft.Image(
                                 src=f_path,
@@ -1432,7 +1431,6 @@ def main(page: ft.Page):
                         selected_files.pop(idx)
                         refresh_file_list()
 
-                # 修改 pick_files：直接进入相册（系统图片选择器）
                 def pick_files(e):
                     picker.pick_files(
                         file_type=ft.FilePickerFileType.IMAGE,
@@ -1444,7 +1442,7 @@ def main(page: ft.Page):
                     icon=ft.Icons.DONE,
                     on_click=lambda e: on_complete(selected_files) if on_complete else None,
                     disabled=True,
-                    visible=False,   # 隐藏该按钮
+                    visible=False,
                 )
 
                 def reset():
@@ -1461,8 +1459,8 @@ def main(page: ft.Page):
                     complete_btn,
                 ], spacing=8), selected_files, reset
 
-            # ---------- 首页（修改：必填项放在最上面） ----------
-            home_msg = ft.Text("", size=16)
+            # ========== 首页：错题录入 + 笔记录入（分开） ==========
+            # ---- 错题录入部分 ----
             subj_dd = ft.Dropdown(
                 label="科目",
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
@@ -1492,7 +1490,7 @@ def main(page: ft.Page):
                 on_complete=None
             )
             picker_col3, idea_files, reset_picker3 = make_file_picker_button(
-                "📷 笔记图片", "image",
+                "📷 笔记图片（错题补充）", "image",
                 on_complete=None
             )
 
@@ -1599,9 +1597,33 @@ def main(page: ft.Page):
                 show_toast(f"✅ {subj} 错题已保存！", "green")
                 refresh_review_view()
 
-            # 首页布局（修改：必填项放上面）
+            # ---- 笔记录入部分 ----
+            note_subject_dd = ft.Dropdown(
+                label="科目",
+                options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
+                value="数学",
+                width=150,
+            )
+            note_content_input = ft.TextField(label="笔记内容", multiline=True, min_lines=4)
+            note_picker_col, note_files, reset_note_picker = make_file_picker_button(
+                "📷 笔记图片（可选）", "image",
+                on_complete=None
+            )
+
+            def submit_note(e):
+                subj = note_subject_dd.value
+                content = note_content_input.value.strip()
+                if not content:
+                    show_toast("请输入笔记内容", "red")
+                    return
+                save_note(subj, content, list(note_files))
+                note_content_input.value = ""
+                reset_note_picker()
+                show_toast(f"✅ {subj} 笔记已保存！", "green")
+
+            # ---- 组装首页（上下分区） ----
             home_page = ft.Column([
-                ft.Text("📸 拍照录题", size=24),
+                ft.Text("📸 拍照录题（错题）", size=22, weight=ft.FontWeight.BOLD),
                 ft.Row([subj_dd], spacing=15) if not is_mobile else ft.Column([subj_dd]),
                 original_input,
                 mistake_input,
@@ -1617,7 +1639,13 @@ def main(page: ft.Page):
                 picker_col3,
                 progress_row,
                 ft.ElevatedButton("💾 保存错题", on_click=submit_error),
-                home_msg,
+                ft.Divider(height=20),
+                ft.Text("📝 记笔记", size=22, weight=ft.FontWeight.BOLD),
+                ft.Row([note_subject_dd], spacing=15) if not is_mobile else ft.Column([note_subject_dd]),
+                note_content_input,
+                note_picker_col,
+                ft.ElevatedButton("💾 保存笔记", on_click=submit_note),
+                ft.Container(height=20),  # 底部留空
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
 
             # ==================== AI聊天 ====================
@@ -2023,154 +2051,155 @@ def main(page: ft.Page):
                     review_card_list.controls.append(ft.Container(content=ft.Text("  暂无复习卡片", size=16), padding=10))
                 else:
                     for card in subject_cards:
-                        q_text = clean_latex(card.get("question", "无题目"))
-                        a_text = card.get("answer", "")
-                        kp = card.get("knowledge_point", "")
-                        ctype = card.get("type", "简答")
-                        created_time = card.get("created", "")
-                        answered_time = card.get("answered_time", "")
-                        is_answered = bool(answered_time)
-                        is_correct = card.get("proficiency", 0) >= 70
+                        try:
+                            q_text = clean_latex(card.get("question", "无题目"))
+                            a_text = card.get("answer", "")
+                            kp = card.get("knowledge_point", "")
+                            ctype = card.get("type", "简答")
+                            created_time = card.get("created", "")
+                            answered_time = card.get("answered_time", "")
+                            is_answered = bool(answered_time)
+                            is_correct = card.get("proficiency", 0) >= 70
 
-                        is_choice = ctype == "选择"
-                        if ctype == "选择":
-                            border_color = "#90CAF9"
-                            bg_color = "#E3F2FD"
-                            type_label = "🔤 选择题"
-                        elif ctype == "填空":
-                            border_color = "#A5D6A7"
-                            bg_color = "#E8F5E9"
-                            type_label = "✏️ 填空题"
-                        elif ctype in ("综合", "综合大题"):
-                            border_color = "#CE93D8"
-                            bg_color = "#F3E5F5"
-                            type_label = "📝 综合题"
-                        else:
-                            border_color = "#FFCC80"
-                            bg_color = "#FFF3E0"
-                            type_label = "💬 简答题"
-
-                        card_state = {"submitted": False, "selected": "", "answer_text": a_text, "kp": kp, "options": [],
-                                      "choice_buttons": [],
-                                      "result_text": None, "knowledge_tip": None, "answer_btn": None, "submit_btn": None,
-                                      "answer_input": None, "choice_column": None, "question_text": q_text,
-                                      "question_type": ctype}
-                        choice_column = ft.Column(spacing=6, visible=False)
-                        answer_input = ft.TextField(label="你的答案", multiline=True, disabled=True, visible=not is_choice)
-                        result_text = ft.Text("", size=14)
-                        knowledge_tip = ft.Text("", size=14, visible=False)
-                        answer_btn = ft.ElevatedButton("作答", visible=not is_answered)
-                        submit_btn = ft.ElevatedButton("提交", visible=False)
-                        options = []
-                        choice_buttons = []
-                        if is_choice:
-                            if card.get("options"):
-                                options = [(opt[:2].strip(" .、"), opt[2:].strip()) for opt in card.get("options", [])]
+                            is_choice = ctype == "选择"
+                            if ctype == "选择":
+                                border_color = "#90CAF9"
+                                bg_color = "#E3F2FD"
+                                type_label = "🔤 选择题"
+                            elif ctype == "填空":
+                                border_color = "#A5D6A7"
+                                bg_color = "#E8F5E9"
+                                type_label = "✏️ 填空题"
+                            elif ctype in ("综合", "综合大题"):
+                                border_color = "#CE93D8"
+                                bg_color = "#F3E5F5"
+                                type_label = "📝 综合题"
                             else:
-                                matches = re.findall(r'([A-D])[\.\、\s]\s*(.+?)(?=[A-D][\.\、\s]|$)', q_text)
-                                if matches:
-                                    options = [(m[0], m[1].strip()) for m in matches]
-                            if not options:
-                                options = [("A", "A"), ("B", "B"), ("C", "C"), ("D", "D")]
-                            for letter, opt_text in options:
-                                btn = ft.TextButton(text=f"{letter}. {opt_text}", data={"letter": letter, "state": card_state},
-                                                    on_click=on_option_click)
-                                choice_buttons.append(btn)
-                                choice_column.controls.append(btn)
-                            choice_column.visible = True
-                            answer_input.visible = False
-                            card_state["options"] = options
-                            card_state["choice_buttons"] = choice_buttons
-                        card_state["answer_input"] = answer_input
-                        card_state["result_text"] = result_text
-                        card_state["knowledge_tip"] = knowledge_tip
-                        card_state["answer_btn"] = answer_btn
-                        card_state["submit_btn"] = submit_btn
-                        card_state["choice_column"] = choice_column
-                        card_state["card_id"] = card.get("id", str(random.randint(1000, 9999)))
-                        card_state["is_choice"] = is_choice
+                                border_color = "#FFCC80"
+                                bg_color = "#FFF3E0"
+                                type_label = "💬 简答题"
 
-                        def enable_answer(e, state=card_state):
-                            if state["is_choice"]:
-                                for btn in state["choice_buttons"]:
-                                    btn.disabled = False
-                            else:
-                                state["answer_input"].disabled = False
-                            state["answer_btn"].visible = False
-                            state["submit_btn"].visible = True
-                            page.update()
+                            card_state = {"submitted": False, "selected": "", "answer_text": a_text, "kp": kp, "options": [],
+                                          "choice_buttons": [],
+                                          "result_text": None, "knowledge_tip": None, "answer_btn": None, "submit_btn": None,
+                                          "answer_input": None, "choice_column": None, "question_text": q_text,
+                                          "question_type": ctype}
+                            choice_column = ft.Column(spacing=6, visible=False)
+                            answer_input = ft.TextField(label="你的答案", multiline=True, disabled=True, visible=not is_choice)
+                            result_text = ft.Text("", size=14)
+                            knowledge_tip = ft.Text("", size=14, visible=False)
+                            answer_btn = ft.ElevatedButton("作答", visible=not is_answered)
+                            submit_btn = ft.ElevatedButton("提交", visible=False)
+                            options = []
+                            choice_buttons = []
+                            if is_choice:
+                                if card.get("options"):
+                                    options = [(opt[:2].strip(" .、"), opt[2:].strip()) for opt in card.get("options", [])]
+                                else:
+                                    matches = re.findall(r'([A-D])[\.\、\s]\s*(.+?)(?=[A-D][\.\、\s]|$)', q_text)
+                                    if matches:
+                                        options = [(m[0], m[1].strip()) for m in matches]
+                                if not options:
+                                    options = [("A", "A"), ("B", "B"), ("C", "C"), ("D", "D")]
+                                for letter, opt_text in options:
+                                    btn = ft.TextButton(text=f"{letter}. {opt_text}", data={"letter": letter, "state": card_state},
+                                                        on_click=on_option_click)
+                                    choice_buttons.append(btn)
+                                    choice_column.controls.append(btn)
+                                choice_column.visible = True
+                                answer_input.visible = False
+                                card_state["options"] = options
+                                card_state["choice_buttons"] = choice_buttons
+                            card_state["answer_input"] = answer_input
+                            card_state["result_text"] = result_text
+                            card_state["knowledge_tip"] = knowledge_tip
+                            card_state["answer_btn"] = answer_btn
+                            card_state["submit_btn"] = submit_btn
+                            card_state["choice_column"] = choice_column
+                            card_state["card_id"] = card.get("id", str(random.randint(1000, 9999)))
+                            card_state["is_choice"] = is_choice
 
-                        answer_btn.on_click = enable_answer
-
-                        def make_submit(state, card_data=card):
-                            def submit(e):
-                                if state["submitted"]:
-                                    return
-                                user_ans = state["selected"].strip() if state["is_choice"] else state["answer_input"].value.strip()
-                                if not user_ans:
-                                    state["result_text"].value = "请输入答案"
-                                    page.update()
-                                    return
-                                state["submitted"] = True
-                                is_correct_ans, explanation, blanks_info = ai_judge_answer(
-                                    user_ans, state["answer_text"],
-                                    state.get("question_text", ""),
-                                    state.get("question_type", "简答")
-                                )
+                            def enable_answer(e, state=card_state):
                                 if state["is_choice"]:
-                                    for i, btn in enumerate(state["choice_buttons"]):
-                                        btn.disabled = True
-                                        opt_letter = state["options"][i][0]
-                                        correct_letter = state["answer_text"].strip().upper()[:1]
-                                        if is_correct_ans:
-                                            btn.style = ft.ButtonStyle(
-                                                bgcolor="#66BB6A" if opt_letter == correct_letter else "#F5F5F5")
-                                        else:
-                                            btn.style = ft.ButtonStyle(bgcolor="#66BB6A" if opt_letter == correct_letter else (
-                                                "#EF5350" if opt_letter == user_ans.upper() else "#F5F5F5"))
-                                        btn.update()
+                                    for btn in state["choice_buttons"]:
+                                        btn.disabled = False
                                 else:
-                                    state["answer_input"].disabled = True
-
-                                if blanks_info:
-                                    detail_lines = []
-                                    for b in blanks_info:
-                                        icon = "✅" if b["is_correct"] else "❌"
-                                        detail_lines.append(f"  空{b['index']}: {icon} 你的答案: {b['user_answer']}  正确答案: {b['correct_answer']}")
-                                    result_msg = "整体：" + ("✅ 正确" if is_correct_ans else "❌ 错误") + "\n" + "\n".join(detail_lines)
-                                    state["result_text"].value = result_msg
-                                else:
-                                    state["result_text"].value = f"{'✅ 正确！' if is_correct_ans else '❌ 错误'}\n{explanation}"
-
-                                if is_correct_ans:
-                                    update_review_card(state["card_id"], 80, True)
-                                else:
-                                    if state["kp"]:
-                                        state["knowledge_tip"].value = f"📚 知识点：{state['kp']}"
-                                        state["knowledge_tip"].visible = True
-                                    update_review_card(state["card_id"], 50, False)
+                                    state["answer_input"].disabled = False
                                 state["answer_btn"].visible = False
-                                state["submit_btn"].visible = False
+                                state["submit_btn"].visible = True
                                 page.update()
 
-                            return submit
+                            answer_btn.on_click = enable_answer
 
-                        submit_btn.on_click = make_submit(card_state)
+                            def make_submit(state, card_data=card):
+                                def submit(e):
+                                    if state["submitted"]:
+                                        return
+                                    user_ans = state["selected"].strip() if state["is_choice"] else state["answer_input"].value.strip()
+                                    if not user_ans:
+                                        state["result_text"].value = "请输入答案"
+                                        page.update()
+                                        return
+                                    state["submitted"] = True
+                                    is_correct_ans, explanation, blanks_info = ai_judge_answer(
+                                        user_ans, state["answer_text"],
+                                        state.get("question_text", ""),
+                                        state.get("question_type", "简答")
+                                    )
+                                    if state["is_choice"]:
+                                        for i, btn in enumerate(state["choice_buttons"]):
+                                            btn.disabled = True
+                                            opt_letter = state["options"][i][0]
+                                            correct_letter = state["answer_text"].strip().upper()[:1]
+                                            if is_correct_ans:
+                                                btn.style = ft.ButtonStyle(
+                                                    bgcolor="#66BB6A" if opt_letter == correct_letter else "#F5F5F5")
+                                            else:
+                                                btn.style = ft.ButtonStyle(bgcolor="#66BB6A" if opt_letter == correct_letter else (
+                                                    "#EF5350" if opt_letter == user_ans.upper() else "#F5F5F5"))
+                                            btn.update()
+                                    else:
+                                        state["answer_input"].disabled = True
 
-                        status_label = ft.Text("", size=12)
-                        if is_answered:
-                            status_label.value = f"✅ 已答对 ({answered_time})" if is_correct else f"❌ 已答错 ({answered_time})"
-                            status_label.color = "green" if is_correct else "red"
-                            if is_choice:
-                                for btn in choice_buttons:
-                                    btn.disabled = True
-                            else:
-                                answer_input.disabled = True
-                            answer_btn.visible = False
-                            submit_btn.visible = False
+                                    if blanks_info:
+                                        detail_lines = []
+                                        for b in blanks_info:
+                                            icon = "✅" if b["is_correct"] else "❌"
+                                            detail_lines.append(f"  空{b['index']}: {icon} 你的答案: {b['user_answer']}  正确答案: {b['correct_answer']}")
+                                        result_msg = "整体：" + ("✅ 正确" if is_correct_ans else "❌ 错误") + "\n" + "\n".join(detail_lines)
+                                        state["result_text"].value = result_msg
+                                    else:
+                                        state["result_text"].value = f"{'✅ 正确！' if is_correct_ans else '❌ 错误'}\n{explanation}"
 
-                        def show_detail(card_data=card):
-                            detail_text = f"""题目：{card_data.get('question','')}
+                                    if is_correct_ans:
+                                        update_review_card(state["card_id"], 80, True)
+                                    else:
+                                        if state["kp"]:
+                                            state["knowledge_tip"].value = f"📚 知识点：{state['kp']}"
+                                            state["knowledge_tip"].visible = True
+                                        update_review_card(state["card_id"], 50, False)
+                                    state["answer_btn"].visible = False
+                                    state["submit_btn"].visible = False
+                                    page.update()
+
+                                return submit
+
+                            submit_btn.on_click = make_submit(card_state)
+
+                            status_label = ft.Text("", size=12)
+                            if is_answered:
+                                status_label.value = f"✅ 已答对 ({answered_time})" if is_correct else f"❌ 已答错 ({answered_time})"
+                                status_label.color = "green" if is_correct else "red"
+                                if is_choice:
+                                    for btn in choice_buttons:
+                                        btn.disabled = True
+                                else:
+                                    answer_input.disabled = True
+                                answer_btn.visible = False
+                                submit_btn.visible = False
+
+                            def show_detail(card_data=card):
+                                detail_text = f"""题目：{card_data.get('question','')}
 
 标准答案：{card_data.get('answer','')}
 
@@ -2179,39 +2208,42 @@ def main(page: ft.Page):
 出题时间：{card_data.get('created','')}
 答题时间：{card_data.get('answered_time','未作答')}"""
 
-                            def open_chat_for_detail():
-                                page.close(detail_dlg)
-                                subj = card_data.get("subject", "总AI")
-                                prompt = f"""我正在复习一道错题，请帮我举一反三：
+                                def open_chat_for_detail():
+                                    page.close(detail_dlg)
+                                    subj = card_data.get("subject", "总AI")
+                                    prompt = f"""我正在复习一道错题，请帮我举一反三：
 
 📝 原题：{card_data.get('question','')}
 ✅ 标准答案：{card_data.get('answer','')}
 📚 知识点：{card_data.get('knowledge_point','')}
 
 请根据以上错题、标准答案和知识点，生成3道同类型的巩固练习题，帮助我举一反三、彻底掌握该知识点。"""
-                                open_chat(subj, initial_message=prompt)
+                                    open_chat(subj, initial_message=prompt)
 
-                            detail_dlg = ft.AlertDialog(
-                                title=ft.Text("题目详情"),
-                                content=ft.Column([ft.Text(detail_text, size=14)], scroll=ft.ScrollMode.AUTO, height=300),
-                                actions=[
-                                    ft.TextButton("关闭", on_click=lambda e: page.close(detail_dlg)),
-                                    ft.ElevatedButton("🔄 举一反三", on_click=lambda e: open_chat_for_detail())
-                                ]
-                            )
-                            page.open(detail_dlg)
+                                detail_dlg = ft.AlertDialog(
+                                    title=ft.Text("题目详情"),
+                                    content=ft.Column([ft.Text(detail_text, size=14)], scroll=ft.ScrollMode.AUTO, height=300),
+                                    actions=[
+                                        ft.TextButton("关闭", on_click=lambda e: page.close(detail_dlg)),
+                                        ft.ElevatedButton("🔄 举一反三", on_click=lambda e: open_chat_for_detail())
+                                    ]
+                                )
+                                page.open(detail_dlg)
 
-                        review_card_list.controls.append(ft.Container(
-                            content=ft.Column([
-                                ft.Row([ft.Text(type_label, size=14), ft.Text(kp, size=14)]),
-                                ft.Text(q_text, size=16),
-                                answer_input, choice_column,
-                                ft.Row([answer_btn, submit_btn]),
-                                result_text, knowledge_tip,
-                                ft.Row([status_label, ft.TextButton("查看详情", on_click=lambda e, cd=card: show_detail(cd))]),
-                            ], spacing=8),
-                            padding=14, border_radius=14, border=ft.border.all(2, border_color), bgcolor=bg_color
-                        ))
+                            review_card_list.controls.append(ft.Container(
+                                content=ft.Column([
+                                    ft.Row([ft.Text(type_label, size=14), ft.Text(kp, size=14)]),
+                                    ft.Text(q_text, size=16),
+                                    answer_input, choice_column,
+                                    ft.Row([answer_btn, submit_btn]),
+                                    result_text, knowledge_tip,
+                                    ft.Row([status_label, ft.TextButton("查看详情", on_click=lambda e, cd=card: show_detail(cd))]),
+                                ], spacing=8),
+                                padding=14, border_radius=14, border=ft.border.all(2, border_color), bgcolor=bg_color
+                            ))
+                        except Exception as e:
+                            print(f"⚠️ 复习卡片加载失败，已跳过: {e}")
+                            continue
                 page.update()
 
             def on_option_click(e):
@@ -2476,11 +2508,10 @@ def main(page: ft.Page):
                     if example:
                         content_children.append(ft.Text(f"例句：{example}", size=14, italic=True, color=ft.Colors.GREY_700))
 
-                    # [修改] 变形：换行显示
                     if forms:
                         forms_words = [f.strip() for f in forms.replace(',', ' ').split() if f.strip()]
                         if forms_words:
-                            forms_row = ft.Row(spacing=8, wrap=True)  # 加 wrap=True
+                            forms_row = ft.Row(spacing=8, wrap=True)
                             forms_row.controls.append(ft.Text("变形：", size=14, weight=ft.FontWeight.BOLD))
                             for fw in forms_words:
                                 target_word_data = next(
@@ -2568,13 +2599,12 @@ def main(page: ft.Page):
                         )
                     )
 
-                    # [修改] 对话框高度自适应
                     dialog = ft.AlertDialog(
                         title=ft.Text(""),
                         content=ft.Container(
                             content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
                             width=400,
-                            height=None,  # 自适应高度
+                            height=None,
                             padding=10,
                         ),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dialog))],
@@ -2654,7 +2684,6 @@ def main(page: ft.Page):
                 title_text = "📖 单词本" if mode == "vocab" else "📘 生词表"
                 _render_list()
 
-                # ---------- 导入词汇按钮 ----------
                 if mode == "vocab":
                     import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
                     page.overlay.append(import_picker)
@@ -2786,7 +2815,7 @@ def main(page: ft.Page):
                 subject_page_content.content = full_page
                 page.update()
 
-            # ★ 错题本（修改：缩略图、长按放大、状态标记） ★
+            # ★ 错题本 ★
             def build_error_list_page(subject):
                 import traceback
                 import re
@@ -2918,339 +2947,342 @@ def main(page: ft.Page):
                         return
 
                     for idx, item in enumerate(subject_items):
-                        original = item.get("original", "")
-                        mistake = item.get("mistake", "")
-                        answer = item.get("answer", "")
-                        idea = item.get("idea", "")
-                        question = item.get("question", "")
-                        q_media = item.get("question_media", []) or item.get("question_images", [])
-                        ts_raw = item.get("time", "")
-                        ts_clean = clean_time_str(ts_raw)
-                        tags = item.get("tags", [])
+                        try:
+                            original = item.get("original", "")
+                            mistake = item.get("mistake", "")
+                            answer = item.get("answer", "")
+                            idea = item.get("idea", "")
+                            question = item.get("question", "")
+                            q_media = item.get("question_media", []) or item.get("question_images", [])
+                            ts_raw = item.get("time", "")
+                            ts_clean = clean_time_str(ts_raw)
+                            tags = item.get("tags", [])
 
-                        tag_text = "、".join(tags) if tags else "未分类"
-                        bg_color = "#F8F9FA"
+                            tag_text = "、".join(tags) if tags else "未分类"
+                            bg_color = "#F8F9FA"
 
-                        # ---- 状态圆点 ----
-                        status = item.get("status", "未看")
-                        status_color = {
-                            "未看": "#9E9E9E",
-                            "已看": "#4CAF50",
-                            "重要": "#F44336",
-                            "已掌握": "#2196F3",
-                        }.get(status, "#9E9E9E")
-                        status_dot = ft.Container(
-                            width=12,
-                            height=12,
-                            border_radius=6,
-                            bgcolor=status_color,
-                            tooltip=status,
-                        )
-
-                        # ---- 缩略图 ----
-                        thumb_img = None
-                        if q_media and os.path.exists(q_media[0]):
-                            try:
-                                thumb_img = ft.Image(
-                                    src=q_media[0],
-                                    width=80,
-                                    height=80,
-                                    fit=ft.ImageFit.COVER,
-                                    border_radius=8,
-                                )
-                            except:
-                                thumb_img = None
-
-                        # 长按放大（0.3秒）
-                        if thumb_img:
-                            def on_long_press(e, path=q_media[0]):
-                                dlg = ft.AlertDialog(
-                                    title=ft.Text("图片预览"),
-                                    content=ft.Container(
-                                        content=ft.Image(src=path, width=400, height=400, fit=ft.ImageFit.CONTAIN),
-                                        width=420,
-                                        height=420,
-                                    ),
-                                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
-                                )
-                                page.open(dlg)
-                                page.update()
-                            thumb_container = ft.GestureDetector(
-                                content=thumb_img,
-                                on_long_press=on_long_press,
+                            # 状态圆点
+                            status = item.get("status", "未看")
+                            status_color = {
+                                "未看": "#9E9E9E",
+                                "已看": "#4CAF50",
+                                "重要": "#F44336",
+                                "已掌握": "#2196F3",
+                            }.get(status, "#9E9E9E")
+                            status_dot = ft.Container(
+                                width=12,
+                                height=12,
+                                border_radius=6,
+                                bgcolor=status_color,
+                                tooltip=status,
                             )
-                        else:
-                            thumb_container = ft.Container()
 
-                        def make_show_detail_card(item_data=item):
-                            def show(e):
-                                detail_children = []
+                            # 缩略图 + 长按放大
+                            thumb_img = None
+                            if q_media and os.path.exists(q_media[0]):
+                                try:
+                                    thumb_img = ft.Image(
+                                        src=q_media[0],
+                                        width=80,
+                                        height=80,
+                                        fit=ft.ImageFit.COVER,
+                                        border_radius=8,
+                                    )
+                                except:
+                                    thumb_img = None
 
-                                detail_children.append(
-                                    ft.Text("📋 错题详情", size=20, weight=ft.FontWeight.BOLD)
+                            if thumb_img:
+                                def on_long_press(e, path=q_media[0]):
+                                    dlg = ft.AlertDialog(
+                                        title=ft.Text("图片预览"),
+                                        content=ft.Container(
+                                            content=ft.Image(src=path, width=400, height=400, fit=ft.ImageFit.CONTAIN),
+                                            width=420,
+                                            height=420,
+                                        ),
+                                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
+                                    )
+                                    page.open(dlg)
+                                    page.update()
+                                thumb_container = ft.GestureDetector(
+                                    content=thumb_img,
+                                    on_long_press=on_long_press,
                                 )
+                            else:
+                                thumb_container = ft.Container()
 
-                                time_str = clean_time_str(item_data.get("time", ""))
-                                detail_children.append(
-                                    ft.Text(f"科目：{item_data.get('subject', '未知')}  时间：{time_str}", size=14, color=ft.Colors.GREY_700)
-                                )
+                            def make_show_detail_card(item_data=item):
+                                def show(e):
+                                    detail_children = []
 
-                                orig_val = item_data.get("original", "") or item_data.get("question", "")
-                                if orig_val:
                                     detail_children.append(
-                                        ft.Text(f"📝 题目：{clean_latex(orig_val)}", size=15, selectable=True)
+                                        ft.Text("📋 错题详情", size=20, weight=ft.FontWeight.BOLD)
                                     )
 
-                                if item_data.get("mistake"):
+                                    time_str = clean_time_str(item_data.get("time", ""))
                                     detail_children.append(
-                                        ft.Text(f"❌ 错因：{item_data['mistake']}", size=14, color=ft.Colors.RED_700, selectable=True)
+                                        ft.Text(f"科目：{item_data.get('subject', '未知')}  时间：{time_str}", size=14, color=ft.Colors.GREY_700)
                                     )
 
-                                if item_data.get("answer"):
-                                    detail_children.append(
-                                        ft.Text(f"✅ 答案：{clean_latex(item_data['answer'])}", size=14, color=ft.Colors.GREEN_700, selectable=True)
-                                    )
-
-                                if item_data.get("idea"):
-                                    detail_children.append(
-                                        ft.Text(f"💡 理解：{item_data['idea']}", size=14, color=ft.Colors.BLUE_700, selectable=True)
-                                    )
-
-                                if tags:
-                                    detail_children.append(
-                                        ft.Text(f"🏷️ 标签：{', '.join(tags)}", size=13, color=ft.Colors.GREY_700)
-                                    )
-
-                                all_media = []
-                                all_media.extend(item_data.get("question_media", []))
-                                all_media.extend(item_data.get("original_media", []))
-                                all_media.extend(item_data.get("answer_media", []))
-                                all_media.extend(item_data.get("idea_media", []))
-                                unique_media = []
-                                seen = set()
-                                for p in all_media:
-                                    if p not in seen:
-                                        seen.add(p)
-                                        unique_media.append(p)
-
-                                if unique_media:
-                                    detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_300))
-                                    detail_children.append(
-                                        ft.Text(f"🖼️ 图片附件（{len(unique_media)}张）", size=14, weight=ft.FontWeight.BOLD)
-                                    )
-
-                                    img_row = ft.Row(spacing=8, wrap=True)
-                                    for img_path in unique_media[:5]:
-                                        full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
-                                        if os.path.exists(full_path):
-                                            try:
-                                                img = ft.Image(
-                                                    src=full_path,
-                                                    width=120,
-                                                    height=120,
-                                                    fit=ft.ImageFit.CONTAIN,
-                                                    border_radius=8,
-                                                )
-
-                                                def make_enlarge(p):
-                                                    def enlarge(e):
-                                                        enlarge_dlg = ft.AlertDialog(
-                                                            title=ft.Text("图片"),
-                                                            content=ft.Container(
-                                                                content=ft.Image(src=p, width=400, height=400, fit=ft.ImageFit.CONTAIN),
-                                                                width=420, height=420,
-                                                            ),
-                                                            actions=[ft.TextButton("关闭", on_click=lambda ev: page.close(enlarge_dlg))],
-                                                        )
-                                                        page.open(enlarge_dlg)
-                                                        page.update()
-                                                    return enlarge
-
-                                                img_container = ft.Container(
-                                                    content=img,
-                                                    on_click=make_enlarge(full_path),
-                                                    ink=True,
-                                                    border_radius=8,
-                                                )
-                                                img_row.controls.append(img_container)
-                                            except Exception as e:
-                                                print(f"[图片加载错误] {full_path}: {e}")
-                                                img_row.controls.append(
-                                                    ft.Text(f"⚠️ {os.path.basename(full_path)}", size=12, color=ft.Colors.ORANGE)
-                                                )
-                                        else:
-                                            img_row.controls.append(
-                                                ft.Text(f"⚠️ 文件不存在：{os.path.basename(img_path)}", size=12, color=ft.Colors.RED)
-                                            )
-
-                                    if img_row.controls:
-                                        detail_children.append(img_row)
-                                    if len(unique_media) > 5:
+                                    orig_val = item_data.get("original", "") or item_data.get("question", "")
+                                    if orig_val:
                                         detail_children.append(
-                                            ft.Text(f"...还有 {len(unique_media)-5} 张", size=12, color=ft.Colors.GREY_500)
+                                            ft.Text(f"📝 题目：{clean_latex(orig_val)}", size=15, selectable=True)
                                         )
 
-                                def open_edit(e):
-                                    page.close(detail_dlg)
-                                    make_show_detail(item_data)(e)
+                                    if item_data.get("mistake"):
+                                        detail_children.append(
+                                            ft.Text(f"❌ 错因：{item_data['mistake']}", size=14, color=ft.Colors.RED_700, selectable=True)
+                                        )
 
-                                action_row = ft.Row([
-                                    ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
-                                    ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
-                                ], alignment=ft.MainAxisAlignment.END)
+                                    if item_data.get("answer"):
+                                        detail_children.append(
+                                            ft.Text(f"✅ 答案：{clean_latex(item_data['answer'])}", size=14, color=ft.Colors.GREEN_700, selectable=True)
+                                        )
 
-                                detail_dlg = ft.AlertDialog(
-                                    title=ft.Text(""),
-                                    content=ft.Container(
-                                        content=ft.Column(detail_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                                        width=450, height=500,
-                                        padding=10,
-                                    ),
-                                    actions=[action_row],
-                                )
-                                page.open(detail_dlg)
-                                page.update()
-                            return show
+                                    if item_data.get("idea"):
+                                        detail_children.append(
+                                            ft.Text(f"💡 理解：{item_data['idea']}", size=14, color=ft.Colors.BLUE_700, selectable=True)
+                                        )
 
-                        # 编辑对话框（含状态下拉）
-                        def make_show_detail(item_data=item):
-                            def show(e):
-                                orig_val = item_data.get("original", "")
-                                mis_val = item_data.get("mistake", "")
-                                ans_val = item_data.get("answer", "")
-                                idea_val = item_data.get("idea", "")
-                                q_val = item_data.get("question", "")
-                                time_val = item_data.get("time", "")
-                                ts_int = item_data.get("timestamp", 0)
-                                current_status = item_data.get("status", "未看")
+                                    if tags:
+                                        detail_children.append(
+                                            ft.Text(f"🏷️ 标签：{', '.join(tags)}", size=13, color=ft.Colors.GREY_700)
+                                        )
 
-                                orig_input = ft.TextField(label="题目 🔒（锁定中）", value=orig_val, multiline=True, min_lines=2, disabled=True)
-                                mis_input = ft.TextField(label="错因", value=mis_val, multiline=True, min_lines=2)
-                                ans_input = ft.TextField(label="答案", value=ans_val, multiline=True, min_lines=2)
-                                idea_input = ft.TextField(label="我的理解 ✏️（可编辑）", value=idea_val, multiline=True, min_lines=2)
-                                status_dropdown = ft.Dropdown(
-                                    label="标记状态",
-                                    options=[
-                                        ft.dropdown.Option("未看"),
-                                        ft.dropdown.Option("已看"),
-                                        ft.dropdown.Option("重要"),
-                                        ft.dropdown.Option("已掌握"),
-                                    ],
-                                    value=current_status,
-                                )
-                                unlock_btn = ft.TextButton("🔓 解锁题目", icon=ft.Icons.LOCK_OPEN)
+                                    all_media = []
+                                    all_media.extend(item_data.get("question_media", []))
+                                    all_media.extend(item_data.get("original_media", []))
+                                    all_media.extend(item_data.get("answer_media", []))
+                                    all_media.extend(item_data.get("idea_media", []))
+                                    unique_media = []
+                                    seen = set()
+                                    for p in all_media:
+                                        if p not in seen:
+                                            seen.add(p)
+                                            unique_media.append(p)
 
-                                def toggle_unlock(e):
-                                    if orig_input.disabled:
-                                        orig_input.disabled = False
-                                        orig_input.label = "题目 ✏️（已解锁）"
-                                        unlock_btn.text = "🔒 锁定题目"
-                                        unlock_btn.icon = ft.Icons.LOCK
-                                    else:
-                                        orig_input.disabled = True
-                                        orig_input.label = "题目 🔒（锁定中）"
-                                        unlock_btn.text = "🔓 解锁题目"
-                                        unlock_btn.icon = ft.Icons.LOCK_OPEN
+                                    if unique_media:
+                                        detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_300))
+                                        detail_children.append(
+                                            ft.Text(f"🖼️ 图片附件（{len(unique_media)}张）", size=14, weight=ft.FontWeight.BOLD)
+                                        )
+
+                                        img_row = ft.Row(spacing=8, wrap=True)
+                                        for img_path in unique_media[:5]:
+                                            full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
+                                            if os.path.exists(full_path):
+                                                try:
+                                                    img = ft.Image(
+                                                        src=full_path,
+                                                        width=120,
+                                                        height=120,
+                                                        fit=ft.ImageFit.CONTAIN,
+                                                        border_radius=8,
+                                                    )
+
+                                                    def make_enlarge(p):
+                                                        def enlarge(e):
+                                                            enlarge_dlg = ft.AlertDialog(
+                                                                title=ft.Text("图片"),
+                                                                content=ft.Container(
+                                                                    content=ft.Image(src=p, width=400, height=400, fit=ft.ImageFit.CONTAIN),
+                                                                    width=420, height=420,
+                                                                ),
+                                                                actions=[ft.TextButton("关闭", on_click=lambda ev: page.close(enlarge_dlg))],
+                                                            )
+                                                            page.open(enlarge_dlg)
+                                                            page.update()
+                                                        return enlarge
+
+                                                    img_container = ft.Container(
+                                                        content=img,
+                                                        on_click=make_enlarge(full_path),
+                                                        ink=True,
+                                                        border_radius=8,
+                                                    )
+                                                    img_row.controls.append(img_container)
+                                                except Exception as e:
+                                                    print(f"[图片加载错误] {full_path}: {e}")
+                                                    img_row.controls.append(
+                                                        ft.Text(f"⚠️ {os.path.basename(full_path)}", size=12, color=ft.Colors.ORANGE)
+                                                    )
+                                            else:
+                                                img_row.controls.append(
+                                                    ft.Text(f"⚠️ 文件不存在：{os.path.basename(img_path)}", size=12, color=ft.Colors.RED)
+                                                )
+
+                                        if img_row.controls:
+                                            detail_children.append(img_row)
+                                        if len(unique_media) > 5:
+                                            detail_children.append(
+                                                ft.Text(f"...还有 {len(unique_media)-5} 张", size=12, color=ft.Colors.GREY_500)
+                                            )
+
+                                    def open_edit(e):
+                                        page.close(detail_dlg)
+                                        make_show_detail(item_data)(e)
+
+                                    action_row = ft.Row([
+                                        ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
+                                        ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
+                                    ], alignment=ft.MainAxisAlignment.END)
+
+                                    detail_dlg = ft.AlertDialog(
+                                        title=ft.Text(""),
+                                        content=ft.Container(
+                                            content=ft.Column(detail_children, spacing=8, scroll=ft.ScrollMode.AUTO),
+                                            width=450, height=500,
+                                            padding=10,
+                                        ),
+                                        actions=[action_row],
+                                    )
+                                    page.open(detail_dlg)
                                     page.update()
+                                return show
 
-                                unlock_btn.on_click = toggle_unlock
+                            def make_show_detail(item_data=item):
+                                def show(e):
+                                    orig_val = item_data.get("original", "")
+                                    mis_val = item_data.get("mistake", "")
+                                    ans_val = item_data.get("answer", "")
+                                    idea_val = item_data.get("idea", "")
+                                    q_val = item_data.get("question", "")
+                                    time_val = item_data.get("time", "")
+                                    ts_int = item_data.get("timestamp", 0)
+                                    current_status = item_data.get("status", "未看")
 
-                                def save_edit(e):
-                                    all_items = load_jsonl(ERRORS_FILE)
-                                    for d in all_items:
-                                        if d.get("timestamp") == ts_int or (d.get("question") == q_val and d.get("time") == time_val):
-                                            d["original"] = orig_input.value
-                                            d["question"] = orig_input.value
-                                            d["mistake"] = mis_input.value
-                                            d["answer"] = ans_input.value
-                                            d["idea"] = idea_input.value
-                                            d["status"] = status_dropdown.value   # 保存状态
-                                            d["update_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                                            break
-                                    save_jsonl(ERRORS_FILE, all_items)
-                                    page.close(edit_dlg)
-                                    page.snack_bar = ft.SnackBar(ft.Text("✅ 已保存"))
-                                    page.snack_bar.open = True
-                                    page.update()
-                                    open_function_page(subject, "错题本")
-                                    page.update()
+                                    orig_input = ft.TextField(label="题目 🔒（锁定中）", value=orig_val, multiline=True, min_lines=2, disabled=True)
+                                    mis_input = ft.TextField(label="错因", value=mis_val, multiline=True, min_lines=2)
+                                    ans_input = ft.TextField(label="答案", value=ans_val, multiline=True, min_lines=2)
+                                    idea_input = ft.TextField(label="我的理解 ✏️（可编辑）", value=idea_val, multiline=True, min_lines=2)
+                                    status_dropdown = ft.Dropdown(
+                                        label="标记状态",
+                                        options=[
+                                            ft.dropdown.Option("未看"),
+                                            ft.dropdown.Option("已看"),
+                                            ft.dropdown.Option("重要"),
+                                            ft.dropdown.Option("已掌握"),
+                                        ],
+                                        value=current_status,
+                                    )
+                                    unlock_btn = ft.TextButton("🔓 解锁题目", icon=ft.Icons.LOCK_OPEN)
 
-                                def delete_item(e):
-                                    all_items = load_jsonl(ERRORS_FILE)
-                                    filtered = [d for d in all_items if not (d.get("timestamp") == ts_int or (d.get("question") == q_val and d.get("time") == time_val))]
-                                    save_jsonl(ERRORS_FILE, filtered)
-                                    page.close(edit_dlg)
-                                    page.snack_bar = ft.SnackBar(ft.Text("🗑️ 已删除"))
-                                    page.snack_bar.open = True
-                                    page.update()
-                                    open_function_page(subject, "错题本")
-                                    page.update()
+                                    def toggle_unlock(e):
+                                        if orig_input.disabled:
+                                            orig_input.disabled = False
+                                            orig_input.label = "题目 ✏️（已解锁）"
+                                            unlock_btn.text = "🔒 锁定题目"
+                                            unlock_btn.icon = ft.Icons.LOCK
+                                        else:
+                                            orig_input.disabled = True
+                                            orig_input.label = "题目 🔒（锁定中）"
+                                            unlock_btn.text = "🔓 解锁题目"
+                                            unlock_btn.icon = ft.Icons.LOCK_OPEN
+                                        page.update()
 
-                                edit_dlg = ft.AlertDialog(
-                                    title=ft.Text("编辑错题"),
-                                    content=ft.Column([
-                                        orig_input,
-                                        ft.Row([unlock_btn], alignment=ft.MainAxisAlignment.END),
-                                        mis_input,
-                                        ans_input,
-                                        idea_input,
-                                        status_dropdown,  # 新增
-                                    ], scroll=ft.ScrollMode.AUTO, width=400, height=450),
-                                    actions=[
-                                        ft.TextButton("🗑️ 删除", on_click=delete_item),
-                                        ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
-                                        ft.ElevatedButton("💾 保存", on_click=save_edit),
-                                    ]
-                                )
-                                page.open(edit_dlg)
-                            return show
+                                    unlock_btn.on_click = toggle_unlock
 
-                        detail_lines = []
-                        if original:
-                            detail_lines.append(f"📝 {original[:80]}")
-                        if mistake:
-                            detail_lines.append(f"❌ {mistake[:80]}")
-                        if answer:
-                            detail_lines.append(f"✅ {answer[:80]}")
-                        if idea:
-                            detail_lines.append(f"💡 {idea[:80]}")
-                        if question:
-                            detail_lines.append(f"📄 {question[:80]}")
-                        if q_media:
-                            detail_lines.append(f"🖼️ 包含图片")
-                        if not detail_lines:
-                            detail_lines.append("（内容为空）")
+                                    def save_edit(e):
+                                        all_items = load_jsonl(ERRORS_FILE)
+                                        for d in all_items:
+                                            if d.get("timestamp") == ts_int or (d.get("question") == q_val and d.get("time") == time_val):
+                                                d["original"] = orig_input.value
+                                                d["question"] = orig_input.value
+                                                d["mistake"] = mis_input.value
+                                                d["answer"] = ans_input.value
+                                                d["idea"] = idea_input.value
+                                                d["status"] = status_dropdown.value
+                                                d["update_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                                                break
+                                        save_jsonl(ERRORS_FILE, all_items)
+                                        page.close(edit_dlg)
+                                        page.snack_bar = ft.SnackBar(ft.Text("✅ 已保存"))
+                                        page.snack_bar.open = True
+                                        page.update()
+                                        open_function_page(subject, "错题本")
+                                        page.update()
 
-                        detail_text = "\n".join(detail_lines[:2])
+                                    def delete_item(e):
+                                        all_items = load_jsonl(ERRORS_FILE)
+                                        filtered = [d for d in all_items if not (d.get("timestamp") == ts_int or (d.get("question") == q_val and d.get("time") == time_val))]
+                                        save_jsonl(ERRORS_FILE, filtered)
+                                        page.close(edit_dlg)
+                                        page.snack_bar = ft.SnackBar(ft.Text("🗑️ 已删除"))
+                                        page.snack_bar.open = True
+                                        page.update()
+                                        open_function_page(subject, "错题本")
+                                        page.update()
 
-                        tag_display = ft.Container(
-                            content=ft.Text(f"🏷️ {tag_text}", size=11, color=ft.Colors.GREY_700),
-                            padding=ft.Padding(left=6, right=6, top=2, bottom=2),
-                            bgcolor=ft.Colors.GREY_200,
-                            border_radius=8,
-                        )
+                                    edit_dlg = ft.AlertDialog(
+                                        title=ft.Text("编辑错题"),
+                                        content=ft.Column([
+                                            orig_input,
+                                            ft.Row([unlock_btn], alignment=ft.MainAxisAlignment.END),
+                                            mis_input,
+                                            ans_input,
+                                            idea_input,
+                                            status_dropdown,
+                                        ], scroll=ft.ScrollMode.AUTO, width=400, height=450),
+                                        actions=[
+                                            ft.TextButton("🗑️ 删除", on_click=delete_item),
+                                            ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
+                                            ft.ElevatedButton("💾 保存", on_click=save_edit),
+                                        ]
+                                    )
+                                    page.open(edit_dlg)
+                                return show
 
-                        container = ft.Container(
-                            content=ft.Column([
-                                ft.Row([
-                                    status_dot,   # 状态圆点
-                                    ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                                    tag_display,
-                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                                thumb_container,  # 缩略图（长按放大）
-                                ft.Text(detail_text, size=14, max_lines=2, color=ft.Colors.BLACK87),
-                            ], spacing=4),
-                            padding=12,
-                            border_radius=12,
-                            bgcolor=bg_color,
-                            border=ft.border.all(1, "#E0E0E0"),
-                            on_click=make_show_detail_card(item),
-                            ink=True,
-                        )
-                        key = str(idx)
-                        container.key = key
-                        card_refs[key] = container
-                        list_view.controls.append(container)
+                            detail_lines = []
+                            if original:
+                                detail_lines.append(f"📝 {original[:80]}")
+                            if mistake:
+                                detail_lines.append(f"❌ {mistake[:80]}")
+                            if answer:
+                                detail_lines.append(f"✅ {answer[:80]}")
+                            if idea:
+                                detail_lines.append(f"💡 {idea[:80]}")
+                            if question:
+                                detail_lines.append(f"📄 {question[:80]}")
+                            if q_media:
+                                detail_lines.append(f"🖼️ 包含图片")
+                            if not detail_lines:
+                                detail_lines.append("（内容为空）")
+
+                            detail_text = "\n".join(detail_lines[:2])
+
+                            tag_display = ft.Container(
+                                content=ft.Text(f"🏷️ {tag_text}", size=11, color=ft.Colors.GREY_700),
+                                padding=ft.Padding(left=6, right=6, top=2, bottom=2),
+                                bgcolor=ft.Colors.GREY_200,
+                                border_radius=8,
+                            )
+
+                            container = ft.Container(
+                                content=ft.Column([
+                                    ft.Row([
+                                        status_dot,
+                                        ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_600, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                                        tag_display,
+                                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                    thumb_container,
+                                    ft.Text(detail_text, size=14, max_lines=2, color=ft.Colors.BLACK87),
+                                ], spacing=4),
+                                padding=12,
+                                border_radius=12,
+                                bgcolor=bg_color,
+                                border=ft.border.all(1, "#E0E0E0"),
+                                on_click=make_show_detail_card(item),
+                                ink=True,
+                            )
+                            key = str(idx)
+                            container.key = key
+                            card_refs[key] = container
+                            list_view.controls.append(container)
+                        except Exception as e:
+                            print(f"⚠️ 加载错题条目失败，已跳过: {e}")
+                            print(f"问题数据: {item}")
+                            continue
                     page.update()
 
                 render_list()
@@ -3264,6 +3296,7 @@ def main(page: ft.Page):
                     ft.Container(content=list_view, expand=True),
                 ], spacing=8, expand=True)
 
+            # ★ 笔记本 ★
             def build_note_list_page(subject):
                 items = load_jsonl(NOTES_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
@@ -3275,68 +3308,72 @@ def main(page: ft.Page):
                                                            padding=20))
                 else:
                     for item in subject_items:
-                        content = item.get("content", "")
-                        images = item.get("images", [])
-                        ts = item.get("time", "")
-                        ts_int = item.get("timestamp", 0)
+                        try:
+                            content = item.get("content", "")
+                            images = item.get("images", [])
+                            ts = item.get("time", "")
+                            ts_int = item.get("timestamp", 0)
 
-                        def make_show_note(item_data=item):
-                            def show(e):
-                                content_input = ft.TextField(label="笔记内容", value=item_data.get("content", ""), multiline=True,
-                                                             min_lines=4)
-                                time_val = item_data.get("time", "")
+                            def make_show_note(item_data=item):
+                                def show(e):
+                                    content_input = ft.TextField(label="笔记内容", value=item_data.get("content", ""), multiline=True,
+                                                                 min_lines=4)
+                                    time_val = item_data.get("time", "")
 
-                                def save_edit(e):
-                                    all_items = load_jsonl(NOTES_FILE)
-                                    for d in all_items:
-                                        if d.get("timestamp") == ts_int:
-                                            d["content"] = content_input.value
-                                            break
-                                    save_jsonl(NOTES_FILE, all_items)
-                                    page.close(edit_dlg)
-                                    page.snack_bar = ft.SnackBar(ft.Text("✅ 已保存"))
-                                    page.snack_bar.open = True
-                                    page.update()
-                                    open_function_page(subject, "笔记本")
-                                    page.update()
+                                    def save_edit(e):
+                                        all_items = load_jsonl(NOTES_FILE)
+                                        for d in all_items:
+                                            if d.get("timestamp") == ts_int:
+                                                d["content"] = content_input.value
+                                                break
+                                        save_jsonl(NOTES_FILE, all_items)
+                                        page.close(edit_dlg)
+                                        page.snack_bar = ft.SnackBar(ft.Text("✅ 已保存"))
+                                        page.snack_bar.open = True
+                                        page.update()
+                                        open_function_page(subject, "笔记本")
+                                        page.update()
 
-                                def delete_item(e):
-                                    all_items = load_jsonl(NOTES_FILE)
-                                    filtered = [d for d in all_items if d.get("timestamp") != ts_int]
-                                    save_jsonl(NOTES_FILE, filtered)
-                                    page.close(edit_dlg)
-                                    page.snack_bar = ft.SnackBar(ft.Text("🗑️ 已删除"))
-                                    page.snack_bar.open = True
-                                    page.update()
-                                    open_function_page(subject, "笔记本")
-                                    page.update()
+                                    def delete_item(e):
+                                        all_items = load_jsonl(NOTES_FILE)
+                                        filtered = [d for d in all_items if d.get("timestamp") != ts_int]
+                                        save_jsonl(NOTES_FILE, filtered)
+                                        page.close(edit_dlg)
+                                        page.snack_bar = ft.SnackBar(ft.Text("🗑️ 已删除"))
+                                        page.snack_bar.open = True
+                                        page.update()
+                                        open_function_page(subject, "笔记本")
+                                        page.update()
 
-                                edit_dlg = ft.AlertDialog(
-                                    title=ft.Text("编辑笔记"),
-                                    content=ft.Column([content_input], scroll=ft.ScrollMode.AUTO, width=400, height=300),
-                                    actions=[
-                                        ft.TextButton("🗑️ 删除", on_click=delete_item),
-                                        ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
-                                        ft.ElevatedButton("💾 保存", on_click=save_edit),
-                                    ]
-                                )
-                                page.open(edit_dlg)
-                            return show
+                                    edit_dlg = ft.AlertDialog(
+                                        title=ft.Text("编辑笔记"),
+                                        content=ft.Column([content_input], scroll=ft.ScrollMode.AUTO, width=400, height=300),
+                                        actions=[
+                                            ft.TextButton("🗑️ 删除", on_click=delete_item),
+                                            ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
+                                            ft.ElevatedButton("💾 保存", on_click=save_edit),
+                                        ]
+                                    )
+                                    page.open(edit_dlg)
+                                return show
 
-                        preview = content[:80] if content else "（空）"
-                        img_hint = f" 🖼️{len(images)}张" if images else ""
+                            preview = content[:80] if content else "（空）"
+                            img_hint = f" 🖼️{len(images)}张" if images else ""
 
-                        list_view.controls.append(ft.Container(
-                            content=ft.Column([
-                                ft.Row([
-                                    ft.Text(f"📝 {ts}{img_hint}", size=13, color=ft.Colors.GREY_600),
-                                    ft.TextButton("编辑", on_click=make_show_note()),
-                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                                ft.Text(preview, size=14, max_lines=3),
-                            ], spacing=4),
-                            padding=12, border_radius=12, bgcolor="#E8F5E9",
-                            border=ft.border.all(1, "#A5D6A7"),
-                        ))
+                            list_view.controls.append(ft.Container(
+                                content=ft.Column([
+                                    ft.Row([
+                                        ft.Text(f"📝 {ts}{img_hint}", size=13, color=ft.Colors.GREY_600),
+                                        ft.TextButton("编辑", on_click=make_show_note()),
+                                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                    ft.Text(preview, size=14, max_lines=3),
+                                ], spacing=4),
+                                padding=12, border_radius=12, bgcolor="#E8F5E9",
+                                border=ft.border.all(1, "#A5D6A7"),
+                            ))
+                        except Exception as e:
+                            print(f"⚠️ 加载笔记条目失败，已跳过: {e}")
+                            continue
                 return list_view
 
             def build_subject_left_panel(subj):
@@ -3575,7 +3612,7 @@ def main(page: ft.Page):
                 page.open(dlg)
                 page.update()
 
-            # [修改] 个人中心：显示数据目录
+            # ---- 个人中心：显示数据目录 ----
             mine_page = ft.Column([
                 ft.Text("⚙️ 个人中心", size=24),
                 today_plan_card,
@@ -3594,7 +3631,7 @@ def main(page: ft.Page):
                 ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
                 ft.Text("所有数据（错题、笔记、单词等）都保存在此文件夹中", size=13, color=ft.Colors.GREY_600),
                 ft.Row([
-                    ft.Text(f"📂 {DATA_DIR}", size=14, expand=True, selectable=True),  # 可复制
+                    ft.Text(f"📂 {DATA_DIR}", size=14, expand=True, selectable=True),
                     ft.ElevatedButton("📂 切换文件夹", on_click=lambda e: sync_folder_picker.get_directory_path(),
                                       icon=ft.Icons.FOLDER_OPEN),
                 ], spacing=10),
