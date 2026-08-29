@@ -1370,7 +1370,7 @@ def main(page: ft.Page):
                     page.update()
                     show_toast(f"数据已切换到 {e.path}")
 
-            # ---------- 自定义图片选择器（缩略图、相册、隐藏完成按钮） ----------
+            # ---------- 自定义图片选择器（修改：相册、缩略图、隐藏完成按钮） ----------
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
@@ -1431,6 +1431,7 @@ def main(page: ft.Page):
                         selected_files.pop(idx)
                         refresh_file_list()
 
+                # 修改：直接进入相册（系统图片选择器）
                 def pick_files(e):
                     picker.pick_files(
                         file_type=ft.FilePickerFileType.IMAGE,
@@ -1442,7 +1443,7 @@ def main(page: ft.Page):
                     icon=ft.Icons.DONE,
                     on_click=lambda e: on_complete(selected_files) if on_complete else None,
                     disabled=True,
-                    visible=False,
+                    visible=False,   # 隐藏该按钮
                 )
 
                 def reset():
