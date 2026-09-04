@@ -1370,7 +1370,7 @@ def main(page: ft.Page):
                     page.update()
                     show_toast(f"数据已切换到 {e.path}")
 
-            # ---------- 自定义图片选择器（相册、缩略图、隐藏完成按钮） ----------
+            # ---------- 自定义图片选择器（相册、横向缩略图） ----------
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
@@ -1383,6 +1383,8 @@ def main(page: ft.Page):
 
                 def refresh_file_list():
                     file_list.controls.clear()
+                    # 横向滚动
+                    row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
                     for idx, f_path in enumerate(selected_files):
                         try:
                             img = ft.Image(
@@ -1399,12 +1401,9 @@ def main(page: ft.Page):
                             icon_size=16,
                             on_click=lambda e, i=idx: remove_file(i),
                         )
-                        row = ft.Row(
-                            [img, del_btn],
-                            spacing=4,
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        )
-                        file_list.controls.append(row)
+                        col = ft.Column([img, del_btn], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+                        row.controls.append(col)
+                    file_list.controls.append(row)
                     complete_btn.disabled = len(selected_files) == 0
                     page.update()
 
@@ -1597,24 +1596,24 @@ def main(page: ft.Page):
                 show_toast(f"✅ {subj} 错题已保存！", "green")
                 refresh_review_view()
 
-            # ---- 笔记录入部分 ----
+            # ---- 笔记录入部分（允许只传图片） ----
             note_subject_dd = ft.Dropdown(
                 label="科目",
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
                 value="数学",
                 width=150,
             )
-            note_content_input = ft.TextField(label="笔记内容", multiline=True, min_lines=4)
+            note_content_input = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=4)
             note_picker_col, note_files, reset_note_picker = make_file_picker_button(
-                "📷 笔记图片（可选）", "image",
+                "📷 笔记图片（可多选）", "image",
                 on_complete=None
             )
 
             def submit_note(e):
                 subj = note_subject_dd.value
                 content = note_content_input.value.strip()
-                if not content:
-                    show_toast("请输入笔记内容", "red")
+                if not content and not note_files:
+                    show_toast("请输入笔记内容或上传图片", "red")
                     return
                 save_note(subj, content, list(note_files))
                 note_content_input.value = ""
@@ -2815,7 +2814,7 @@ def main(page: ft.Page):
                 subject_page_content.content = full_page
                 page.update()
 
-            # ★ 错题本 ★
+            # ★ 错题本 ★（修复缩略图、长按放大、卡片点击）
             def build_error_list_page(subject):
                 import traceback
                 import re
@@ -2977,12 +2976,12 @@ def main(page: ft.Page):
                                 tooltip=status,
                             )
 
-                            # 缩略图 + 长按
+                            # ========== 缩略图（固定大小 + 长按放大） ==========
                             thumb_container = ft.Container()
                             if q_media and len(q_media) > 0:
                                 first_img = q_media[0]
-                                try:
-                                    if os.path.exists(first_img):
+                                if os.path.exists(first_img):
+                                    try:
                                         thumb_img = ft.Image(
                                             src=first_img,
                                             width=80,
@@ -3003,13 +3002,32 @@ def main(page: ft.Page):
                                             page.open(dlg)
                                             page.update()
                                         thumb_container = ft.GestureDetector(
-                                            content=thumb_img,
+                                            content=ft.Container(
+                                                content=thumb_img,
+                                                width=80,
+                                                height=80,
+                                                border_radius=8,
+                                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                                            ),
                                             on_long_press=on_long_press,
                                         )
-                                except Exception as e:
-                                    print(f"缩略图加载失败: {e}")
+                                    except Exception as e:
+                                        print(f"缩略图加载失败: {e}")
+                                        thumb_container = ft.Container(
+                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                            width=80,
+                                            height=80,
+                                            alignment=ft.alignment.center,
+                                        )
+                                else:
+                                    thumb_container = ft.Container(
+                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                        width=80,
+                                        height=80,
+                                        alignment=ft.alignment.center,
+                                    )
 
-                            # 构建显示文本（若无文字，显示"点击查看详情"）
+                            # 构建显示文本
                             detail_lines = []
                             if original:
                                 detail_lines.append(f"📝 {original[:80]}")
@@ -3035,7 +3053,7 @@ def main(page: ft.Page):
                                 border_radius=8,
                             )
 
-                            # 点击卡片打开详情
+                            # ---------- 点击卡片打开详情（修复关闭按钮） ----------
                             def make_show_detail_card(item_data=item):
                                 def show(e):
                                     detail_children = []
@@ -3136,7 +3154,7 @@ def main(page: ft.Page):
                                         make_show_detail(item_data)(e)
                                     action_row = ft.Row([
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
-                                        ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
+                                        ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),  # 独立关闭
                                     ], alignment=ft.MainAxisAlignment.END)
                                     detail_dlg = ft.AlertDialog(
                                         title=ft.Text(""),
@@ -3277,7 +3295,7 @@ def main(page: ft.Page):
                     ft.Container(content=list_view, expand=True),
                 ], spacing=8, expand=True)
 
-            # ★ 笔记本（添加缩略图 + 长按放大） ★
+            # ★ 笔记本（添加缩略图、长按放大、卡片点击可开详情） ★
             def build_note_list_page(subject):
                 items = load_jsonl(NOTES_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
@@ -3299,8 +3317,8 @@ def main(page: ft.Page):
                             thumb_container = ft.Container()
                             if images and len(images) > 0:
                                 first_img = images[0]
-                                try:
-                                    if os.path.exists(first_img):
+                                if os.path.exists(first_img):
+                                    try:
                                         thumb_img = ft.Image(
                                             src=first_img,
                                             width=80,
@@ -3321,12 +3339,32 @@ def main(page: ft.Page):
                                             page.open(dlg)
                                             page.update()
                                         thumb_container = ft.GestureDetector(
-                                            content=thumb_img,
+                                            content=ft.Container(
+                                                content=thumb_img,
+                                                width=80,
+                                                height=80,
+                                                border_radius=8,
+                                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                                            ),
                                             on_long_press=on_long_press,
                                         )
-                                except Exception as e:
-                                    print(f"笔记缩略图加载失败: {e}")
+                                    except Exception as e:
+                                        print(f"笔记缩略图加载失败: {e}")
+                                        thumb_container = ft.Container(
+                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                            width=80,
+                                            height=80,
+                                            alignment=ft.alignment.center,
+                                        )
+                                else:
+                                    thumb_container = ft.Container(
+                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                        width=80,
+                                        height=80,
+                                        alignment=ft.alignment.center,
+                                    )
 
+                            # 点击卡片打开编辑（相当于详情）
                             def make_show_note(item_data=item):
                                 def show(e):
                                     content_input = ft.TextField(label="笔记内容", value=item_data.get("content", ""), multiline=True,
@@ -3364,6 +3402,7 @@ def main(page: ft.Page):
                                         ]
                                     )
                                     page.open(edit_dlg)
+                                    page.update()
                                 return show
 
                             preview = content[:80] if content else "（空）"
@@ -3378,8 +3417,11 @@ def main(page: ft.Page):
                                     thumb_container,
                                     ft.Text(preview, size=14, max_lines=3),
                                 ], spacing=4),
-                                padding=12, border_radius=12, bgcolor="#E8F5E9",
+                                padding=12,
+                                border_radius=12,
+                                bgcolor="#E8F5E9",
                                 border=ft.border.all(1, "#A5D6A7"),
+                                on_click=make_show_note(),  # 点击卡片打开编辑
                             ))
                         except Exception as e:
                             print(f"⚠️ 加载笔记条目失败，已跳过: {e}")
