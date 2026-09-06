@@ -2814,7 +2814,7 @@ def main(page: ft.Page):
                 subject_page_content.content = full_page
                 page.update()
 
-            # ★ 错题本 ★（修复缩略图、长按放大、卡片点击）
+            # ★ 错题本（修复缩略图、长按、详情缩放） ★
             def build_error_list_page(subject):
                 import traceback
                 import re
@@ -2976,31 +2976,30 @@ def main(page: ft.Page):
                                 tooltip=status,
                             )
 
-                            # ========== 缩略图（固定大小 + 长按放大） ==========
-                            thumb_container = ft.Container()
+                            # ---------- 缩略图（修复路径 + 长按） ----------
+                            thumb_container = ft.Container(
+                                width=80,
+                                height=80,
+                                border_radius=8,
+                                bgcolor=ft.Colors.GREY_200,
+                                alignment=ft.alignment.center,
+                            )
                             if q_media and len(q_media) > 0:
                                 first_img = q_media[0]
-                                if os.path.exists(first_img):
+                                # 确保路径是绝对路径
+                                if not os.path.isabs(first_img):
+                                    full_path = os.path.join(DATA_DIR, first_img)
+                                else:
+                                    full_path = first_img
+                                if os.path.exists(full_path):
                                     try:
                                         thumb_img = ft.Image(
-                                            src=first_img,
+                                            src=full_path,
                                             width=80,
                                             height=80,
                                             fit=ft.ImageFit.COVER,
-                                            border_radius=8,
                                         )
-                                        def on_long_press(e, path=first_img):
-                                            dlg = ft.AlertDialog(
-                                                title=ft.Text("图片预览"),
-                                                content=ft.Container(
-                                                    content=ft.Image(src=path, width=400, height=400, fit=ft.ImageFit.CONTAIN),
-                                                    width=420,
-                                                    height=420,
-                                                ),
-                                                actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
-                                            )
-                                            page.open(dlg)
-                                            page.update()
+                                        # 使用 GestureDetector 包裹图片，支持长按
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
                                                 content=thumb_img,
@@ -3009,23 +3008,47 @@ def main(page: ft.Page):
                                                 border_radius=8,
                                                 clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                                             ),
-                                            on_long_press=on_long_press,
+                                            on_long_press=lambda e, path=full_path: show_image_preview(path),
                                         )
                                     except Exception as e:
                                         print(f"缩略图加载失败: {e}")
                                         thumb_container = ft.Container(
-                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
                                             width=80,
                                             height=80,
                                             alignment=ft.alignment.center,
+                                            border_radius=8,
+                                            bgcolor=ft.Colors.GREY_200,
                                         )
                                 else:
+                                    # 文件不存在，显示占位
                                     thumb_container = ft.Container(
-                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
                                         width=80,
                                         height=80,
                                         alignment=ft.alignment.center,
+                                        border_radius=8,
+                                        bgcolor=ft.Colors.GREY_200,
                                     )
+
+                            # ---------- 图片预览函数（支持缩放） ----------
+                            def show_image_preview(image_path):
+                                # 使用 InteractiveViewer 实现缩放
+                                preview_dlg = ft.AlertDialog(
+                                    title=ft.Text("图片预览"),
+                                    content=ft.Container(
+                                        content=ft.InteractiveViewer(
+                                            content=ft.Image(src=image_path, fit=ft.ImageFit.CONTAIN),
+                                            min_scale=0.5,
+                                            max_scale=3.0,
+                                        ),
+                                        width=400,
+                                        height=400,
+                                    ),
+                                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(preview_dlg))],
+                                )
+                                page.open(preview_dlg)
+                                page.update()
 
                             # 构建显示文本
                             detail_lines = []
@@ -3053,7 +3076,7 @@ def main(page: ft.Page):
                                 border_radius=8,
                             )
 
-                            # ---------- 点击卡片打开详情（修复关闭按钮） ----------
+                            # 点击卡片打开详情
                             def make_show_detail_card(item_data=item):
                                 def show(e):
                                     detail_children = []
@@ -3107,31 +3130,23 @@ def main(page: ft.Page):
                                             full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
                                             if os.path.exists(full_path):
                                                 try:
-                                                    img = ft.Image(
-                                                        src=full_path,
+                                                    # 使用 InteractiveViewer 实现缩放
+                                                    img = ft.Container(
+                                                        content=ft.InteractiveViewer(
+                                                            content=ft.Image(src=full_path, fit=ft.ImageFit.CONTAIN),
+                                                            min_scale=0.5,
+                                                            max_scale=3.0,
+                                                        ),
                                                         width=120,
                                                         height=120,
-                                                        fit=ft.ImageFit.CONTAIN,
                                                         border_radius=8,
+                                                        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                                                     )
-                                                    def make_enlarge(p):
-                                                        def enlarge(e):
-                                                            enlarge_dlg = ft.AlertDialog(
-                                                                title=ft.Text("图片"),
-                                                                content=ft.Container(
-                                                                    content=ft.Image(src=p, width=400, height=400, fit=ft.ImageFit.CONTAIN),
-                                                                    width=420, height=420,
-                                                                ),
-                                                                actions=[ft.TextButton("关闭", on_click=lambda ev: page.close(enlarge_dlg))],
-                                                            )
-                                                            page.open(enlarge_dlg)
-                                                            page.update()
-                                                        return enlarge
+                                                    # 点击打开独立预览（已支持缩放）
                                                     img_container = ft.Container(
                                                         content=img,
-                                                        on_click=make_enlarge(full_path),
+                                                        on_click=lambda e, p=full_path: show_image_preview(p),
                                                         ink=True,
-                                                        border_radius=8,
                                                     )
                                                     img_row.controls.append(img_container)
                                                 except Exception as e:
@@ -3154,7 +3169,7 @@ def main(page: ft.Page):
                                         make_show_detail(item_data)(e)
                                     action_row = ft.Row([
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
-                                        ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),  # 独立关闭
+                                        ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
                                     ], alignment=ft.MainAxisAlignment.END)
                                     detail_dlg = ft.AlertDialog(
                                         title=ft.Text(""),
@@ -3295,7 +3310,7 @@ def main(page: ft.Page):
                     ft.Container(content=list_view, expand=True),
                 ], spacing=8, expand=True)
 
-            # ★ 笔记本（添加缩略图、长按放大、卡片点击可开详情） ★
+            # ★ 笔记本（添加缩略图、长按、卡片点击） ★
             def build_note_list_page(subject):
                 items = load_jsonl(NOTES_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
@@ -3314,25 +3329,38 @@ def main(page: ft.Page):
                             ts_int = item.get("timestamp", 0)
 
                             # 缩略图 + 长按
-                            thumb_container = ft.Container()
+                            thumb_container = ft.Container(
+                                width=80,
+                                height=80,
+                                border_radius=8,
+                                bgcolor=ft.Colors.GREY_200,
+                                alignment=ft.alignment.center,
+                            )
                             if images and len(images) > 0:
                                 first_img = images[0]
-                                if os.path.exists(first_img):
+                                if not os.path.isabs(first_img):
+                                    full_path = os.path.join(DATA_DIR, first_img)
+                                else:
+                                    full_path = first_img
+                                if os.path.exists(full_path):
                                     try:
                                         thumb_img = ft.Image(
-                                            src=first_img,
+                                            src=full_path,
                                             width=80,
                                             height=80,
                                             fit=ft.ImageFit.COVER,
-                                            border_radius=8,
                                         )
-                                        def on_long_press(e, path=first_img):
+                                        def on_long_press(e, path=full_path):
                                             dlg = ft.AlertDialog(
                                                 title=ft.Text("图片预览"),
                                                 content=ft.Container(
-                                                    content=ft.Image(src=path, width=400, height=400, fit=ft.ImageFit.CONTAIN),
-                                                    width=420,
-                                                    height=420,
+                                                    content=ft.InteractiveViewer(
+                                                        content=ft.Image(src=path, fit=ft.ImageFit.CONTAIN),
+                                                        min_scale=0.5,
+                                                        max_scale=3.0,
+                                                    ),
+                                                    width=400,
+                                                    height=400,
                                                 ),
                                                 actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
                                             )
@@ -3351,20 +3379,24 @@ def main(page: ft.Page):
                                     except Exception as e:
                                         print(f"笔记缩略图加载失败: {e}")
                                         thumb_container = ft.Container(
-                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
                                             width=80,
                                             height=80,
                                             alignment=ft.alignment.center,
+                                            border_radius=8,
+                                            bgcolor=ft.Colors.GREY_200,
                                         )
                                 else:
                                     thumb_container = ft.Container(
-                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_400),
+                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
                                         width=80,
                                         height=80,
                                         alignment=ft.alignment.center,
+                                        border_radius=8,
+                                        bgcolor=ft.Colors.GREY_200,
                                     )
 
-                            # 点击卡片打开编辑（相当于详情）
+                            # 点击卡片打开编辑
                             def make_show_note(item_data=item):
                                 def show(e):
                                     content_input = ft.TextField(label="笔记内容", value=item_data.get("content", ""), multiline=True,
@@ -3650,6 +3682,61 @@ def main(page: ft.Page):
                 page.open(dlg)
                 page.update()
 
+            # ---------- 备份恢复 ----------
+            backup_status = ft.Text("", size=13, color=ft.Colors.GREY_600)
+            backup_picker = ft.FilePicker(on_result=lambda e: on_backup_result(e))
+            restore_picker = ft.FilePicker(on_result=lambda e: on_restore_result(e))
+            page.overlay.append(backup_picker)
+            page.overlay.append(restore_picker)
+
+            def on_backup_result(e: ft.FilePickerResultEvent):
+                if e.path:
+                    dest_dir = e.path
+                    backup_status.value = "⏳ 正在备份..."
+                    backup_status.color = ft.Colors.BLUE
+                    page.update()
+                    def do_backup():
+                        try:
+                            import shutil
+                            if os.path.exists(DATA_DIR):
+                                backup_folder = os.path.join(dest_dir, "智能错题笔记备份")
+                                shutil.copytree(DATA_DIR, backup_folder, dirs_exist_ok=True)
+                                backup_status.value = f"✅ 备份成功！位置：{backup_folder}"
+                                backup_status.color = ft.Colors.GREEN
+                            else:
+                                backup_status.value = "❌ 数据目录不存在"
+                                backup_status.color = ft.Colors.RED
+                        except Exception as ex:
+                            backup_status.value = f"❌ 备份失败：{str(ex)[:50]}"
+                            backup_status.color = ft.Colors.RED
+                        page.update()
+                    threading.Thread(target=do_backup, daemon=True).start()
+
+            def on_restore_result(e: ft.FilePickerResultEvent):
+                if e.path:
+                    src_dir = e.path
+                    backup_status.value = "⏳ 正在恢复..."
+                    backup_status.color = ft.Colors.BLUE
+                    page.update()
+                    def do_restore():
+                        try:
+                            import shutil
+                            os.makedirs(DATA_DIR, exist_ok=True)
+                            for item in os.listdir(src_dir):
+                                src_item = os.path.join(src_dir, item)
+                                dst_item = os.path.join(DATA_DIR, item)
+                                if os.path.isdir(src_item):
+                                    shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
+                                else:
+                                    shutil.copy2(src_item, dst_item)
+                            backup_status.value = "✅ 恢复成功！请重启应用"
+                            backup_status.color = ft.Colors.GREEN
+                        except Exception as ex:
+                            backup_status.value = f"❌ 恢复失败：{str(ex)[:50]}"
+                            backup_status.color = ft.Colors.RED
+                        page.update()
+                    threading.Thread(target=do_restore, daemon=True).start()
+
             # ---- 个人中心 ----
             mine_page = ft.Column([
                 ft.Text("⚙️ 个人中心", size=24),
@@ -3675,6 +3762,13 @@ def main(page: ft.Page):
                 ], spacing=10),
                 ft.Text("长按路径可复制", size=12, color=ft.Colors.GREY_600),
                 sync_status_text,
+                ft.Divider(),
+                ft.Text("💾 数据备份与恢复", size=18, weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.ElevatedButton("📤 备份数据", on_click=lambda e: backup_picker.get_directory_path(), icon=ft.Icons.BACKUP),
+                    ft.ElevatedButton("📥 恢复数据", on_click=lambda e: restore_picker.get_directory_path(), icon=ft.Icons.RESTORE),
+                ], spacing=10),
+                backup_status,
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
             # ========== 导航 ==========
@@ -3711,7 +3805,6 @@ def main(page: ft.Page):
         page.update()
         print("=== 启动异常 ===")
         traceback.print_exc()
-
 if __name__ == "__main__":
     ft.app(target=main) 
      
