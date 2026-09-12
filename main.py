@@ -11,6 +11,7 @@ import threading
 import string
 import sys
 import base64
+import uuid
 from datetime import datetime, timedelta
 import traceback
 
@@ -652,7 +653,8 @@ def copy_file_to_lib(src_path, target_dir, allowed_exts):
     ext = os.path.splitext(src_path)[1].lower()
     if ext not in allowed_exts:
         return ""
-    new_name = str(int(time.time() * 1000)) + ext
+    # 【修复 Bug 2】用 UUID 命名，避免同一毫秒内多文件互相覆盖
+    new_name = str(uuid.uuid4().hex) + ext
     dst = os.path.join(target_dir, new_name)
     shutil.copy(src_path, dst)
     return dst
@@ -1190,7 +1192,8 @@ def build_sentence_page(subject, page):
         ft.Divider(height=1),
         ft.Container(content=sentence_list, expand=True),
     ], spacing=8, expand=True)
-    # ==================== main 函数（完整，包含权限请求） ====================
+
+# ==================== main 函数（完整，包含权限请求） ====================
 def main(page: ft.Page):
     page.add(ft.Text("⏳ 应用启动中..."))
     page.update()
@@ -1251,6 +1254,7 @@ def main(page: ft.Page):
             page.responsive = True
             page.theme_mode = ft.ThemeMode.LIGHT
 
+            # 【修复 Bug 5】删除 page_transitions，避免低版本 Flet 不兼容导致闪退
             page.theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
@@ -1261,13 +1265,6 @@ def main(page: ft.Page):
                     surface_variant=ft.Colors.ORANGE_50,
                 ),
                 visual_density=ft.VisualDensity.STANDARD,
-                page_transitions=ft.PageTransitionsTheme(
-                    android=ft.PageTransitionTheme.ZOOM,
-                    ios=ft.PageTransitionTheme.CUPERTINO,
-                    macos=ft.PageTransitionTheme.CUPERTINO,
-                    linux=ft.PageTransitionTheme.ZOOM,
-                    windows=ft.PageTransitionTheme.ZOOM,
-                ),
             )
 
             page.theme.text_theme = ft.TextTheme(
@@ -1319,8 +1316,17 @@ def main(page: ft.Page):
                     animate_opacity=ft.Animation(300, ft.AnimationCurve.EASE_IN_OUT),
                 )
                 page.overlay.append(toast)
-                toast.left = (page.window.width - 200) / 2 if not is_mobile else (page.width - 200) / 2
-                toast.top = (page.window.height - 80) / 2 if not is_mobile else (page.height - 80) / 2
+                # 【修复 Bug 6】统一用 page.width/height，回退到 window 尺寸，再回退到默认值
+                try:
+                    w = page.width or (page.window.width if page.window else None) or 360
+                except Exception:
+                    w = 360
+                try:
+                    h = page.height or (page.window.height if page.window else None) or 640
+                except Exception:
+                    h = 640
+                toast.left = max((w - 200) / 2, 10)
+                toast.top = max((h - 80) / 2, 10)
                 toast.opacity = 1
                 page.update()
 
@@ -1833,6 +1839,9 @@ def main(page: ft.Page):
                     return None
 
             def build_chat_window(subject, initial_message=None):
+                # 【修复 Bug 1】让停止按钮真正能改到外层的 stop_flag
+                nonlocal stop_flag, generation_active
+
                 display_name = subject if subject != "总AI" else "总AI"
                 history = load_chat_history(subject)
 
@@ -1986,7 +1995,12 @@ def main(page: ft.Page):
                     threading.Thread(target=ai_thread, daemon=True).start()
 
                 send_btn.on_click = lambda e: handle_send()
-                stop_btn.on_click = lambda e: setattr(sys.modules[__name__], 'stop_flag', True)
+
+                # 【修复 Bug 1】停止按钮真正设置 stop_flag
+                def stop_generation(e):
+                    nonlocal stop_flag
+                    stop_flag = True
+                stop_btn.on_click = stop_generation
 
                 def clear_history(e):
                     fp = get_chat_history_file(subject)
@@ -3828,6 +3842,6 @@ def main(page: ft.Page):
         page.update()
         print("=== 启动异常 ===")
         traceback.print_exc()
+
 if __name__ == "__main__":
-    ft.app(target=main)    
-       
+    ft.app(target=main)

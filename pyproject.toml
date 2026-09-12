@@ -3,11 +3,16 @@
 "android.permission.CAMERA" = true
 "android.permission.READ_EXTERNAL_STORAGE" = true
 "android.permission.WRITE_EXTERNAL_STORAGE" = true
+
 [project]
 name = "chiyu-study"
 version = "1.0.0"
 description = "池鱼Study"
 requires-python = ">=3.9"
+dependencies = [
+    "flet==0.28.3",
+    "requests",
+]
 
 [tool.flet]
 product = "池鱼Study"
@@ -17,3 +22,7 @@ icon = "assets/icon.png"
 
 [tool.flet.app]
 path = "."
+
+[tool.flet.splash]
+color = "#FFF3E0"
+image = "assets/splash.png"

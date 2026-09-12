@@ -42,7 +42,6 @@ jobs:
           FLET_ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           flet build apk \
-            --project "池鱼Study" \
             --build-number ${{ github.run_number }} \
             --build-version 1.0.${{ github.run_number }}
 
