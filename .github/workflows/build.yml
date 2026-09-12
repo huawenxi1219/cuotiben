@@ -35,15 +35,16 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-release-key.keystore
 
       - name: 打包 APK（正式签名）
+        env:
+          FLET_ANDROID_SIGNING_KEY_STORE: ${{ github.workspace }}/my-release-key.keystore
+          FLET_ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ALIAS }}
+          FLET_ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ALIAS_PASSWORD }}
+          FLET_ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           flet build apk \
             --project "池鱼Study" \
-            --keystore my-release-key.keystore \
-            --alias ${{ secrets.ALIAS }} \
-            --keystore-password ${{ secrets.KEYSTORE_PASSWORD }} \
-            --alias-password ${{ secrets.ALIAS_PASSWORD }} \
             --build-number ${{ github.run_number }} \
-            --version 1.0.${{ github.run_number }}
+            --build-version 1.0.${{ github.run_number }}
 
       - name: 创建 Tag
         id: tag
