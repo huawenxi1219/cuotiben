@@ -22,7 +22,3 @@ icon = "assets/icon.png"
 
 [tool.flet.app]
 path = "."
-
-[tool.flet.splash]
-color = "#FFF3E0"
-image = "assets/splash.png"
