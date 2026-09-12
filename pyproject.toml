@@ -3,3 +3,17 @@
 "android.permission.CAMERA" = true
 "android.permission.READ_EXTERNAL_STORAGE" = true
 "android.permission.WRITE_EXTERNAL_STORAGE" = true
+[project]
+name = "chiyu-study"
+version = "1.0.0"
+description = "池鱼Study"
+requires-python = ">=3.9"
+
+[tool.flet]
+product = "池鱼Study"
+company = "池鱼"
+copyright = "Copyright (C) 2025"
+icon = "assets/icon.png"
+
+[tool.flet.app]
+path = "."

@@ -1,4 +1,5 @@
 name: Build APK
+
 on:
   workflow_dispatch:
   push:
@@ -29,8 +30,20 @@ jobs:
         run: |
           pip install flet==0.28.3 requests
 
-      - name: 打包 APK
-        run: flet build apk
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-release-key.keystore
+
+      - name: 打包 APK（正式签名）
+        run: |
+          flet build apk \
+            --project "池鱼Study" \
+            --keystore my-release-key.keystore \
+            --alias ${{ secrets.ALIAS }} \
+            --keystore-password ${{ secrets.KEYSTORE_PASSWORD }} \
+            --alias-password ${{ secrets.ALIAS_PASSWORD }} \
+            --build-number ${{ github.run_number }} \
+            --version 1.0.${{ github.run_number }}
 
       - name: 创建 Tag
         id: tag
