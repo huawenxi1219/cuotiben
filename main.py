@@ -1192,14 +1192,12 @@ def build_sentence_page(subject, page):
     ], spacing=8, expand=True)
     # ==================== main 函数（完整，包含权限请求） ====================
 def main(page: ft.Page):
-    # ========== 显示启动标记 ==========
     page.add(ft.Text("⏳ 应用启动中..."))
     page.update()
     print("=== main 函数开始 ===")
 
     try:
-        # ========== 设置数据目录为应用工作目录（无需权限） ==========
-        storage_dir = os.getcwd()  # 在 Android 上为应用私有目录
+        storage_dir = os.getcwd()
         print(f"工作目录: {storage_dir}")
 
         global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
@@ -1229,11 +1227,9 @@ def main(page: ft.Page):
             os.makedirs(d, exist_ok=True)
         print("数据目录已创建:", DATA_DIR)
 
-        # ========== 初始化 ==========
         init_vocabulary()
         init_content_lib()
 
-        # ========== 定义 load_ui ==========
         def load_ui():
             page.controls.clear()
             page.add(ft.Text("📱 加载界面中..."))
@@ -1251,19 +1247,18 @@ def main(page: ft.Page):
                 page.window.min_width = 320
                 page.padding = 10
                 page.spacing = 8
-            page.title = "智能错题笔记助手"
+            page.title = "池鱼Study"
             page.responsive = True
             page.theme_mode = ft.ThemeMode.LIGHT
 
-            # ---------- 主题 ----------
             page.theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
-                    primary=ft.Colors.BLUE_600,
-                    primary_container=ft.Colors.BLUE_50,
-                    secondary=ft.Colors.BLUE_400,
+                    primary=ft.Colors.ORANGE_600,
+                    primary_container=ft.Colors.ORANGE_50,
+                    secondary=ft.Colors.DEEP_ORANGE_400,
                     surface=ft.Colors.WHITE,
-                    surface_variant=ft.Colors.GREY_50,
+                    surface_variant=ft.Colors.ORANGE_50,
                 ),
                 visual_density=ft.VisualDensity.STANDARD,
                 page_transitions=ft.PageTransitionsTheme(
@@ -1284,15 +1279,15 @@ def main(page: ft.Page):
                 body_large=ft.TextStyle(size=16, weight=ft.FontWeight.NORMAL, color=ft.Colors.BLACK87),
                 body_medium=ft.TextStyle(size=14, weight=ft.FontWeight.NORMAL, color=ft.Colors.BLACK87),
                 body_small=ft.TextStyle(size=12, weight=ft.FontWeight.NORMAL, color=ft.Colors.GREY_600),
-                label_large=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, color=ft.Colors.BLUE_600),
+                label_large=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, color=ft.Colors.ORANGE_600),
             )
 
             page.dark_theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
-                    primary=ft.Colors.BLUE_400,
-                    primary_container=ft.Colors.BLUE_900,
-                    secondary=ft.Colors.BLUE_300,
+                    primary=ft.Colors.ORANGE_400,
+                    primary_container=ft.Colors.ORANGE_900,
+                    secondary=ft.Colors.DEEP_ORANGE_300,
                     surface=ft.Colors.GREY_900,
                     surface_variant=ft.Colors.GREY_800,
                 ),
@@ -1307,10 +1302,9 @@ def main(page: ft.Page):
                 body_large=ft.TextStyle(size=16, weight=ft.FontWeight.NORMAL, color=ft.Colors.WHITE),
                 body_medium=ft.TextStyle(size=14, weight=ft.FontWeight.NORMAL, color=ft.Colors.WHITE),
                 body_small=ft.TextStyle(size=12, weight=ft.FontWeight.NORMAL, color=ft.Colors.GREY_400),
-                label_large=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, color=ft.Colors.BLUE_400),
+                label_large=ft.TextStyle(size=14, weight=ft.FontWeight.W_500, color=ft.Colors.ORANGE_400),
             )
 
-            # ---------- 全局变量 ----------
             main_subject_page = None
             subject_page_content = ft.Container(expand=True)
 
@@ -1344,9 +1338,77 @@ def main(page: ft.Page):
                 target_text.value = text
                 target_text.color = color
                 page.update()
-                threading.Thread(target=lambda: (time.sleep(2), setattr(target_text, 'value', ''), page.update()), daemon=True).start()
+                threading.Thread(
+                    target=lambda: (time.sleep(2), setattr(target_text, 'value', ''), page.update()),
+                    daemon=True
+                ).start()
 
-            # ---------- 文件夹选择 ----------
+            def show_image_gallery(image_paths, start_index=0):
+                if not image_paths:
+                    return
+
+                valid_paths = []
+                for p in image_paths:
+                    full = p if os.path.isabs(p) else os.path.join(DATA_DIR, p)
+                    if os.path.exists(full):
+                        valid_paths.append(full)
+
+                if not valid_paths:
+                    page.snack_bar = ft.SnackBar(ft.Text("图片不存在"))
+                    page.snack_bar.open = True
+                    page.update()
+                    return
+
+                if start_index >= len(valid_paths):
+                    start_index = 0
+
+                total = len(valid_paths)
+                current_index = [start_index]
+
+                image_view = ft.InteractiveViewer(
+                    content=ft.Image(src=valid_paths[start_index], fit=ft.ImageFit.CONTAIN),
+                    min_scale=0.5,
+                    max_scale=3.0,
+                    expand=True,
+                )
+                counter_text = ft.Text(f"{start_index+1}/{total}", size=15, color=ft.Colors.GREY_700)
+
+                def update_image(idx):
+                    if 0 <= idx < total:
+                        current_index[0] = idx
+                        image_view.content = ft.Image(src=valid_paths[idx], fit=ft.ImageFit.CONTAIN)
+                        counter_text.value = f"{idx+1}/{total}"
+                        page.update()
+
+                def prev_image(e):
+                    if current_index[0] > 0:
+                        update_image(current_index[0] - 1)
+
+                def next_image(e):
+                    if current_index[0] < total - 1:
+                        update_image(current_index[0] + 1)
+
+                btn_row = ft.Row([
+                    ft.IconButton(icon=ft.Icons.ARROW_BACK_IOS, icon_size=28, on_click=prev_image),
+                    counter_text,
+                    ft.IconButton(icon=ft.Icons.ARROW_FORWARD_IOS, icon_size=28, on_click=next_image),
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=30)
+
+                gallery_dlg = ft.AlertDialog(
+                    title=ft.Text("图片预览"),
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Container(content=image_view, width=400, height=400, alignment=ft.alignment.center),
+                            btn_row,
+                        ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        width=420,
+                        height=500,
+                    ),
+                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(gallery_dlg))],
+                )
+                page.open(gallery_dlg)
+                page.update()
+
             sync_status_text = ft.Text("", size=14)
             sync_folder_picker = ft.FilePicker(on_result=lambda e: on_sync_folder_selected(e))
             page.overlay.append(sync_folder_picker)
@@ -1370,7 +1432,6 @@ def main(page: ft.Page):
                     page.update()
                     show_toast(f"数据已切换到 {e.path}")
 
-            # ---------- 自定义图片选择器（相册、横向缩略图） ----------
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
@@ -1383,7 +1444,6 @@ def main(page: ft.Page):
 
                 def refresh_file_list():
                     file_list.controls.clear()
-                    # 横向滚动
                     row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
                     for idx, f_path in enumerate(selected_files):
                         try:
@@ -1396,13 +1456,19 @@ def main(page: ft.Page):
                             )
                         except:
                             img = ft.Text("🖼️", size=40)
+
                         del_btn = ft.IconButton(
                             icon=ft.Icons.CLOSE,
                             icon_size=16,
                             on_click=lambda e, i=idx: remove_file(i),
                         )
-                        col = ft.Column([img, del_btn], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+                        col = ft.Column(
+                            [img, del_btn],
+                            spacing=2,
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        )
                         row.controls.append(col)
+
                     file_list.controls.append(row)
                     complete_btn.disabled = len(selected_files) == 0
                     page.update()
@@ -1458,8 +1524,6 @@ def main(page: ft.Page):
                     complete_btn,
                 ], spacing=8), selected_files, reset
 
-            # ========== 首页：错题录入 + 笔记录入（分开） ==========
-            # ---- 错题录入部分 ----
             subj_dd = ft.Dropdown(
                 label="科目",
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
@@ -1596,7 +1660,6 @@ def main(page: ft.Page):
                 show_toast(f"✅ {subj} 错题已保存！", "green")
                 refresh_review_view()
 
-            # ---- 笔记录入部分（允许只传图片） ----
             note_subject_dd = ft.Dropdown(
                 label="科目",
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
@@ -1620,7 +1683,6 @@ def main(page: ft.Page):
                 reset_note_picker()
                 show_toast(f"✅ {subj} 笔记已保存！", "green")
 
-            # ---- 组装首页 ----
             home_page = ft.Column([
                 ft.Text("📸 拍照录题（错题）", size=22, weight=ft.FontWeight.BOLD),
                 ft.Row([subj_dd], spacing=15) if not is_mobile else ft.Column([subj_dd]),
@@ -1647,12 +1709,17 @@ def main(page: ft.Page):
                 ft.Container(height=20),
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
 
-            # ==================== AI聊天 ====================
             AI_SUBJECTS = [("总AI", "🤖"), ("数学", "📐"), ("语文", "📜"), ("英语", "📝"),
                            ("物理", "⚛️"), ("化学", "🧪"), ("生物", "🧬"),
                            ("历史", "🏛️"), ("政治", "⚖️"), ("地理", "🌍")]
 
-            contact_panel = ft.Container(visible=False, bgcolor="#E0E0E0", border_radius=16, padding=15, width=220)
+            contact_panel = ft.Container(
+                visible=False,
+                bgcolor="#FFE0B2",
+                border_radius=16,
+                padding=15,
+                width=220
+            )
 
             def close_contact_panel(e=None):
                 contact_panel.visible = False
@@ -1666,17 +1733,39 @@ def main(page: ft.Page):
 
             contact_list = ft.Column(spacing=8)
             for subj_name, subj_icon in AI_SUBJECTS:
-                btn = ft.TextButton(text=f"{subj_icon} {subj_name}", on_click=lambda e, s=subj_name: open_chat(s))
+                btn = ft.TextButton(
+                    text=f"{subj_icon} {subj_name}",
+                    on_click=lambda e, s=subj_name: open_chat(s)
+                )
                 contact_list.controls.append(btn)
-            contact_panel.content = ft.Column([ft.Text("🧠 AI 助手", size=18), ft.Divider(), contact_list], spacing=5)
+            contact_panel.content = ft.Column(
+                [ft.Text("🧠 AI 助手", size=18), ft.Divider(), contact_list],
+                spacing=5
+            )
 
-            ai_ball = ft.Container(content=ft.Text("AI", size=20, color="white"), width=56, height=56,
-                                   border_radius=28, bgcolor="#1976D2", alignment=ft.alignment.center,
-                                   on_click=lambda e: (close_contact_panel() if contact_panel.visible else open_contact_panel(e)))
+            ai_ball = ft.Container(
+                content=ft.Text("AI", size=20, color="white"),
+                width=56,
+                height=56,
+                border_radius=28,
+                bgcolor="#FF7043",
+                alignment=ft.alignment.center,
+                on_click=lambda e: (
+                    close_contact_panel() if contact_panel.visible else open_contact_panel(e)
+                )
+            )
             ball_container = ft.Container(content=ai_ball, right=10, bottom=10)
 
-            chat_dialog = ft.Container(visible=False, left=20, top=20, right=20, bottom=20,
-                                       bgcolor="white", border_radius=16, padding=20)
+            chat_dialog = ft.Container(
+                visible=False,
+                left=20,
+                top=20,
+                right=20,
+                bottom=20,
+                bgcolor="white",
+                border_radius=16,
+                padding=20
+            )
             current_chat_subject = "总AI"
             stop_flag = False
             generation_active = False
@@ -1699,14 +1788,31 @@ def main(page: ft.Page):
                 if not api_key:
                     on_chunk("❌ 未配置API密钥")
                     return
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                payload = {"model": "glm-4-flash", "messages": messages, "temperature": 0.7, "max_tokens": 2048, "stream": True}
+
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "glm-4-flash",
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 2048,
+                    "stream": True
+                }
+
                 try:
-                    resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                                         headers=headers, json=payload, stream=True, timeout=60)
+                    resp = requests.post(
+                        "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        stream=True,
+                        timeout=60
+                    )
                     if resp.status_code != 200:
                         on_chunk(f"❌ API错误 {resp.status_code}")
                         return
+
                     accumulated = ""
                     for line in resp.iter_lines(decode_unicode=True):
                         if stop_flag:
@@ -1729,9 +1835,13 @@ def main(page: ft.Page):
             def build_chat_window(subject, initial_message=None):
                 display_name = subject if subject != "总AI" else "总AI"
                 history = load_chat_history(subject)
+
                 context_messages = []
                 for msg in history[-20:]:
-                    context_messages.append({"role": msg["role"], "content": msg["content"]})
+                    context_messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
 
                 memory_summary = get_memory_summary()
                 profile_summary = get_profile_summary()
@@ -1741,6 +1851,7 @@ def main(page: ft.Page):
 - 对于解题类问题，请先给出思路，再给出步骤。
 - 对于作文类问题，请提供框架和例句。
 - 回答要简洁、准确、有条理。"""
+
                 custom_skill = load_custom_skill()
                 if custom_skill:
                     system_prompt += f"\n\n额外的教学指导：{custom_skill}"
@@ -1759,7 +1870,12 @@ def main(page: ft.Page):
                     all_messages.append(msg)
 
                 chat_history_display = ft.ListView(spacing=12, expand=True)
-                chat_input = ft.TextField(label=f"向{display_name}老师提问...", multiline=True, min_lines=2, max_lines=5)
+                chat_input = ft.TextField(
+                    label=f"向{display_name}老师提问...",
+                    multiline=True,
+                    min_lines=2,
+                    max_lines=5
+                )
                 send_btn = ft.ElevatedButton("发送", icon=ft.Icons.SEND)
                 stop_btn = ft.TextButton("停止生成", visible=False)
                 chat_status = ft.Text("", size=14)
@@ -1769,11 +1885,17 @@ def main(page: ft.Page):
                     chat_history_display.controls.append(
                         ft.Container(
                             content=ft.Column([
-                                ft.Text("你" if is_user else display_name, size=12, weight=ft.FontWeight.BOLD,
-                                        color=ft.Colors.BLUE if is_user else ft.Colors.GREEN),
+                                ft.Text(
+                                    "你" if is_user else display_name,
+                                    size=12,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=ft.Colors.ORANGE_600 if is_user else ft.Colors.GREEN
+                                ),
                                 ft.Text(msg["content"], size=14),
                             ], spacing=4),
-                            padding=10, border_radius=12, bgcolor="#E3F2FD" if is_user else "#E8F5E9",
+                            padding=10,
+                            border_radius=12,
+                            bgcolor="#FFE0B2" if is_user else "#E8F5E9",
                         )
                     )
 
@@ -1791,10 +1913,17 @@ def main(page: ft.Page):
                     chat_history_display.controls.append(
                         ft.Container(
                             content=ft.Column([
-                                ft.Text("你", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
+                                ft.Text(
+                                    "你",
+                                    size=12,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=ft.Colors.ORANGE_600
+                                ),
                                 ft.Text(content, size=14),
                             ], spacing=4),
-                            padding=10, border_radius=12, bgcolor="#E3F2FD",
+                            padding=10,
+                            border_radius=12,
+                            bgcolor="#FFE0B2",
                         )
                     )
                     send_btn.visible = False
@@ -1830,18 +1959,27 @@ def main(page: ft.Page):
                         chat_history_display.controls.append(
                             ft.Container(
                                 content=ft.Column([
-                                    ft.Text(display_name, size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN),
+                                    ft.Text(
+                                        display_name,
+                                        size=12,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.Colors.GREEN
+                                    ),
                                     ft.Text(ai_response if ai_response else "（无回应）", size=14),
                                 ], spacing=4),
-                                padding=10, border_radius=12, bgcolor="#E8F5E9",
+                                padding=10,
+                                border_radius=12,
+                                bgcolor="#E8F5E9",
                             )
                         )
                         send_btn.visible = True
                         stop_btn.visible = False
                         chat_status.value = ""
+
                         if ai_response:
                             save_chat_message(subject, "assistant", ai_response)
                             update_chat_memory(subject, content, ai_response)
+
                         update_chat_stats(subject)
                         page.update()
 
@@ -1863,8 +2001,13 @@ def main(page: ft.Page):
                     ft.Row([
                         ft.Text(f"💬 {display_name} 对话", size=20, weight=ft.FontWeight.BOLD),
                         ft.TextButton("🗑️ 清除历史", on_click=clear_history),
-                        ft.IconButton(icon=ft.Icons.CLOSE,
-                                      on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
+                        ft.IconButton(
+                            icon=ft.Icons.CLOSE,
+                            on_click=lambda e: (
+                                setattr(chat_dialog, 'visible', False),
+                                page.update()
+                            )
+                        ),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     ft.Divider(),
                     ft.Container(content=chat_history_display, expand=True),
@@ -1872,7 +2015,6 @@ def main(page: ft.Page):
                     chat_status,
                 ], spacing=10, expand=True)
 
-            # ==================== 智能复习 ====================
             review_subject_dropdown = ft.Dropdown(
                 label="选择科目",
                 options=[ft.dropdown.Option(sub) for sub in
@@ -2439,7 +2581,6 @@ def main(page: ft.Page):
             ], spacing=15, expand=True)
             refresh_review_view()
 
-            # ==================== 英语单词本 ====================
             mine_msg = ft.Text("", size=16)
 
             def _load_user_new_words():
@@ -2736,16 +2877,15 @@ def main(page: ft.Page):
             vocab_page = _vocab_page_dynamic
             new_words_page = _new_words_page_dynamic
 
-            # ==================== 学科页面 ====================
             selected_subject_for_page = "数学"
 
             def build_function_card_grid(subject):
                 all_cards = [
-                    ("📋", "错题本", ft.Colors.BLUE_100),
+                    ("📋", "错题本", ft.Colors.ORANGE_100),
                     ("📝", "笔记本", ft.Colors.GREEN_100),
-                    ("🧠", "智能复习", ft.Colors.ORANGE_100),
-                    ("📖", "单词本", ft.Colors.PURPLE_100),
-                    ("📘", "生词表", ft.Colors.TEAL_100),
+                    ("🧠", "智能复习", ft.Colors.AMBER_100),
+                    ("📖", "单词本", ft.Colors.DEEP_ORANGE_100),
+                    ("📘", "生词表", ft.Colors.YELLOW_100),
                     ("💬", "金句", ft.Colors.PINK_100),
                 ]
                 cards_config = all_cards if subject == "英语" else all_cards[:3]
@@ -2814,29 +2954,12 @@ def main(page: ft.Page):
                 subject_page_content.content = full_page
                 page.update()
 
-            # ★ 错题本（修复缩略图、长按、详情缩放） ★
             def build_error_list_page(subject):
                 import traceback
                 import re
                 items = load_jsonl(ERRORS_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
                 subject_items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
-
-                tag_colors = [
-                    "#E3F2FD", "#FFF3E0", "#E8F5E9", "#FCE4EC", "#F3E5F5",
-                    "#E0F7FA", "#FFF8E1", "#F1F8E9", "#FBE9E7", "#EDE7F6"
-                ]
-
-                def get_tag_color(tags):
-                    if not tags:
-                        return "#F8F9FA"
-                    idx = abs(hash(tags[0])) % len(tag_colors)
-                    return tag_colors[idx]
-
-                def reset_all_cards():
-                    for key, container in card_refs.items():
-                        container.bgcolor = "#F8F9FA"
-                        container.border = ft.border.all(1, "#E0E0E0")
 
                 def clean_time_str(t):
                     if not t:
@@ -2847,120 +2970,43 @@ def main(page: ft.Page):
                     label="🔍 智能搜索错题",
                     hint_text="输入知识点或描述，如：我想复习导数",
                     expand=True,
-                    on_submit=lambda e: perform_smart_search(e),
-                    border_color=ft.Colors.BLUE_400,
+                    border_color=ft.Colors.ORANGE_400,
                     border_width=2,
                 )
-                search_btn = ft.ElevatedButton("搜索", on_click=lambda e: perform_smart_search(e), icon=ft.Icons.SEARCH,
-                                               bgcolor=ft.Colors.BLUE_500, color=ft.Colors.WHITE)
+                search_btn = ft.ElevatedButton("搜索", on_click=lambda e: perform_search(e), icon=ft.Icons.SEARCH,
+                                               bgcolor=ft.Colors.ORANGE_500, color=ft.Colors.WHITE)
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_600)
                 search_row = ft.Row([search_input, search_btn], spacing=10)
 
                 list_view = ft.ListView(spacing=10, expand=True)
-                card_refs = {}
 
-                @retry_request(max_retries=2, base_delay=2)
-                def perform_smart_search(e):
-                    query = search_input.value.strip()
-                    if not query:
-                        search_status.value = "请输入搜索内容"
-                        search_status.color = ft.Colors.ORANGE
-                        page.update()
-                        return
-
-                    reset_all_cards()
-                    search_status.value = f"⏳ AI正在分析：{query}"
-                    search_status.color = ft.Colors.BLUE
-                    page.update()
-
-                    def do_search():
-                        api_key = load_ai_config().get("api_key_free", "").strip()
-                        if not api_key:
-                            search_status.value = "❌ 未配置API密钥"
-                            search_status.color = ft.Colors.RED
-                            page.update()
-                            return
-
-                        prompt = f"""请分析以下错题列表，找出与用户查询匹配的题目。
-用户查询：{query}
-
-错题列表（仅显示题目摘要）：
-{chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(subject_items)])}
-
-返回匹配的题目序号（从1开始），JSON数组格式，如：[1, 3, 5]
-只返回JSON数组，不要其他文字。"""
-                        try:
-                            resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                                                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                                                 json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
-                                                       "temperature": 0.3, "max_tokens": 500}, timeout=30)
-                            if resp.status_code == 200:
-                                content = resp.json()["choices"][0]["message"]["content"]
-                                try:
-                                    matches = json.loads(content)
-                                except:
-                                    match = re.search(r'\[[0-9,\s]*\]', content)
-                                    matches = json.loads(match.group()) if match else []
-
-                                if matches and isinstance(matches, list):
-                                    highlight_indices = [m - 1 for m in matches if 1 <= m <= len(subject_items)]
-                                    if highlight_indices:
-                                        for idx in highlight_indices:
-                                            key = str(idx)
-                                            if key in card_refs:
-                                                card_refs[key].bgcolor = "#FFF3CD"
-                                                card_refs[key].border = ft.border.all(2, "#FFC107")
-                                        search_status.value = f"✅ 找到 {len(highlight_indices)} 个匹配的错题"
-                                        search_status.color = ft.Colors.GREEN
-                                        if highlight_indices:
-                                            first_key = str(highlight_indices[0])
-                                            if first_key in card_refs:
-                                                list_view.scroll_to(key=first_key, duration=300)
-                                    else:
-                                        search_status.value = "❌ 未找到匹配的错题"
-                                        search_status.color = ft.Colors.ORANGE
-                                else:
-                                    search_status.value = "❌ AI未返回有效结果"
-                                    search_status.color = ft.Colors.RED
-                            else:
-                                search_status.value = f"❌ API错误: {resp.status_code}"
-                                search_status.color = ft.Colors.RED
-                        except Exception as ex:
-                            search_status.value = f"❌ 搜索失败: {str(ex)[:50]}"
-                            search_status.color = ft.Colors.RED
-                            print("[搜索错误]")
-                            traceback.print_exc()
-                        page.update()
-
-                    threading.Thread(target=do_search, daemon=True).start()
-
-                def render_list():
+                def render_list(items_to_show=None, highlight_set=None):
                     list_view.controls.clear()
-                    card_refs.clear()
+                    if items_to_show is None:
+                        items_to_show = subject_items
+                    if highlight_set is None:
+                        highlight_set = set()
 
-                    if not subject_items:
+                    if not items_to_show:
                         list_view.controls.append(ft.Container(
                             content=ft.Text("  暂无错题", size=16, color=ft.Colors.GREY_600), padding=20
                         ))
                         page.update()
                         return
 
-                    for idx, item in enumerate(subject_items):
+                    for idx, item in enumerate(items_to_show):
                         try:
                             original = item.get("original", "")
                             mistake = item.get("mistake", "")
                             answer = item.get("answer", "")
                             idea = item.get("idea", "")
-                            question = item.get("question", "")
                             q_media = item.get("question_media", []) or item.get("question_images", [])
-                            ts_raw = item.get("time", "")
-                            ts_clean = clean_time_str(ts_raw)
+                            ts_clean = clean_time_str(item.get("time", ""))
                             tags = item.get("tags", [])
-
                             tag_text = "、".join(tags) if tags else "未分类"
-                            bg_color = "#F8F9FA"
+                            is_highlighted = idx in highlight_set
+                            bg_color = "#FFF3CD" if is_highlighted else "#F8F9FA"
 
-                            # 状态圆点
                             status = item.get("status", "未看")
                             status_color = {
                                 "未看": "#9E9E9E",
@@ -2969,88 +3015,30 @@ def main(page: ft.Page):
                                 "已掌握": "#2196F3",
                             }.get(status, "#9E9E9E")
                             status_dot = ft.Container(
-                                width=12,
-                                height=12,
-                                border_radius=6,
-                                bgcolor=status_color,
-                                tooltip=status,
+                                width=12, height=12, border_radius=6,
+                                bgcolor=status_color, tooltip=status,
                             )
 
-                            # ---------- 缩略图（修复路径 + 长按） ----------
                             thumb_container = ft.Container(
-                                width=80,
-                                height=80,
-                                border_radius=8,
-                                bgcolor=ft.Colors.GREY_200,
-                                alignment=ft.alignment.center,
+                                width=80, height=80, border_radius=8,
+                                bgcolor=ft.Colors.GREY_200, alignment=ft.alignment.center,
                             )
                             if q_media and len(q_media) > 0:
                                 first_img = q_media[0]
-                                # 确保路径是绝对路径
-                                if not os.path.isabs(first_img):
-                                    full_path = os.path.join(DATA_DIR, first_img)
-                                else:
-                                    full_path = first_img
+                                full_path = first_img if os.path.isabs(first_img) else os.path.join(DATA_DIR, first_img)
                                 if os.path.exists(full_path):
                                     try:
-                                        thumb_img = ft.Image(
-                                            src=full_path,
-                                            width=80,
-                                            height=80,
-                                            fit=ft.ImageFit.COVER,
-                                        )
-                                        # 使用 GestureDetector 包裹图片，支持长按
+                                        thumb_img = ft.Image(src=full_path, width=80, height=80, fit=ft.ImageFit.COVER)
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
-                                                content=thumb_img,
-                                                width=80,
-                                                height=80,
-                                                border_radius=8,
-                                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                                                content=thumb_img, width=80, height=80,
+                                                border_radius=8, clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                                             ),
-                                            on_long_press=lambda e, path=full_path: show_image_preview(path),
+                                            on_long_press=lambda e, paths=q_media: show_image_gallery(paths, 0),
                                         )
                                     except Exception as e:
                                         print(f"缩略图加载失败: {e}")
-                                        thumb_container = ft.Container(
-                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
-                                            width=80,
-                                            height=80,
-                                            alignment=ft.alignment.center,
-                                            border_radius=8,
-                                            bgcolor=ft.Colors.GREY_200,
-                                        )
-                                else:
-                                    # 文件不存在，显示占位
-                                    thumb_container = ft.Container(
-                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
-                                        width=80,
-                                        height=80,
-                                        alignment=ft.alignment.center,
-                                        border_radius=8,
-                                        bgcolor=ft.Colors.GREY_200,
-                                    )
 
-                            # ---------- 图片预览函数（支持缩放） ----------
-                            def show_image_preview(image_path):
-                                # 使用 InteractiveViewer 实现缩放
-                                preview_dlg = ft.AlertDialog(
-                                    title=ft.Text("图片预览"),
-                                    content=ft.Container(
-                                        content=ft.InteractiveViewer(
-                                            content=ft.Image(src=image_path, fit=ft.ImageFit.CONTAIN),
-                                            min_scale=0.5,
-                                            max_scale=3.0,
-                                        ),
-                                        width=400,
-                                        height=400,
-                                    ),
-                                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(preview_dlg))],
-                                )
-                                page.open(preview_dlg)
-                                page.update()
-
-                            # 构建显示文本
                             detail_lines = []
                             if original:
                                 detail_lines.append(f"📝 {original[:80]}")
@@ -3060,23 +3048,18 @@ def main(page: ft.Page):
                                 detail_lines.append(f"✅ {answer[:80]}")
                             if idea:
                                 detail_lines.append(f"💡 {idea[:80]}")
-                            if question:
-                                detail_lines.append(f"📄 {question[:80]}")
                             if q_media:
                                 detail_lines.append(f"🖼️ 包含 {len(q_media)} 张图片")
                             if not detail_lines:
                                 detail_lines.append("点击查看详情")
-
                             detail_text = "\n".join(detail_lines[:2])
 
                             tag_display = ft.Container(
                                 content=ft.Text(f"🏷️ {tag_text}", size=11, color=ft.Colors.GREY_700),
                                 padding=ft.Padding(left=6, right=6, top=2, bottom=2),
-                                bgcolor=ft.Colors.GREY_200,
-                                border_radius=8,
+                                bgcolor=ft.Colors.GREY_200, border_radius=8,
                             )
 
-                            # 点击卡片打开详情
                             def make_show_detail_card(item_data=item):
                                 def show(e):
                                     detail_children = []
@@ -3108,7 +3091,6 @@ def main(page: ft.Page):
                                         detail_children.append(
                                             ft.Text(f"🏷️ 标签：{', '.join(tags)}", size=13, color=ft.Colors.GREY_700)
                                         )
-                                    # 图片附件
                                     all_media = []
                                     all_media.extend(item_data.get("question_media", []))
                                     all_media.extend(item_data.get("original_media", []))
@@ -3123,47 +3105,23 @@ def main(page: ft.Page):
                                     if unique_media:
                                         detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_300))
                                         detail_children.append(
-                                            ft.Text(f"🖼️ 图片附件（{len(unique_media)}张）", size=14, weight=ft.FontWeight.BOLD)
+                                            ft.Text(f"🖼️ 图片附件（{len(unique_media)}张，点击查看）", size=14, weight=ft.FontWeight.BOLD)
                                         )
                                         img_row = ft.Row(spacing=8, wrap=True)
-                                        for img_path in unique_media[:5]:
+                                        for img_path in unique_media:
                                             full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
                                             if os.path.exists(full_path):
                                                 try:
-                                                    # 使用 InteractiveViewer 实现缩放
                                                     img = ft.Container(
-                                                        content=ft.InteractiveViewer(
-                                                            content=ft.Image(src=full_path, fit=ft.ImageFit.CONTAIN),
-                                                            min_scale=0.5,
-                                                            max_scale=3.0,
-                                                        ),
-                                                        width=120,
-                                                        height=120,
-                                                        border_radius=8,
-                                                        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                                                        content=ft.Image(src=full_path, width=100, height=100, fit=ft.ImageFit.COVER, border_radius=8),
+                                                        on_click=lambda e, paths=unique_media, idx=unique_media.index(img_path): show_image_gallery(paths, idx),
+                                                        ink=True, border_radius=8,
                                                     )
-                                                    # 点击打开独立预览（已支持缩放）
-                                                    img_container = ft.Container(
-                                                        content=img,
-                                                        on_click=lambda e, p=full_path: show_image_preview(p),
-                                                        ink=True,
-                                                    )
-                                                    img_row.controls.append(img_container)
+                                                    img_row.controls.append(img)
                                                 except Exception as e:
                                                     print(f"[图片加载错误] {full_path}: {e}")
-                                                    img_row.controls.append(
-                                                        ft.Text(f"⚠️ {os.path.basename(full_path)}", size=12, color=ft.Colors.ORANGE)
-                                                    )
-                                            else:
-                                                img_row.controls.append(
-                                                    ft.Text(f"⚠️ 文件不存在：{os.path.basename(img_path)}", size=12, color=ft.Colors.RED)
-                                                )
                                         if img_row.controls:
                                             detail_children.append(img_row)
-                                        if len(unique_media) > 5:
-                                            detail_children.append(
-                                                ft.Text(f"...还有 {len(unique_media)-5} 张", size=12, color=ft.Colors.GREY_500)
-                                            )
                                     def open_edit(e):
                                         page.close(detail_dlg)
                                         make_show_detail(item_data)(e)
@@ -3175,8 +3133,7 @@ def main(page: ft.Page):
                                         title=ft.Text(""),
                                         content=ft.Container(
                                             content=ft.Column(detail_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                                            width=450, height=500,
-                                            padding=10,
+                                            width=450, height=500, padding=10,
                                         ),
                                         actions=[action_row],
                                     )
@@ -3283,13 +3240,12 @@ def main(page: ft.Page):
                                 padding=12,
                                 border_radius=12,
                                 bgcolor=bg_color,
-                                border=ft.border.all(1, "#E0E0E0"),
+                                border=ft.border.all(2 if is_highlighted else 1, "#FFC107" if is_highlighted else "#E0E0E0"),
                                 on_click=make_show_detail_card(item),
                                 ink=True,
                             )
                             key = str(idx)
                             container.key = key
-                            card_refs[key] = container
                             list_view.controls.append(container)
                         except Exception as e:
                             print(f"⚠️ 加载错题条目失败（idx={idx}），已跳过，错误: {e}")
@@ -3300,17 +3256,82 @@ def main(page: ft.Page):
                         ))
                     page.update()
 
+                def perform_search(e):
+                    query = search_input.value.strip()
+                    if not query:
+                        search_status.value = "请输入搜索内容"
+                        search_status.color = ft.Colors.ORANGE
+                        page.update()
+                        return
+                    search_status.value = f"⏳ AI正在分析：{query}"
+                    search_status.color = ft.Colors.ORANGE_600
+                    page.update()
+
+                    def do_search():
+                        api_key = load_ai_config().get("api_key_free", "").strip()
+                        if not api_key:
+                            search_status.value = "❌ 未配置API密钥"
+                            search_status.color = ft.Colors.RED
+                            page.update()
+                            return
+                        prompt = f"""请分析以下错题列表，找出与用户查询匹配的题目。
+用户查询：{query}
+
+错题列表（仅显示题目摘要）：
+{chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(subject_items)])}
+
+返回匹配的题目序号（从1开始），JSON数组格式，如：[1, 3, 5]
+只返回JSON数组，不要其他文字。"""
+                        try:
+                            resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                                                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                                                 json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
+                                                       "temperature": 0.3, "max_tokens": 500}, timeout=30)
+                            if resp.status_code == 200:
+                                content = resp.json()["choices"][0]["message"]["content"]
+                                try:
+                                    matches = json.loads(content)
+                                except:
+                                    match = re.search(r'\[[0-9,\s]*\]', content)
+                                    matches = json.loads(match.group()) if match else []
+                                if matches and isinstance(matches, list):
+                                    highlight_indices = [m - 1 for m in matches if 1 <= m <= len(subject_items)]
+                                    if highlight_indices:
+                                        matched_items = [subject_items[i] for i in highlight_indices]
+                                        other_items = [item for i, item in enumerate(subject_items) if i not in highlight_indices]
+                                        sorted_items = matched_items + other_items
+                                        highlight_set = set(range(len(matched_items)))
+                                        render_list(sorted_items, highlight_set)
+                                        search_status.value = f"✅ 找到 {len(highlight_indices)} 个匹配的错题（已置顶）"
+                                        search_status.color = ft.Colors.GREEN
+                                    else:
+                                        search_status.value = "❌ 未找到匹配的错题"
+                                        search_status.color = ft.Colors.ORANGE
+                                else:
+                                    search_status.value = "❌ AI未返回有效结果"
+                                    search_status.color = ft.Colors.RED
+                            else:
+                                search_status.value = f"❌ API错误: {resp.status_code}"
+                                search_status.color = ft.Colors.RED
+                        except Exception as ex:
+                            search_status.value = f"❌ 搜索失败: {str(ex)[:50]}"
+                            search_status.color = ft.Colors.RED
+                            print("[搜索错误]")
+                            traceback.print_exc()
+                        page.update()
+
+                    threading.Thread(target=do_search, daemon=True).start()
+
                 render_list()
                 return ft.Column([
                     ft.Text("📋 错题本", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text("🔍 智能搜索：输入知识点或描述，AI自动匹配相关错题", size=13, color=ft.Colors.BLUE_600),
+                    ft.Text("🔍 智能搜索：输入知识点或描述，AI自动匹配并置顶", size=13, color=ft.Colors.ORANGE_600),
                     search_row,
                     search_status,
                     ft.Divider(height=1),
                     ft.Container(content=list_view, expand=True),
                 ], spacing=8, expand=True)
 
-            # ★ 笔记本（添加缩略图、长按、卡片点击） ★
             def build_note_list_page(subject):
                 items = load_jsonl(NOTES_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
@@ -3328,76 +3349,83 @@ def main(page: ft.Page):
                             ts = item.get("time", "")
                             ts_int = item.get("timestamp", 0)
 
-                            # 缩略图 + 长按
                             thumb_container = ft.Container(
-                                width=80,
-                                height=80,
-                                border_radius=8,
-                                bgcolor=ft.Colors.GREY_200,
-                                alignment=ft.alignment.center,
+                                width=80, height=80, border_radius=8,
+                                bgcolor=ft.Colors.GREY_200, alignment=ft.alignment.center,
                             )
                             if images and len(images) > 0:
                                 first_img = images[0]
-                                if not os.path.isabs(first_img):
-                                    full_path = os.path.join(DATA_DIR, first_img)
-                                else:
-                                    full_path = first_img
+                                full_path = first_img if os.path.isabs(first_img) else os.path.join(DATA_DIR, first_img)
                                 if os.path.exists(full_path):
                                     try:
-                                        thumb_img = ft.Image(
-                                            src=full_path,
-                                            width=80,
-                                            height=80,
-                                            fit=ft.ImageFit.COVER,
-                                        )
-                                        def on_long_press(e, path=full_path):
-                                            dlg = ft.AlertDialog(
-                                                title=ft.Text("图片预览"),
-                                                content=ft.Container(
-                                                    content=ft.InteractiveViewer(
-                                                        content=ft.Image(src=path, fit=ft.ImageFit.CONTAIN),
-                                                        min_scale=0.5,
-                                                        max_scale=3.0,
-                                                    ),
-                                                    width=400,
-                                                    height=400,
-                                                ),
-                                                actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
-                                            )
-                                            page.open(dlg)
-                                            page.update()
+                                        thumb_img = ft.Image(src=full_path, width=80, height=80, fit=ft.ImageFit.COVER)
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
-                                                content=thumb_img,
-                                                width=80,
-                                                height=80,
-                                                border_radius=8,
-                                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                                                content=thumb_img, width=80, height=80,
+                                                border_radius=8, clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                                             ),
-                                            on_long_press=on_long_press,
+                                            on_long_press=lambda e, paths=images: show_image_gallery(paths, 0),
                                         )
                                     except Exception as e:
                                         print(f"笔记缩略图加载失败: {e}")
-                                        thumb_container = ft.Container(
-                                            content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
-                                            width=80,
-                                            height=80,
-                                            alignment=ft.alignment.center,
-                                            border_radius=8,
-                                            bgcolor=ft.Colors.GREY_200,
-                                        )
-                                else:
-                                    thumb_container = ft.Container(
-                                        content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=40, color=ft.Colors.GREY_600),
-                                        width=80,
-                                        height=80,
-                                        alignment=ft.alignment.center,
-                                        border_radius=8,
-                                        bgcolor=ft.Colors.GREY_200,
-                                    )
 
-                            # 点击卡片打开编辑
                             def make_show_note(item_data=item):
+                                def show(e):
+                                    detail_children = []
+                                    detail_children.append(
+                                        ft.Text("📝 笔记详情", size=20, weight=ft.FontWeight.BOLD)
+                                    )
+                                    detail_children.append(
+                                        ft.Text(f"时间：{ts}", size=13, color=ft.Colors.GREY_600)
+                                    )
+                                    if content:
+                                        detail_children.append(
+                                            ft.Text(content, size=15, selectable=True)
+                                        )
+                                    else:
+                                        detail_children.append(
+                                            ft.Text("（无文字内容）", size=14, color=ft.Colors.GREY_500)
+                                        )
+                                    if images:
+                                        detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_300))
+                                        detail_children.append(
+                                            ft.Text(f"🖼️ 图片附件（{len(images)}张，点击查看）", size=14, weight=ft.FontWeight.BOLD)
+                                        )
+                                        img_row = ft.Row(spacing=8, wrap=True)
+                                        for img_path in images:
+                                            full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
+                                            if os.path.exists(full_path):
+                                                try:
+                                                    img = ft.Container(
+                                                        content=ft.Image(src=full_path, width=100, height=100, fit=ft.ImageFit.COVER, border_radius=8),
+                                                        on_click=lambda e, paths=images, idx=images.index(img_path): show_image_gallery(paths, idx),
+                                                        ink=True, border_radius=8,
+                                                    )
+                                                    img_row.controls.append(img)
+                                                except Exception as e:
+                                                    print(f"[图片加载错误] {full_path}: {e}")
+                                        if img_row.controls:
+                                            detail_children.append(img_row)
+                                    def open_edit(e):
+                                        page.close(detail_dlg)
+                                        make_edit_note(item_data)(e)
+                                    action_row = ft.Row([
+                                        ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
+                                        ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
+                                    ], alignment=ft.MainAxisAlignment.END)
+                                    detail_dlg = ft.AlertDialog(
+                                        title=ft.Text(""),
+                                        content=ft.Container(
+                                            content=ft.Column(detail_children, spacing=8, scroll=ft.ScrollMode.AUTO),
+                                            width=450, height=500, padding=10,
+                                        ),
+                                        actions=[action_row],
+                                    )
+                                    page.open(detail_dlg)
+                                    page.update()
+                                return show
+
+                            def make_edit_note(item_data=item):
                                 def show(e):
                                     content_input = ft.TextField(label="笔记内容", value=item_data.get("content", ""), multiline=True,
                                                                  min_lines=4)
@@ -3444,16 +3472,16 @@ def main(page: ft.Page):
                                 content=ft.Column([
                                     ft.Row([
                                         ft.Text(f"📝 {ts}{img_hint}", size=13, color=ft.Colors.GREY_600),
-                                        ft.TextButton("编辑", on_click=make_show_note()),
+                                        ft.TextButton("编辑", on_click=make_edit_note()),
                                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                                     thumb_container,
                                     ft.Text(preview, size=14, max_lines=3),
                                 ], spacing=4),
                                 padding=12,
                                 border_radius=12,
-                                bgcolor="#E8F5E9",
-                                border=ft.border.all(1, "#A5D6A7"),
-                                on_click=make_show_note(),  # 点击卡片打开编辑
+                                bgcolor="#FFF3E0",
+                                border=ft.border.all(1, "#FFB74D"),
+                                on_click=make_show_note(),
                             ))
                         except Exception as e:
                             print(f"⚠️ 加载笔记条目失败，已跳过: {e}")
@@ -3470,7 +3498,7 @@ def main(page: ft.Page):
                                         color="white" if is_selected else "black"),
                         padding=ft.Padding(left=16, top=12, right=16, bottom=12),
                         border_radius=10,
-                        bgcolor=ft.Colors.BLUE_600 if is_selected else ft.Colors.GREY_200,
+                        bgcolor=ft.Colors.ORANGE_600 if is_selected else ft.Colors.GREY_200,
                         on_click=lambda e, ss=s: on_subject_selected(ss),
                     )
                     subj_buttons.append(btn)
@@ -3499,7 +3527,6 @@ def main(page: ft.Page):
                 ft.Container(content=subject_page_content, expand=True),
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
 
-            # ==================== 个人中心 ====================
             today_plan_text = ft.Text("点击「生成今日计划」获取 AI 学习建议", size=15, color="grey", selectable=True)
             today_plan_card = ft.Container(
                 content=ft.Column([
@@ -3682,7 +3709,6 @@ def main(page: ft.Page):
                 page.open(dlg)
                 page.update()
 
-            # ---------- 备份恢复 ----------
             backup_status = ft.Text("", size=13, color=ft.Colors.GREY_600)
             backup_picker = ft.FilePicker(on_result=lambda e: on_backup_result(e))
             restore_picker = ft.FilePicker(on_result=lambda e: on_restore_result(e))
@@ -3699,7 +3725,7 @@ def main(page: ft.Page):
                         try:
                             import shutil
                             if os.path.exists(DATA_DIR):
-                                backup_folder = os.path.join(dest_dir, "智能错题笔记备份")
+                                backup_folder = os.path.join(dest_dir, "池鱼Study备份")
                                 shutil.copytree(DATA_DIR, backup_folder, dirs_exist_ok=True)
                                 backup_status.value = f"✅ 备份成功！位置：{backup_folder}"
                                 backup_status.color = ft.Colors.GREEN
@@ -3737,7 +3763,6 @@ def main(page: ft.Page):
                         page.update()
                     threading.Thread(target=do_restore, daemon=True).start()
 
-            # ---- 个人中心 ----
             mine_page = ft.Column([
                 ft.Text("⚙️ 个人中心", size=24),
                 today_plan_card,
@@ -3771,7 +3796,6 @@ def main(page: ft.Page):
                 backup_status,
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
-            # ========== 导航 ==========
             current_page = ft.Container(expand=True)
 
             def switch_page(index):
@@ -3795,7 +3819,6 @@ def main(page: ft.Page):
             page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
             print("步骤7: UI 加载完成")
 
-        # ========== 直接加载 UI ==========
         load_ui()
 
     except Exception as e:
@@ -3806,5 +3829,5 @@ def main(page: ft.Page):
         print("=== 启动异常 ===")
         traceback.print_exc()
 if __name__ == "__main__":
-    ft.app(target=main) 
-      
+    ft.app(target=main)    
+       
