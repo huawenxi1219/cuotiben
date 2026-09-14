@@ -14,10 +14,8 @@ import uuid
 from datetime import datetime, timedelta
 import traceback
 
-# ==================== 调试开关 ====================
 DEBUG = True
 
-# ==================== 路径配置（外部存储） ====================
 if getattr(sys, 'frozen', False):
     DATA_DIR = "/storage/emulated/0/智能错题笔记"
 else:
@@ -41,20 +39,135 @@ NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
 SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 LEARNING_EVENTS_FILE = os.path.join(DATA_DIR, "learning_events.jsonl")
+VOCAB_SETTINGS_FILE = os.path.join(DATA_DIR, "vocab_settings.json")
 _jsonl_lock = threading.Lock()
-TARGET_VOCAB_COUNT = 3500
 
-# ==================== 确保数据目录存在 ====================
+DEFAULT_VOCAB_SETTINGS = {
+    "daily_new": 20,
+    "daily_review_limit": 100,
+    "quiz_mode": "mix",
+    "show_phonetic": True,
+}
+
 for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
     os.makedirs(d, exist_ok=True)
 
-# ==================== update_data_dir 函数 ====================
+
+def load_vocab_settings():
+    if not os.path.exists(VOCAB_SETTINGS_FILE):
+        return dict(DEFAULT_VOCAB_SETTINGS)
+    try:
+        with open(VOCAB_SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for k, v in DEFAULT_VOCAB_SETTINGS.items():
+            data.setdefault(k, v)
+        return data
+    except BaseException:
+        return dict(DEFAULT_VOCAB_SETTINGS)
+
+
+def save_vocab_settings(settings):
+    with open(VOCAB_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+REVIEW_INTERVALS = [1, 2, 4, 7, 15, 30, 60, 120]
+
+
+def ensure_learning_field(word_data):
+    if "learning" not in word_data or not isinstance(word_data.get("learning"), dict):
+        word_data["learning"] = {
+            "status": "new", "level": 0,
+            "next_review": datetime.now().strftime("%Y-%m-%d"),
+            "review_count": 0, "correct_count": 0, "wrong_count": 0, "last_review": ""
+        }
+    else:
+        L = word_data["learning"]
+        L.setdefault("status", "new")
+        L.setdefault("level", 0)
+        L.setdefault("next_review", datetime.now().strftime("%Y-%m-%d"))
+        L.setdefault("review_count", 0)
+        L.setdefault("correct_count", 0)
+        L.setdefault("wrong_count", 0)
+        L.setdefault("last_review", "")
+    return word_data
+
+
+def schedule_next_review(level):
+    idx = min(max(level, 0), len(REVIEW_INTERVALS) - 1)
+    return REVIEW_INTERVALS[idx]
+
+
+def update_word_learning(word, result):
+    existing = load_jsonl(VOCAB_FILE)
+    today = datetime.now().strftime("%Y-%m-%d")
+    for i, w in enumerate(existing):
+        if w.get("word", "").lower() == word.lower():
+            ensure_learning_field(existing[i])
+            L = existing[i]["learning"]
+            L["review_count"] = L.get("review_count", 0) + 1
+            L["last_review"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            if result in ("know", "quiz_correct"):
+                L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
+                L["correct_count"] = L.get("correct_count", 0) + 1
+                days = schedule_next_review(L["level"])
+                L["next_review"] = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+                L["status"] = "mastered" if L["level"] >= 4 else "review"
+            elif result == "fuzzy":
+                L["next_review"] = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+                L["status"] = "learning"
+            elif result in ("forget", "quiz_wrong"):
+                L["level"] = 0
+                L["wrong_count"] = L.get("wrong_count", 0) + 1
+                L["next_review"] = today
+                L["status"] = "learning"
+            existing[i] = w
+            break
+    save_jsonl(VOCAB_FILE, existing)
+
+
+def get_today_new_words(limit):
+    all_words = load_jsonl(VOCAB_FILE)
+    new_words = []
+    for w in all_words:
+        ensure_learning_field(w)
+        if w["learning"].get("status") == "new":
+            new_words.append(w)
+    return new_words[:limit]
+
+
+def get_today_review_words(limit):
+    all_words = load_jsonl(VOCAB_FILE)
+    today = datetime.now().strftime("%Y-%m-%d")
+    review = []
+    for w in all_words:
+        ensure_learning_field(w)
+        L = w["learning"]
+        if L.get("status") == "new":
+            continue
+        nxt = L.get("next_review", "")
+        if nxt and nxt <= today:
+            review.append(w)
+    return review[:limit]
+
+
+def get_wrong_words(limit=500):
+    all_words = load_jsonl(VOCAB_FILE)
+    wrong = []
+    for w in all_words:
+        ensure_learning_field(w)
+        L = w["learning"]
+        if L.get("wrong_count", 0) > 0 and L.get("level", 0) < 3:
+            wrong.append(w)
+    wrong.sort(key=lambda x: -x["learning"].get("wrong_count", 0))
+    return wrong[:limit]
+
+
 def update_data_dir(new_path: str):
     global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
     global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
     global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
-    global VOCAB_FILE, SENTENCES_FILE, LEARNING_EVENTS_FILE
-
+    global VOCAB_FILE, SENTENCES_FILE, LEARNING_EVENTS_FILE, VOCAB_SETTINGS_FILE
     DATA_DIR = new_path
     IMAGES_DIR = os.path.join(DATA_DIR, "images")
     VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
@@ -73,26 +186,25 @@ def update_data_dir(new_path: str):
     VOCAB_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
     SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
     LEARNING_EVENTS_FILE = os.path.join(DATA_DIR, "learning_events.jsonl")
-
+    VOCAB_SETTINGS_FILE = os.path.join(DATA_DIR, "vocab_settings.json")
     for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
         os.makedirs(d, exist_ok=True)
 
-# ==================== API 自动重试装饰器 ====================
-def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
+
+def retry_request(max_retries=3, base_delay=2, backoff=2,
+                  exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
     def decorator(func):
         def wrapper(*args, **kwargs):
             last_exception = None
             for attempt in range(max_retries + 1):
                 try:
-                    if kwargs.get('stream', False):
-                        return func(*args, **kwargs)
                     return func(*args, **kwargs)
                 except exceptions as e:
                     last_exception = e
                     if attempt == max_retries:
                         raise
                     delay = base_delay * (backoff ** attempt)
-                    print(f"[重试] 第{attempt+1}次失败，{delay}秒后重试... 错误: {e}")
+                    print(f"[重试] 第{attempt + 1}次失败，{delay}秒后重试... 错误: {e}")
                     time.sleep(delay)
                 except Exception as e:
                     raise e
@@ -100,10 +212,12 @@ def retry_request(max_retries=3, base_delay=2, backoff=2, exceptions=(requests.e
         return wrapper
     return decorator
 
+
 def init_vocabulary():
     if not os.path.exists(VOCAB_FILE):
         with open(VOCAB_FILE, "w", encoding="utf-8") as f:
             pass
+
 
 def load_jsonl(filepath):
     with _jsonl_lock:
@@ -115,9 +229,10 @@ def load_jsonl(filepath):
                     if line:
                         try:
                             data.append(json.loads(line))
-                        except:
+                        except BaseException:
                             pass
     return data
+
 
 def save_jsonl(filepath, data_list):
     with _jsonl_lock:
@@ -125,19 +240,20 @@ def save_jsonl(filepath, data_list):
             for item in data_list:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
+
 def load_custom_skill():
     if os.path.exists(CUSTOM_SKILL_FILE):
         with open(CUSTOM_SKILL_FILE, "r", encoding="utf-8") as f:
             return f.read().strip()
     return ""
 
+
 def save_custom_skill(text):
     with open(CUSTOM_SKILL_FILE, "w", encoding="utf-8") as f:
         f.write(text)
 
-# ==================== 学习事件记录（精准画像基础） ====================
+
 def log_learning_event(event_type, subject, kp="", detail="", correct=None, difficulty=None):
-    """记录一条学习事件，用于精准画像和 AI 长记忆"""
     event = {
         "time": time.strftime("%Y-%m-%d %H:%M:%S"),
         "timestamp": int(time.time()),
@@ -150,7 +266,6 @@ def log_learning_event(event_type, subject, kp="", detail="", correct=None, diff
     }
     events = load_jsonl(LEARNING_EVENTS_FILE)
     events.append(event)
-    # 保留策略：只保留最近 1000 条
     if len(events) > 1000:
         archive_file = os.path.join(DATA_DIR, "learning_events_archive.jsonl")
         archive = load_jsonl(archive_file)
@@ -159,408 +274,8 @@ def log_learning_event(event_type, subject, kp="", detail="", correct=None, diff
         events = events[-1000:]
     save_jsonl(LEARNING_EVENTS_FILE, events)
 
-def save_error(subject, original="", original_media=None, answer="", answer_media=None,
-               mistake="", idea="", idea_media=None, manual_tags=""):
-    if original_media is None:
-        original_media = []
-    if answer_media is None:
-        answer_media = []
-    if idea_media is None:
-        idea_media = []
-    user_tags = []
-    if manual_tags.strip():
-        user_tags = [tag.strip() for tag in manual_tags.split(",") if tag.strip()]
-    data = load_jsonl(ERRORS_FILE)
-    question_media = list(set(original_media))
-    entry = {
-        "type": "error", "subject": subject, "original": original, "original_media": original_media,
-        "answer": answer, "answer_media": answer_media, "mistake": mistake, "idea": idea,
-        "idea_media": idea_media, "question": original, "question_media": question_media,
-        "tags": [subject] + user_tags if user_tags else [subject],
-        "error_type": "", "difficulty": 0, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "timestamp": int(time.time()), "deep_analysis": "", "status": "未看"
-    }
-    data.append(entry)
-    save_jsonl(ERRORS_FILE, data)
-    log_learning_event("error_upload", subject, kp="", detail=f"上传错题：{original[:80]} | 错因：{mistake[:60]}")
-    if not user_tags:
-        threading.Thread(target=auto_tag_error, args=(entry["timestamp"],), daemon=True).start()
-
-@retry_request(max_retries=3, base_delay=2)
-def auto_tag_error(timestamp):
-    errors = load_jsonl(ERRORS_FILE)
-    target = None
-    for err in errors:
-        if err.get("timestamp") == timestamp:
-            target = err
-            break
-    if not target:
-        return
-    content_parts = []
-    if target.get("original"):
-        content_parts.append(f"题目：{target['original']}")
-    if target.get("mistake"):
-        content_parts.append(f"学生错误：{target['mistake']}")
-    if target.get("idea"):
-        content_parts.append(f"学生见解：{target['idea']}")
-    if target.get("answer"):
-        content_parts.append(f"标准答案：{target['answer']}")
-    content_text = "\n".join(content_parts)
-    if not content_text:
-        return
-    ai_config = load_ai_config()
-    api_key = ai_config.get("api_key_free", "").strip()
-    if not api_key:
-        return
-    prompt = f"""你是一个专业的高中教师。请分析以下错题，并严格按照JSON格式输出标签信息：
-{{
-  "knowledge_point": "三级知识点",
-  "sub_knowledge": "四级细分题型",
-  "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他",
-  "difficulty": 1-5,
-  "reason": "简短错误分析"
-}}
-题目内容：
-{content_text[:500]}
-只输出JSON。"""
-    try:
-        resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                             json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
-                                   "temperature": 0.3, "max_tokens": 300}, timeout=30)
-        if resp.status_code == 200:
-            content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-            try:
-                tag_data = json.loads(content)
-            except:
-                match = re.search(r'\{[^}]+\}', content)
-                tag_data = json.loads(match.group()) if match else {}
-            tags = [target.get("subject", "")]
-            if tag_data.get("knowledge_point"):
-                tags.append(tag_data["knowledge_point"])
-            if tag_data.get("sub_knowledge"):
-                tags.append(tag_data["sub_knowledge"])
-            error_type = tag_data.get("error_type", "")
-            difficulty = tag_data.get("difficulty", 0)
-            errors = load_jsonl(ERRORS_FILE)
-            for err in errors:
-                if err.get("timestamp") == timestamp:
-                    err["tags"] = tags
-                    err["error_type"] = error_type
-                    err["difficulty"] = difficulty
-                    break
-            save_jsonl(ERRORS_FILE, errors)
-            subject = target.get("subject", "")
-            if subject:
-                update_weak_subject(subject, 0.1)
-            if tag_data.get("knowledge_point"):
-                update_weak_knowledge(f"{subject}-{tag_data['knowledge_point']}", 0.15)
-                update_knowledge_memory(f"{subject}-{tag_data['knowledge_point']}", summary=tag_data.get("reason", ""), error_type=error_type)
-                log_learning_event("error_analyzed", subject, kp=tag_data['knowledge_point'],
-                                   detail=tag_data.get("reason", ""), difficulty=difficulty)
-            if error_type:
-                profile = load_user_profile()
-                profile["error_types"][error_type] = profile["error_types"].get(error_type, 0) + 1
-                save_user_profile(profile)
-            if tag_data.get("knowledge_point"):
-                add_recent_focus(f"{subject}-{tag_data['knowledge_point']}")
-    except:
-        pass
-
-def save_note(subject, content, media):
-    data = load_jsonl(NOTES_FILE)
-    data.append({"type": "note", "subject": subject, "content": content, "media": media,
-                 "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
-    save_jsonl(NOTES_FILE, data)
-    log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
-
-def search_related_errors(subject, question_text, limit=3):
-    all_errors = load_jsonl(ERRORS_FILE)
-    if not all_errors:
-        return []
-    subject_errors = [e for e in all_errors if e.get("subject") == subject]
-    if not subject_errors:
-        return []
-    keywords = set(re.findall(r'[\w\u4e00-\u9fff]{2,}', question_text))
-    scored = []
-    for err in subject_errors[-20:]:
-        score = 0
-        for tag in err.get("tags", []):
-            for kw in keywords:
-                if kw in tag:
-                    score += 3
-        for field in ["original", "mistake", "idea"]:
-            for kw in keywords:
-                if kw in err.get(field, ""):
-                    score += 1
-        if score > 0:
-            scored.append((score, err))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [err for _, err in scored[:limit]]
-
-def load_new_words():
-    return load_jsonl(NEW_WORDS_FILE)
-
-def load_sentences():
-    return load_jsonl(SENTENCES_FILE)
-
-def save_sentences(sentences):
-    save_jsonl(SENTENCES_FILE, sentences)
-
-def add_sentence(category, sentence, translation="", favorite=False):
-    sentences = load_sentences()
-    new_id = max([s.get("id", 0) for s in sentences]) + 1 if sentences else 1
-    now = time.strftime("%Y-%m-%d %H:%M:%S")
-    sentences.append({
-        "id": new_id,
-        "category": category,
-        "sentence": sentence,
-        "translation": translation,
-        "favorite": favorite,
-        "created": now,
-        "updated": now
-    })
-    save_sentences(sentences)
-    return new_id
-
-def delete_sentence(sentence_id):
-    sentences = load_sentences()
-    sentences = [s for s in sentences if s.get("id") != sentence_id]
-    save_sentences(sentences)
-
-def toggle_favorite(sentence_id):
-    sentences = load_sentences()
-    for s in sentences:
-        if s.get("id") == sentence_id:
-            s["favorite"] = not s.get("favorite", False)
-            break
-    save_sentences(sentences)
-
-def update_sentence(sentence_id, category=None, sentence=None, translation=None):
-    sentences = load_sentences()
-    for s in sentences:
-        if s.get("id") == sentence_id:
-            if category is not None:
-                s["category"] = category
-            if sentence is not None:
-                s["sentence"] = sentence
-            if translation is not None:
-                s["translation"] = translation
-            s["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            break
-    save_sentences(sentences)
-
-def save_new_words(data):
-    save_jsonl(NEW_WORDS_FILE, data)
-
-CONTENT_LIB_FILES = {
-    "语文": "chinese.json", "数学": "math.json", "英语": "english.json",
-    "物理": "physics.json", "化学": "chemistry.json", "生物": "biology.json",
-    "历史": "history.json", "政治": "politics.json", "地理": "geography.json",
-}
-
-def init_content_lib():
-    defaults = {
-        "语文": {"subject": "语文", "poems": [], "classical_chinese": [], "writing_templates": []},
-        "数学": {"subject": "数学", "formulas": [], "question_types": [], "common_mistakes": []},
-        "英语": {"subject": "英语", "core_vocabulary": [], "grammar_points": [], "writing_patterns": []},
-        "物理": {"subject": "物理", "formulas": [], "models": [], "experiments": []},
-        "化学": {"subject": "化学", "equations": [], "principles": [], "experiments": []},
-        "生物": {"subject": "生物", "concepts": [], "processes": [], "experiments": []},
-        "历史": {"subject": "历史", "timeline": [], "causal_chains": [], "figures": []},
-        "政治": {"subject": "政治", "core_concepts": [], "answer_templates": []},
-        "地理": {"subject": "地理", "map_points": [], "principles": [], "regions": []},
-    }
-    for subject, filename in CONTENT_LIB_FILES.items():
-        filepath = os.path.join(CONTENT_LIB_DIR, filename)
-        if not os.path.exists(filepath):
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(defaults.get(subject, {"subject": subject}), f, ensure_ascii=False, indent=2)
-
-def load_content_lib(subject):
-    filename = CONTENT_LIB_FILES.get(subject)
-    if not filename:
-        return {"subject": subject}
-    filepath = os.path.join(CONTENT_LIB_DIR, filename)
-    if not os.path.exists(filepath):
-        init_content_lib()
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {"subject": subject}
-
-def clean_latex(text):
-    superscript_map = {
-        '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
-        '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
-        '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', 'n': 'ⁿ', 'i': 'ⁱ'
-    }
-    subscript_map = {
-        '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅',
-        '6': '₆', '7': '₇', '8': '₈', '9': '₉',
-        '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎', 'x': 'ₓ', 'a': 'ₐ', 'e': 'ₑ', 'n': 'ₙ'
-    }
-    symbol_map = {
-        r'\pi': 'π', r'\Pi': 'Π', r'\theta': 'θ', r'\Theta': 'Θ', r'\alpha': 'α',
-        r'\beta': 'β', r'\gamma': 'γ', r'\Gamma': 'Γ', r'\delta': 'δ', r'\Delta': 'Δ',
-        r'\epsilon': 'ε', r'\lambda': 'λ', r'\Lambda': 'Λ', r'\mu': 'μ', r'\sigma': 'σ',
-        r'\Sigma': 'Σ', r'\omega': 'ω', r'\Omega': 'Ω', r'\infty': '∞', r'\pm': '±',
-        r'\sqrt': '√', r'\times': '×', r'\cdot': '·', r'\div': '÷', r'\leq': '≤',
-        r'\geq': '≥', r'\neq': '≠', r'\approx': '≈', r'\equiv': '≡', r'\sum': '∑',
-        r'\prod': '∏', r'\int': '∫', r'\partial': '∂', r'\degree': '°', r'\angle': '∠',
-        r'\triangle': '△', r'\perp': '⊥', r'\parallel': '∥', r'\rightarrow': '→',
-        r'\Rightarrow': '⇒', r'\leftarrow': '←', r'\Leftarrow': '⇐', r'\leftrightarrow': '↔',
-        r'\circ': '∘', r'\bullet': '•', r'\cdots': '⋯', r'\vdots': '⋮', r'\ddots': '⋱',
-        r'\bar': '̄', r'\hat': '̂', r'\dot': '̇', r'\ddot': '̈', r'\vec': '⃗',
-    }
-
-    def sup_repl(match):
-        return ''.join(superscript_map.get(c, c) for c in match.group(1))
-
-    def sub_repl(match):
-        return ''.join(subscript_map.get(c, c) for c in match.group(1))
-
-    text = re.sub(r'\^\{([^}]+)\}', sup_repl, text)
-    text = re.sub(r'\_\{([^}]+)\}', sub_repl, text)
-    text = re.sub(r'\^(\d+)', lambda m: ''.join(superscript_map.get(c, c) for c in m.group(1)), text)
-    text = re.sub(r'\_(\d+)', lambda m: ''.join(subscript_map.get(c, c) for c in m.group(1)), text)
-    for latex, unicode_char in symbol_map.items():
-        text = text.replace(latex, unicode_char)
-    return text.strip()
-
-def convert_chemical_formula(text):
-    text = re.sub(r'([A-Z][a-z]?)(\d+[+-])(?![^{])', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
-    text = re.sub(r'([A-Z][a-z]?)([+-])(?![^{])', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
-    text = re.sub(r'\)(\d+)(?![_{])', r')_{\1}', text)
-    text = re.sub(r'([A-Z][a-z]?)(\d+)(?![_{^])', lambda m: f"{m.group(1)}_{{{m.group(2)}}}", text)
-    return text
-
-def build_katex_html(content_items):
-    parts = []
-    for item in content_items:
-        if isinstance(item, tuple) and item[0] == 'text':
-            parts.append(str(item[1]))
-        elif isinstance(item, tuple) and item[0] == 'latex':
-            text = str(item[1])
-            text = convert_chemical_formula(text)
-            parts.append(clean_latex(text))
-        else:
-            parts.append(str(item))
-    return '\n\n'.join(parts)
-# ==================== 回收站 ====================
-def move_to_recycle(item):
-    recycle = load_jsonl(RECYCLE_FILE)
-    recycle.append({
-        "original_type": item.get("type"),
-        "data": item,
-        "delete_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "delete_ts": int(time.time()),
-    })
-    save_jsonl(RECYCLE_FILE, recycle)
-
-def restore_from_recycle(delete_ts):
-    recycle, target, keep = load_jsonl(RECYCLE_FILE), None, []
-    for item in recycle:
-        if item.get("delete_ts", 0) == delete_ts:
-            target = item
-        else:
-            keep.append(item)
-    if target:
-        save_jsonl(RECYCLE_FILE, keep)
-        d, t = target.get("data", {}), target.get("original_type", "")
-        if t == "error":
-            errors = load_jsonl(ERRORS_FILE)
-            errors.append(d)
-            save_jsonl(ERRORS_FILE, errors)
-        elif t == "note":
-            notes = load_jsonl(NOTES_FILE)
-            notes.append(d)
-            save_jsonl(NOTES_FILE, notes)
-        return True
-    return False
-
-def empty_recycle():
-    save_jsonl(RECYCLE_FILE, [])
-
-def copy_file_to_lib(src_path, target_dir, allowed_exts):
-    if not os.path.exists(src_path):
-        return ""
-    ext = os.path.splitext(src_path)[1].lower()
-    if ext not in allowed_exts:
-        return ""
-    new_name = str(uuid.uuid4().hex) + ext
-    dst = os.path.join(target_dir, new_name)
-    shutil.copy(src_path, dst)
-    return dst
-
-IMG_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
-VIDEO_EXTS = [".mp4", ".mov", ".avi", ".mkv", ".flv", ".wmv"]
-DOC_EXTS = [".pdf", ".doc", ".docx", ".txt", ".md", ".ppt", ".pptx", ".xls", ".xlsx"]
-
-def load_ai_config():
-    if not os.path.exists(AI_CONFIG_FILE):
-        return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
-    with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_ai_config(config):
-    with open(AI_CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-
-def get_chat_history_file(subject):
-    safe = re.sub(r'[\\/*?:"<>|]', "_", subject)
-    return os.path.join(CHAT_HISTORY_DIR, f"chat_{safe}.jsonl")
-
-def load_chat_history(subject):
-    return load_jsonl(get_chat_history_file(subject))
-
-def save_chat_message(subject, role, content):
-    fp = get_chat_history_file(subject)
-    data = load_jsonl(fp)
-    data.append({"role": role, "content": content, "time": time.strftime("%Y-%m-%d %H:%M:%S")})
-    save_jsonl(fp, data)
-
-def load_user_profile():
-    if not os.path.exists(USER_PROFILE_FILE):
-        default = {
-            "name": "学生", "grade": "高三",
-            "weak_subjects": {}, "weak_knowledge": {},
-            "error_types": {}, "recent_focus": [],
-            "total_errors": 0, "total_chats": 0,
-            "chat_memory": {
-                "last_update": "",
-                "recent_topics": [],
-                "weak_points": [],
-                "discussed_errors": [],
-                "last_question_summary": ""
-            },
-            "knowledge_memory": {},
-            "error_memory": []
-        }
-        return default
-    with open(USER_PROFILE_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        if "chat_memory" not in data:
-            data["chat_memory"] = {
-                "last_update": "",
-                "recent_topics": [],
-                "weak_points": [],
-                "discussed_errors": [],
-                "last_question_summary": ""
-            }
-        if "knowledge_memory" not in data:
-            data["knowledge_memory"] = {}
-        if "error_memory" not in data:
-            data["error_memory"] = []
-        return data
-
-def save_user_profile(profile):
-    with open(USER_PROFILE_FILE, "w", encoding="utf-8") as f:
-        json.dump(profile, f, ensure_ascii=False, indent=2)
 
 def update_knowledge_memory(kp, summary="", error_type=""):
-    """更新知识点记忆（AI 长记忆核心）"""
     profile = load_user_profile()
     km = profile.get("knowledge_memory", {})
     if kp not in km:
@@ -574,8 +289,8 @@ def update_knowledge_memory(kp, summary="", error_type=""):
     profile["knowledge_memory"] = km
     save_user_profile(profile)
 
+
 def add_error_memory(subject, summary, knowledge_point="", discussed=False):
-    """记录一条错题内容记忆"""
     profile = load_user_profile()
     em = profile.get("error_memory", [])
     em.append({
@@ -588,54 +303,6 @@ def add_error_memory(subject, summary, knowledge_point="", discussed=False):
     em = em[-50:]
     profile["error_memory"] = em
     save_user_profile(profile)
-
-def get_memory_context(subject=None):
-    """构造给 AI 的长记忆上下文"""
-    profile = load_user_profile()
-    parts = []
-
-    km = profile.get("knowledge_memory", {})
-    if subject:
-        filtered_km = {k: v for k, v in km.items() if k.startswith(f"{subject}-")}
-    else:
-        filtered_km = km
-    if filtered_km:
-        sorted_km = sorted(filtered_km.items(), key=lambda x: x[1].get("events", 0), reverse=True)[:5]
-        lines = []
-        for kp, info in sorted_km:
-            level = info.get("level", 0.3)
-            summary = info.get("summary", "")
-            line = f"- {kp}（掌握度 {level:.2f}，事件 {info.get('events', 0)} 次）"
-            if summary:
-                line += f"：{summary}"
-            lines.append(line)
-        parts.append("【知识点记忆】\n" + "\n".join(lines))
-
-    em = profile.get("error_memory", [])
-    if subject:
-        em = [e for e in em if e.get("subject") == subject]
-    if em:
-        recent_em = em[-5:]
-        lines = [f"- [{e.get('subject', '')}] {e.get('summary', '')}" for e in recent_em]
-        parts.append("【错题内容记忆（最近5条）】\n" + "\n".join(lines))
-
-    chat_mem = profile.get("chat_memory", {})
-    if chat_mem.get("recent_topics"):
-        parts.append(f"【近期讨论话题】{', '.join(chat_mem['recent_topics'][:5])}")
-    if chat_mem.get("weak_points"):
-        parts.append(f"【薄弱点】{', '.join(chat_mem['weak_points'][:5])}")
-    if chat_mem.get("last_question_summary"):
-        parts.append(f"【上次问题】{chat_mem['last_question_summary']}")
-
-    error_types = profile.get("error_types", {})
-    if error_types:
-        top_et = sorted(error_types.items(), key=lambda x: x[1], reverse=True)[:3]
-        parts.append(f"【高频错因】{', '.join(f'{k}({v}次)' for k, v in top_et)}")
-
-    if parts:
-        return "\n\n".join(parts)
-    return ""
-
 @retry_request(max_retries=2, base_delay=1)
 def update_chat_memory(subject, user_msg, ai_response):
     def do_update():
@@ -661,7 +328,7 @@ AI回答：{ai_response[:500]}
                 content = resp.json()["choices"][0]["message"]["content"]
                 try:
                     info = json.loads(content)
-                except:
+                except BaseException:
                     match = re.search(r'\{[^}]+\}', content)
                     info = json.loads(match.group()) if match else {}
                 if info:
@@ -682,43 +349,54 @@ AI回答：{ai_response[:500]}
                     memory["last_update"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     profile["chat_memory"] = memory
                     save_user_profile(profile)
-
                     for t in topics[:2]:
                         update_knowledge_memory(f"{subject}-{t}", summary=info.get("summary", ""))
                     log_learning_event("chat", subject, kp=topics[0] if topics else "",
                                        detail=user_msg[:80])
-                    print("[记忆库] 已更新")
-        except Exception as e:
-            print(f"[记忆库] 更新失败: {e}")
+        except BaseException:
+            pass
     threading.Thread(target=do_update, daemon=True).start()
 
-def get_memory_summary():
-    return get_memory_context()
 
-def update_weak_subject(subject, w=0.1):
-    p = load_user_profile()
-    p["weak_subjects"][subject] = min(1.0, p["weak_subjects"].get(subject, 0) + w)
-    save_user_profile(p)
 
-def update_weak_knowledge(kp, w=0.1):
-    p = load_user_profile()
-    p["weak_knowledge"][kp] = min(1.0, p["weak_knowledge"].get(kp, 0) + w)
-    save_user_profile(p)
+def get_memory_context(subject=None):
+    profile = load_user_profile()
+    parts = []
+    km = profile.get("knowledge_memory", {})
+    filtered_km = {k: v for k, v in km.items() if k.startswith(f"{subject}-")} if subject else km
+    if filtered_km:
+        sorted_km = sorted(filtered_km.items(), key=lambda x: x[1].get("events", 0), reverse=True)[:5]
+        lines = []
+        for kp, info in sorted_km:
+            level = info.get("level", 0.3)
+            summary = info.get("summary", "")
+            line = f"- {kp}（掌握度 {level:.2f}，事件 {info.get('events', 0)} 次）"
+            if summary:
+                line += f"：{summary}"
+            lines.append(line)
+        parts.append("【知识点记忆】\n" + "\n".join(lines))
+    em = profile.get("error_memory", [])
+    if subject:
+        em = [e for e in em if e.get("subject") == subject]
+    if em:
+        recent_em = em[-5:]
+        lines = [f"- [{e.get('subject', '')}] {e.get('summary', '')}" for e in recent_em]
+        parts.append("【错题内容记忆（最近5条）】\n" + "\n".join(lines))
+    chat_mem = profile.get("chat_memory", {})
+    if chat_mem.get("recent_topics"):
+        parts.append(f"【近期讨论话题】{', '.join(chat_mem['recent_topics'][:5])}")
+    if chat_mem.get("weak_points"):
+        parts.append(f"【薄弱点】{', '.join(chat_mem['weak_points'][:5])}")
+    if chat_mem.get("last_question_summary"):
+        parts.append(f"【上次问题】{chat_mem['last_question_summary']}")
+    error_types = profile.get("error_types", {})
+    if error_types:
+        top_et = sorted(error_types.items(), key=lambda x: x[1], reverse=True)[:3]
+        parts.append(f"【高频错因】{', '.join(f'{k}({v}次)' for k, v in top_et)}")
+    return "\n\n".join(parts) if parts else ""
 
-def update_chat_stats(subject):
-    p = load_user_profile()
-    p["total_chats"] += 1
-    save_user_profile(p)
-
-def add_recent_focus(kp):
-    p = load_user_profile()
-    if kp not in p["recent_focus"]:
-        p["recent_focus"].insert(0, kp)
-        p["recent_focus"] = p["recent_focus"][:10]
-        save_user_profile(p)
 
 def get_teaching_strategy(subject):
-    """根据错因分布生成讲题策略"""
     profile = load_user_profile()
     error_types = profile.get("error_types", {})
     if not error_types:
@@ -736,9 +414,8 @@ def get_teaching_strategy(subject):
     for et, count in top[:3]:
         if et in strategy_map:
             lines.append(f"- 学生常犯「{et}」（{count}次），讲题时{strategy_map[et]}")
-    if lines:
-        return "【讲题策略】\n" + "\n".join(lines)
-    return ""
+    return "【讲题策略】\n" + "\n".join(lines) if lines else ""
+
 
 def get_profile_summary():
     p = load_user_profile()
@@ -752,6 +429,7 @@ def get_profile_summary():
     s += f"总错题：{p['total_errors']} | 总对话：{p['total_chats']}"
     return s
 
+
 def analyze_knowledge_framework():
     errors = load_jsonl(ERRORS_FILE)
     ec = {}
@@ -762,21 +440,271 @@ def analyze_knowledge_framework():
     save_user_profile(p)
     return {"error_counts": ec, "total_errors": len(errors)}
 
+
+def load_user_profile():
+    if not os.path.exists(USER_PROFILE_FILE):
+        return {
+            "name": "学生", "grade": "高三",
+            "weak_subjects": {}, "weak_knowledge": {},
+            "error_types": {}, "recent_focus": [],
+            "total_errors": 0, "total_chats": 0,
+            "chat_memory": {"last_update": "", "recent_topics": [], "weak_points": [],
+                            "discussed_errors": [], "last_question_summary": ""},
+            "knowledge_memory": {}, "error_memory": []
+        }
+    with open(USER_PROFILE_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        if "chat_memory" not in data:
+            data["chat_memory"] = {"last_update": "", "recent_topics": [], "weak_points": [],
+                                   "discussed_errors": [], "last_question_summary": ""}
+        data.setdefault("knowledge_memory", {})
+        data.setdefault("error_memory", [])
+        return data
+
+
+def save_user_profile(profile):
+    with open(USER_PROFILE_FILE, "w", encoding="utf-8") as f:
+        json.dump(profile, f, ensure_ascii=False, indent=2)
+
+
+def update_weak_subject(subject, w=0.1):
+    p = load_user_profile()
+    p["weak_subjects"][subject] = min(1.0, p["weak_subjects"].get(subject, 0) + w)
+    save_user_profile(p)
+
+
+def update_weak_knowledge(kp, w=0.1):
+    p = load_user_profile()
+    p["weak_knowledge"][kp] = min(1.0, p["weak_knowledge"].get(kp, 0) + w)
+    save_user_profile(p)
+
+
+def update_chat_stats(subject):
+    p = load_user_profile()
+    p["total_chats"] += 1
+    save_user_profile(p)
+
+
+def add_recent_focus(kp):
+    p = load_user_profile()
+    if kp not in p["recent_focus"]:
+        p["recent_focus"].insert(0, kp)
+        p["recent_focus"] = p["recent_focus"][:10]
+        save_user_profile(p)
+
+
+def load_ai_config():
+    if not os.path.exists(AI_CONFIG_FILE):
+        return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
+    with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_ai_config(config):
+    with open(AI_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+def get_chat_history_file(subject):
+    safe = re.sub(r'[\\/*?:"<>|]', "_", subject)
+    return os.path.join(CHAT_HISTORY_DIR, f"chat_{safe}.jsonl")
+
+
+def load_chat_history(subject):
+    return load_jsonl(get_chat_history_file(subject))
+
+
+def save_chat_message(subject, role, content):
+    fp = get_chat_history_file(subject)
+    data = load_jsonl(fp)
+    data.append({"role": role, "content": content, "time": time.strftime("%Y-%m-%d %H:%M:%S")})
+    save_jsonl(fp, data)
+
+
+def move_to_recycle(item):
+    recycle = load_jsonl(RECYCLE_FILE)
+    recycle.append({
+        "original_type": item.get("type"), "data": item,
+        "delete_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "delete_ts": int(time.time()),
+    })
+    save_jsonl(RECYCLE_FILE, recycle)
+
+
+def restore_from_recycle(delete_ts):
+    recycle, target, keep = load_jsonl(RECYCLE_FILE), None, []
+    for item in recycle:
+        if item.get("delete_ts", 0) == delete_ts:
+            target = item
+        else:
+            keep.append(item)
+    if target:
+        save_jsonl(RECYCLE_FILE, keep)
+        d, t = target.get("data", {}), target.get("original_type", "")
+        if t == "error":
+            errors = load_jsonl(ERRORS_FILE)
+            errors.append(d)
+            save_jsonl(ERRORS_FILE, errors)
+        elif t == "note":
+            notes = load_jsonl(NOTES_FILE)
+            notes.append(d)
+            save_jsonl(NOTES_FILE, notes)
+        return True
+    return False
+
+
+def empty_recycle():
+    save_jsonl(RECYCLE_FILE, [])
+
+
+def copy_file_to_lib(src_path, target_dir, allowed_exts):
+    if not os.path.exists(src_path):
+        return ""
+    ext = os.path.splitext(src_path)[1].lower()
+    if ext not in allowed_exts:
+        return ""
+    new_name = str(uuid.uuid4().hex) + ext
+    dst = os.path.join(target_dir, new_name)
+    shutil.copy(src_path, dst)
+    return dst
+
+
+IMG_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
+VIDEO_EXTS = [".mp4", ".mov", ".avi", ".mkv", ".flv", ".wmv"]
+DOC_EXTS = [".pdf", ".doc", ".docx", ".txt", ".md", ".ppt", ".pptx", ".xls", ".xlsx"]
+
+
+def save_error(subject, original="", original_media=None, answer="", answer_media=None,
+               mistake="", idea="", idea_media=None, manual_tags=""):
+    if original_media is None:
+        original_media = []
+    if answer_media is None:
+        answer_media = []
+    if idea_media is None:
+        idea_media = []
+    user_tags = [t.strip() for t in manual_tags.split(",") if t.strip()] if manual_tags.strip() else []
+    data = load_jsonl(ERRORS_FILE)
+    question_media = list(set(original_media))
+    entry = {
+        "type": "error", "subject": subject, "original": original, "original_media": original_media,
+        "answer": answer, "answer_media": answer_media, "mistake": mistake, "idea": idea,
+        "idea_media": idea_media, "question": original, "question_media": question_media,
+        "tags": [subject] + user_tags if user_tags else [subject],
+        "error_type": "", "difficulty": 0, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": int(time.time()), "deep_analysis": "", "status": "未看"
+    }
+    data.append(entry)
+    save_jsonl(ERRORS_FILE, data)
+    log_learning_event("error_upload", subject, kp="",
+                       detail=f"上传错题：{original[:80]} | 错因：{mistake[:60]}")
+    if not user_tags:
+        threading.Thread(target=auto_tag_error, args=(entry["timestamp"],), daemon=True).start()
+
+
+@retry_request(max_retries=3, base_delay=2)
+def auto_tag_error(timestamp):
+    errors = load_jsonl(ERRORS_FILE)
+    target = None
+    for err in errors:
+        if err.get("timestamp") == timestamp:
+            target = err
+            break
+    if not target:
+        return
+    content_parts = []
+    if target.get("original"):
+        content_parts.append(f"题目：{target['original']}")
+    if target.get("mistake"):
+        content_parts.append(f"学生错误：{target['mistake']}")
+    if target.get("idea"):
+        content_parts.append(f"学生见解：{target['idea']}")
+    if target.get("answer"):
+        content_parts.append(f"标准答案：{target['answer']}")
+    content_text = "\n".join(content_parts)
+    if not content_text:
+        return
+    api_key = load_ai_config().get("api_key_free", "").strip()
+    if not api_key:
+        return
+    prompt = f"""你是一个专业的高中教师。请分析以下错题，并严格按照JSON格式输出标签信息：
+{{
+  "knowledge_point": "三级知识点",
+  "sub_knowledge": "四级细分题型",
+  "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他",
+  "difficulty": 1-5,
+  "reason": "简短错误分析"
+}}
+题目内容：
+{content_text[:500]}
+只输出JSON。"""
+    try:
+        resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                             json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
+                                   "temperature": 0.3, "max_tokens": 300}, timeout=30)
+        if resp.status_code == 200:
+            content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            try:
+                tag_data = json.loads(content)
+            except BaseException:
+                match = re.search(r'\{[^}]+\}', content)
+                tag_data = json.loads(match.group()) if match else {}
+            tags = [target.get("subject", "")]
+            if tag_data.get("knowledge_point"):
+                tags.append(tag_data["knowledge_point"])
+            if tag_data.get("sub_knowledge"):
+                tags.append(tag_data["sub_knowledge"])
+            error_type = tag_data.get("error_type", "")
+            difficulty = tag_data.get("difficulty", 0)
+            errors = load_jsonl(ERRORS_FILE)
+            for err in errors:
+                if err.get("timestamp") == timestamp:
+                    err["tags"] = tags
+                    err["error_type"] = error_type
+                    err["difficulty"] = difficulty
+                    break
+            save_jsonl(ERRORS_FILE, errors)
+            subject = target.get("subject", "")
+            if subject:
+                update_weak_subject(subject, 0.1)
+            if tag_data.get("knowledge_point"):
+                update_weak_knowledge(f"{subject}-{tag_data['knowledge_point']}", 0.15)
+                update_knowledge_memory(f"{subject}-{tag_data['knowledge_point']}",
+                                        summary=tag_data.get("reason", ""), error_type=error_type)
+                log_learning_event("error_analyzed", subject, kp=tag_data['knowledge_point'],
+                                   detail=tag_data.get("reason", ""), difficulty=difficulty)
+            if error_type:
+                profile = load_user_profile()
+                profile["error_types"][error_type] = profile["error_types"].get(error_type, 0) + 1
+                save_user_profile(profile)
+            if tag_data.get("knowledge_point"):
+                add_recent_focus(f"{subject}-{tag_data['knowledge_point']}")
+    except BaseException:
+        pass
+
+
+def save_note(subject, content, media):
+    data = load_jsonl(NOTES_FILE)
+    data.append({"type": "note", "subject": subject, "content": content, "media": media,
+                 "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
+    save_jsonl(NOTES_FILE, data)
+    log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
+
+
 @retry_request(max_retries=3, base_delay=2)
 def generate_word_info(word):
     api_key = load_ai_config().get("api_key_free", "").strip()
     if not api_key:
-        print(f"[生成] 未配置 API 密钥，无法生成 {word}")
         return None
     prompt = f"""请为英语单词 "{word}" 生成词条信息，格式为 JSON：
 {{
     "word": "{word}",
-    "phonetic": "音标（如 /əˈbændən/）",
-    "meaning": "中文释义（如 放弃；抛弃）",
+    "phonetic": "音标",
+    "meaning": "中文释义",
     "example": "一个例句",
-    "forms": "变形（如 abandons, abandoning, abandoned）",
-    "grammar": {{"collocations": ["搭配1", "搭配2"], "notes": ["注意点"], "test_points": ["考点"]}},
-    "phrases": ["短语1", "短语2"]
+    "forms": "变形",
+    "grammar": {{"collocations": [], "notes": [], "test_points": []}},
+    "phrases": []
 }}
 只返回 JSON 对象。"""
     try:
@@ -788,7 +716,7 @@ def generate_word_info(word):
             content = resp.json()["choices"][0]["message"]["content"]
             try:
                 new_data = json.loads(content)
-            except:
+            except BaseException:
                 match = re.search(r'\{[^}]+\}', content)
                 new_data = json.loads(match.group()) if match else None
             if new_data:
@@ -798,337 +726,137 @@ def generate_word_info(word):
                 new_data.setdefault("forms", "")
                 new_data.setdefault("grammar", {})
                 new_data.setdefault("phrases", [])
-                print(f"[生成] ✅ 成功生成单词: {word}")
                 return new_data
-            else:
-                print(f"[生成] ❌ 解析 JSON 失败: {content[:100]}")
-        else:
-            print(f"[生成] ❌ API 错误 {resp.status_code} 生成 {word}")
     except Exception as e:
-        print(f"[生成] ❌ 异常生成 {word}: {e}")
+        print(f"[生成] 异常 {word}: {e}")
     return None
 
-def add_word_to_vocab(word_data):
-    existing = load_jsonl(VOCAB_FILE)
-    word = word_data.get("word", "")
-    if not word:
-        return False
-    if any(w.get("word", "").lower() == word.lower() for w in existing):
-        print(f"[添加] 单词 {word} 已存在，跳过")
-        return False
-    existing.append(word_data)
-    save_jsonl(VOCAB_FILE, existing)
-    print(f"[添加] ✅ 已添加单词: {word}")
-    return True
 
-def build_sentence_page(subject, page):
-    CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
-    category_colors = {
-        "开头": "#E3F2FD", "转折": "#FFF3E0", "结尾": "#E8F5E9",
-        "观点": "#FCE4EC", "举例": "#F3E5F5", "读后续写": "#E0F7FA",
-        "其他": "#F5F5F5"
+def load_sentences():
+    return load_jsonl(SENTENCES_FILE)
+
+
+def save_sentences(sentences):
+    save_jsonl(SENTENCES_FILE, sentences)
+
+
+def add_sentence(category, sentence, translation="", favorite=False):
+    sentences = load_sentences()
+    new_id = max([s.get("id", 0) for s in sentences]) + 1 if sentences else 1
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    sentences.append({"id": new_id, "category": category, "sentence": sentence,
+                      "translation": translation, "favorite": favorite,
+                      "created": now, "updated": now})
+    save_sentences(sentences)
+    return new_id
+
+
+def delete_sentence(sentence_id):
+    sentences = [s for s in load_sentences() if s.get("id") != sentence_id]
+    save_sentences(sentences)
+
+
+def toggle_favorite(sentence_id):
+    sentences = load_sentences()
+    for s in sentences:
+        if s.get("id") == sentence_id:
+            s["favorite"] = not s.get("favorite", False)
+            break
+    save_sentences(sentences)
+
+
+def update_sentence(sentence_id, category=None, sentence=None, translation=None):
+    sentences = load_sentences()
+    for s in sentences:
+        if s.get("id") == sentence_id:
+            if category is not None:
+                s["category"] = category
+            if sentence is not None:
+                s["sentence"] = sentence
+            if translation is not None:
+                s["translation"] = translation
+            s["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            break
+    save_sentences(sentences)
+
+
+def clean_latex(text):
+    superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
+                       '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+                       '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', 'n': 'ⁿ', 'i': 'ⁱ'}
+    subscript_map = {'0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅',
+                     '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+                     '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎', 'x': 'ₓ', 'a': 'ₐ', 'e': 'ₑ', 'n': 'ₙ'}
+    symbol_map = {r'\pi': 'π', r'\theta': 'θ', r'\alpha': 'α', r'\beta': 'β', r'\gamma': 'γ',
+                  r'\delta': 'δ', r'\Delta': 'Δ', r'\lambda': 'λ', r'\mu': 'μ', r'\sigma': 'σ',
+                  r'\omega': 'ω', r'\infty': '∞', r'\pm': '±', r'\sqrt': '√', r'\times': '×',
+                  r'\cdot': '·', r'\div': '÷', r'\leq': '≤', r'\geq': '≥', r'\neq': '≠',
+                  r'\approx': '≈', r'\sum': '∑', r'\int': '∫', r'\partial': '∂', r'\angle': '∠',
+                  r'\triangle': '△', r'\perp': '⊥', r'\rightarrow': '→', r'\Rightarrow': '⇒'}
+
+    def sup_repl(match):
+        return ''.join(superscript_map.get(c, c) for c in match.group(1))
+
+    def sub_repl(match):
+        return ''.join(subscript_map.get(c, c) for c in match.group(1))
+
+    text = re.sub(r'\^\{([^}]+)\}', sup_repl, text)
+    text = re.sub(r'\_\{([^}]+)\}', sub_repl, text)
+    text = re.sub(r'\^(\d+)', lambda m: ''.join(superscript_map.get(c, c) for c in m.group(1)), text)
+    text = re.sub(r'\_(\d+)', lambda m: ''.join(subscript_map.get(c, c) for c in m.group(1)), text)
+    for latex, unicode_char in symbol_map.items():
+        text = text.replace(latex, unicode_char)
+    return text.strip()
+
+
+def convert_chemical_formula(text):
+    text = re.sub(r'([A-Z][a-z]?)(\d+[+-])(?![^{])', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
+    text = re.sub(r'([A-Z][a-z]?)([+-])(?![^{])', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
+    text = re.sub(r'\)(\d+)(?![_{])', r')_{\1}', text)
+    text = re.sub(r'([A-Z][a-z]?)(\d+)(?![_{^])', lambda m: f"{m.group(1)}_{{{m.group(2)}}}", text)
+    return text
+
+
+CONTENT_LIB_FILES = {
+    "语文": "chinese.json", "数学": "math.json", "英语": "english.json",
+    "物理": "physics.json", "化学": "chemistry.json", "生物": "biology.json",
+    "历史": "history.json", "政治": "politics.json", "地理": "geography.json",
+}
+
+
+def init_content_lib():
+    defaults = {
+        "语文": {"subject": "语文", "poems": [], "classical_chinese": [], "writing_templates": []},
+        "数学": {"subject": "数学", "formulas": [], "question_types": [], "common_mistakes": []},
+        "英语": {"subject": "英语", "core_vocabulary": [], "grammar_points": [], "writing_patterns": []},
+        "物理": {"subject": "物理", "formulas": [], "models": [], "experiments": []},
+        "化学": {"subject": "化学", "equations": [], "principles": [], "experiments": []},
+        "生物": {"subject": "生物", "concepts": [], "processes": [], "experiments": []},
+        "历史": {"subject": "历史", "timeline": [], "causal_chains": [], "figures": []},
+        "政治": {"subject": "政治", "core_concepts": [], "answer_templates": []},
+        "地理": {"subject": "地理", "map_points": [], "principles": [], "regions": []},
     }
+    for subject, filename in CONTENT_LIB_FILES.items():
+        filepath = os.path.join(CONTENT_LIB_DIR, filename)
+        if not os.path.exists(filepath):
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(defaults.get(subject, {"subject": subject}), f, ensure_ascii=False, indent=2)
 
-    search_input = ft.TextField(label="🔍 搜索句子", hint_text="输入关键词...", expand=True)
-    category_dropdown = ft.Dropdown(
-        label="分类",
-        options=[ft.dropdown.Option(c) for c in CATEGORIES],
-        value="全部",
-        width=120,
-    )
-    favorite_filter_switch = ft.Switch(label="仅收藏", value=False)
 
-    sentence_list = ft.ListView(spacing=8, expand=True)
-    status_text = ft.Text("", size=14)
+def load_content_lib(subject):
+    filename = CONTENT_LIB_FILES.get(subject)
+    if not filename:
+        return {"subject": subject}
+    filepath = os.path.join(CONTENT_LIB_DIR, filename)
+    if not os.path.exists(filepath):
+        init_content_lib()
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except BaseException:
+        return {"subject": subject}
 
-    def show_add_dialog(edit_data=None):
-        is_edit = edit_data is not None
-        cat_drop = ft.Dropdown(
-            label="分类",
-            options=[ft.dropdown.Option(c) for c in CATEGORIES if c != "全部"],
-            value=edit_data.get("category", "观点") if is_edit else "观点",
-            width=150,
-        )
-        sent_input = ft.TextField(
-            label="英文句子",
-            value=edit_data.get("sentence", "") if is_edit else "",
-            multiline=True,
-            min_lines=3,
-            max_lines=5,
-            expand=True,
-        )
-        trans_input = ft.TextField(
-            label="中文翻译（可选）",
-            value=edit_data.get("translation", "") if is_edit else "",
-            multiline=True,
-            min_lines=2,
-            max_lines=3,
-            expand=True,
-        )
 
-        def do_save(e):
-            cat = cat_drop.value
-            sent = sent_input.value.strip()
-            trans = trans_input.value.strip()
-            if not sent:
-                page.snack_bar = ft.SnackBar(ft.Text("请输入句子内容"))
-                page.snack_bar.open = True
-                page.update()
-                return
-            if is_edit:
-                update_sentence(edit_data["id"], cat, sent, trans)
-            else:
-                add_sentence(cat, sent, trans)
-            page.close(dialog)
-            refresh_list()
-            page.snack_bar = ft.SnackBar(ft.Text("✅ 已保存" if not is_edit else "✅ 已更新"))
-            page.snack_bar.open = True
-            page.update()
-
-        dialog = ft.AlertDialog(
-            title=ft.Text("编辑金句" if is_edit else "添加金句"),
-            content=ft.Column([
-                cat_drop,
-                sent_input,
-                trans_input,
-            ], spacing=10, width=400),
-            actions=[
-                ft.TextButton("取消", on_click=lambda e: page.close(dialog)),
-                ft.ElevatedButton("保存", on_click=do_save),
-            ]
-        )
-        page.open(dialog)
-
-    def show_ai_generate_dialog():
-        topic_input = ft.TextField(
-            label="输入主题",
-            hint_text="例如：环境保护、科技发展、个人成长...",
-            multiline=True,
-            min_lines=2,
-            max_lines=3,
-            expand=True,
-        )
-        count_row = ft.Row(spacing=10)
-        count_drop = ft.Dropdown(
-            label="快速选择",
-            options=[ft.dropdown.Option(str(i)) for i in [3, 5, 8, 10]],
-            value="5",
-            width=120,
-        )
-        count_input = ft.TextField(
-            label="自定义数量",
-            hint_text="输入数字（如 6）",
-            width=100,
-            text_align=ft.TextAlign.CENTER,
-        )
-        count_row.controls.extend([count_drop, ft.Text("或", size=14), count_input])
-
-        def do_generate(e):
-            topic = topic_input.value.strip()
-            if not topic:
-                page.snack_bar = ft.SnackBar(ft.Text("请输入主题"))
-                page.snack_bar.open = True
-                page.update()
-                return
-            custom_val = count_input.value.strip()
-            if custom_val and custom_val.isdigit():
-                count = int(custom_val)
-            else:
-                count = int(count_drop.value)
-            if count < 1:
-                count = 3
-            if count > 20:
-                count = 20
-            page.close(dialog)
-            status_text.value = f"⏳ AI正在生成 {count} 个金句..."
-            status_text.color = "blue"
-            page.update()
-
-            def generate_thread():
-                api_key = load_ai_config().get("api_key_free", "").strip()
-                if not api_key:
-                    status_text.value = "❌ 未配置API密钥"
-                    status_text.color = "red"
-                    page.update()
-                    return
-                prompt = f"""你是一位英语写作专家。请为作文主题 "{topic}" 生成 {count} 个实用的万能金句（英语），适合高考英语作文使用。
-每个句子要附带中文翻译。
-输出格式为 JSON 数组：
-[
-  {{"sentence": "英文句子", "translation": "中文翻译", "category": "自动判断分类（开头/转折/结尾/观点/举例/读后续写）"}}
-]
-只返回 JSON 数组。"""
-                try:
-                    resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                                         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                                         json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
-                                               "temperature": 0.7, "max_tokens": 1500}, timeout=45)
-                    if resp.status_code == 200:
-                        content = resp.json()["choices"][0]["message"]["content"]
-                        try:
-                            items = json.loads(content)
-                        except:
-                            match = re.search(r'\[.*\]', content, re.DOTALL)
-                            items = json.loads(match.group()) if match else None
-                        if items:
-                            added = 0
-                            for item in items:
-                                cat = item.get("category", "其他")
-                                if cat not in CATEGORIES:
-                                    cat = "其他"
-                                add_sentence(cat, item.get("sentence", ""), item.get("translation", ""))
-                                added += 1
-                            refresh_list()
-                            status_text.value = f"✅ 成功添加 {added} 个金句"
-                            status_text.color = "green"
-                        else:
-                            status_text.value = "❌ AI返回格式异常"
-                            status_text.color = "red"
-                    else:
-                        status_text.value = f"❌ API错误: {resp.status_code}"
-                        status_text.color = "red"
-                except Exception as ex:
-                    status_text.value = f"❌ 生成失败: {str(ex)[:50]}"
-                    status_text.color = "red"
-                page.update()
-
-            threading.Thread(target=generate_thread, daemon=True).start()
-
-        dialog = ft.AlertDialog(
-            title=ft.Text("🤖 AI生成金句"),
-            content=ft.Column([
-                topic_input,
-                count_row,
-            ], spacing=10, width=400),
-            actions=[
-                ft.TextButton("取消", on_click=lambda e: page.close(dialog)),
-                ft.ElevatedButton("生成并添加", on_click=do_generate),
-            ]
-        )
-        page.open(dialog)
-
-    def render_sentence_list(filter_category="全部", keyword="", only_favorite=False):
-        sentence_list.controls.clear()
-        sentences = load_sentences()
-        sentences.sort(key=lambda x: (not x.get("favorite", False), x.get("updated", x.get("created", ""))), reverse=True)
-
-        filtered = []
-        for s in sentences:
-            if only_favorite and not s.get("favorite", False):
-                continue
-            if filter_category != "全部" and s.get("category") != filter_category:
-                continue
-            if keyword:
-                kw = keyword.lower()
-                if kw not in s.get("sentence", "").lower() and kw not in s.get("translation", "").lower():
-                    continue
-            filtered.append(s)
-
-        if not filtered:
-            sentence_list.controls.append(
-                ft.Container(
-                    content=ft.Text("  暂无金句，点击「添加」或「AI生成」来创建", size=14, color=ft.Colors.GREY_600),
-                    padding=20,
-                )
-            )
-            page.update()
-            return
-
-        for s in filtered:
-            sid = s.get("id")
-            cat = s.get("category", "其他")
-            sentence = s.get("sentence", "")
-            translation = s.get("translation", "")
-            favorite = s.get("favorite", False)
-            updated = s.get("updated", s.get("created", ""))
-            bg_color = category_colors.get(cat, "#F5F5F5")
-
-            fav_btn = ft.IconButton(
-                icon=ft.Icons.STAR if favorite else ft.Icons.STAR_BORDER,
-                icon_color=ft.Colors.AMBER if favorite else ft.Colors.GREY_400,
-                icon_size=20,
-                on_click=lambda e, sid=sid: (toggle_favorite(sid), refresh_list()),
-                tooltip="收藏/取消收藏"
-            )
-
-            copy_btn = ft.IconButton(
-                icon=ft.Icons.COPY,
-                icon_size=18,
-                on_click=lambda e, text=sentence: page.set_clipboard(text),
-                tooltip="复制句子"
-            )
-
-            edit_btn = ft.IconButton(
-                icon=ft.Icons.EDIT,
-                icon_size=18,
-                on_click=lambda e, data=s: show_add_dialog(data),
-                tooltip="编辑"
-            )
-
-            del_btn = ft.IconButton(
-                icon=ft.Icons.DELETE,
-                icon_size=18,
-                on_click=lambda e, sid=sid: (delete_sentence(sid), refresh_list()),
-                tooltip="删除"
-            )
-
-            card = ft.Container(
-                content=ft.Column([
-                    ft.Row([
-                        ft.Container(
-                            content=ft.Text(cat, size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
-                            bgcolor=ft.Colors.BLUE_600,
-                            border_radius=10,
-                            padding=ft.Padding(left=8, right=8, top=2, bottom=2),
-                        ),
-                        ft.Row([fav_btn, copy_btn, edit_btn, del_btn], spacing=2),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Text(sentence, size=15, selectable=True),
-                    ft.Text(translation, size=13, color=ft.Colors.GREY_700, italic=True, selectable=True) if translation else ft.Text(""),
-                    ft.Text(f"📅 {updated}", size=10, color=ft.Colors.GREY_500),
-                ], spacing=4),
-                padding=10,
-                border_radius=12,
-                bgcolor=bg_color,
-                margin=ft.margin.only(bottom=4),
-                border=ft.border.all(1, ft.Colors.AMBER_200 if favorite else ft.Colors.GREY_200),
-            )
-            sentence_list.controls.append(card)
-        page.update()
-
-    def refresh_list():
-        render_sentence_list(
-            category_dropdown.value,
-            search_input.value.strip(),
-            favorite_filter_switch.value
-        )
-
-    search_input.on_change = lambda e: refresh_list()
-    category_dropdown.on_change = lambda e: refresh_list()
-    favorite_filter_switch.on_change = lambda e: refresh_list()
-
-    render_sentence_list()
-
-    return ft.Column([
-        ft.Row([
-            ft.Text("💬 金句列表", size=20, weight=ft.FontWeight.BOLD),
-            ft.Row([
-                ft.ElevatedButton("➕ 添加", on_click=lambda e: show_add_dialog(), icon=ft.Icons.ADD),
-                ft.ElevatedButton("🤖 AI生成", on_click=lambda e: show_ai_generate_dialog(), icon=ft.Icons.AUTO_AWESOME),
-            ], spacing=8),
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        ft.Text("英语作文万能句子，可收藏、搜索、分类筛选", size=14, color=ft.Colors.GREY_600),
-        ft.Row([
-            search_input,
-            category_dropdown,
-            favorite_filter_switch,
-        ], spacing=10),
-        status_text,
-        ft.Divider(height=1),
-        ft.Container(content=sentence_list, expand=True),
-    ], spacing=8, expand=True)
-
-# ==================== main 函数 ====================
 def main(page: ft.Page):
     page.add(ft.Text("⏳ 应用启动中..."))
     page.update()
@@ -1141,7 +869,7 @@ def main(page: ft.Page):
         global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
         global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
         global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
-        global VOCAB_FILE, SENTENCES_FILE, LEARNING_EVENTS_FILE
+        global VOCAB_FILE, SENTENCES_FILE, LEARNING_EVENTS_FILE, VOCAB_SETTINGS_FILE
 
         DATA_DIR = os.path.join(storage_dir, "智能错题笔记")
         IMAGES_DIR = os.path.join(DATA_DIR, "images")
@@ -1161,6 +889,7 @@ def main(page: ft.Page):
         VOCAB_FILE = NEW_WORDS_FILE
         SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
         LEARNING_EVENTS_FILE = os.path.join(DATA_DIR, "learning_events.jsonl")
+        VOCAB_SETTINGS_FILE = os.path.join(DATA_DIR, "vocab_settings.json")
 
         for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
             os.makedirs(d, exist_ok=True)
@@ -1187,8 +916,6 @@ def main(page: ft.Page):
                 page.spacing = 0
             page.title = "池鱼Study"
             page.responsive = True
-
-            # ==================== 暗黑主题（PyDracula 风格 + 暖橙强调） ====================
             page.theme_mode = ft.ThemeMode.DARK
 
             page.theme = ft.Theme(
@@ -1224,20 +951,16 @@ def main(page: ft.Page):
             main_subject_page = None
             subject_page_content = ft.Container(expand=True)
 
-            # ==================== 磨砂 + 动画 Toast ====================
             def show_toast(text, color="green", duration=1.6):
                 if color == "green":
                     bg = "#33FF8A65"
                     icon = "✅"
-                    accent = "#FF8A65"
                 elif color == "red":
                     bg = "#33EF5350"
                     icon = "❌"
-                    accent = "#EF5350"
                 else:
                     bg = "#33FFB74D"
                     icon = "ℹ️"
-                    accent = "#FFB74D"
 
                 toast = ft.Container(
                     content=ft.Row([
@@ -1280,7 +1003,7 @@ def main(page: ft.Page):
                     time.sleep(0.4)
                     try:
                         page.overlay.remove(toast)
-                    except:
+                    except BaseException:
                         pass
                     page.update()
 
@@ -1295,7 +1018,6 @@ def main(page: ft.Page):
                     daemon=True
                 ).start()
 
-            # ==================== 图片预览（沉浸式 + 全屏遮罩） ====================
             def show_image_gallery(image_paths, start_index=0):
                 if not image_paths:
                     return
@@ -1314,11 +1036,7 @@ def main(page: ft.Page):
                     start_index = 0
 
                 total = len(valid_paths)
-                state = {
-                    "index": start_index,
-                    "scale": 1.0,
-                    "controls_visible": True,
-                }
+                state = {"index": start_index, "scale": 1.0, "controls_visible": True}
 
                 image_view = ft.InteractiveViewer(
                     content=ft.Image(src=valid_paths[start_index], fit=ft.ImageFit.CONTAIN),
@@ -1326,7 +1044,6 @@ def main(page: ft.Page):
                     max_scale=6.0,
                     expand=True,
                 )
-
                 counter_text = ft.Text(
                     f"{start_index+1} / {total}",
                     size=12,
@@ -1336,7 +1053,9 @@ def main(page: ft.Page):
 
                 prev_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_BACK_IOS_NEW, size=22, color="#EEFFFFFF"),
-                    width=48, height=48, border_radius=24,
+                    width=48,
+                    height=48,
+                    border_radius=24,
                     bgcolor="#44000000",
                     blur=10,
                     alignment=ft.alignment.center,
@@ -1348,7 +1067,9 @@ def main(page: ft.Page):
 
                 next_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_FORWARD_IOS, size=22, color="#EEFFFFFF"),
-                    width=48, height=48, border_radius=24,
+                    width=48,
+                    height=48,
+                    border_radius=24,
                     bgcolor="#44000000",
                     blur=10,
                     alignment=ft.alignment.center,
@@ -1405,7 +1126,9 @@ def main(page: ft.Page):
 
                 close_btn = ft.Container(
                     content=ft.Icon(ft.Icons.CLOSE, size=24, color="#EEFFFFFF"),
-                    width=44, height=44, border_radius=22,
+                    width=44,
+                    height=44,
+                    border_radius=22,
                     bgcolor="#44000000",
                     blur=10,
                     alignment=ft.alignment.center,
@@ -1427,23 +1150,25 @@ def main(page: ft.Page):
                     expand=True,
                 )
 
-                middle_area = ft.Container(
-                    content=ft.Container(content=image_view, expand=True),
-                    expand=True,
-                )
-
                 image_stack = ft.Stack([
                     ft.Container(bgcolor="#000000", expand=True),
-                    ft.Container(content=image_view, expand=True, padding=ft.Padding(left=60, right=60, top=60, bottom=60)),
+                    ft.Container(
+                        content=image_view,
+                        expand=True,
+                        padding=ft.Padding(left=60, right=60, top=60, bottom=60),
+                    ),
                     ft.Row([left_area, ft.Container(width=1), right_area], expand=True),
                     ft.Container(
                         content=ft.Row([close_btn], alignment=ft.MainAxisAlignment.END),
-                        top=8, right=8,
+                        top=8,
+                        right=8,
                     ),
                     ft.Container(
                         content=counter_container,
                         alignment=ft.alignment.bottom_center,
-                        bottom=16, left=0, right=0,
+                        bottom=16,
+                        left=0,
+                        right=0,
                     ),
                 ], expand=True)
 
@@ -1470,7 +1195,7 @@ def main(page: ft.Page):
                     update_data_dir(e.path)
                     try:
                         page.client_storage.set("data_path", e.path)
-                    except:
+                    except BaseException:
                         pass
                     sync_status_text.value = f"✅ 已切换到：{e.path}"
                     sync_status_text.color = "green"
@@ -1498,28 +1223,15 @@ def main(page: ft.Page):
                     row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
                     for idx, f_path in enumerate(selected_files):
                         try:
-                            img = ft.Image(
-                                src=f_path,
-                                width=60,
-                                height=60,
-                                fit=ft.ImageFit.COVER,
-                                border_radius=8,
-                            )
-                        except:
+                            img = ft.Image(src=f_path, width=60, height=60,
+                                           fit=ft.ImageFit.COVER, border_radius=8)
+                        except BaseException:
                             img = ft.Text("🖼️", size=40)
-
-                        del_btn = ft.IconButton(
-                            icon=ft.Icons.CLOSE,
-                            icon_size=16,
-                            on_click=lambda e, i=idx: remove_file(i),
-                        )
-                        col = ft.Column(
-                            [img, del_btn],
-                            spacing=2,
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        )
+                        del_btn = ft.IconButton(icon=ft.Icons.CLOSE, icon_size=16,
+                                                on_click=lambda e, i=idx: remove_file(i))
+                        col = ft.Column([img, del_btn], spacing=2,
+                                        horizontal_alignment=ft.CrossAxisAlignment.CENTER)
                         row.controls.append(col)
-
                     file_list.controls.append(row)
                     complete_btn.disabled = len(selected_files) == 0
                     page.update()
@@ -1546,17 +1258,12 @@ def main(page: ft.Page):
                         refresh_file_list()
 
                 def pick_files(e):
-                    picker.pick_files(
-                        file_type=ft.FilePickerFileType.IMAGE,
-                        allow_multiple=True
-                    )
+                    picker.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
 
                 complete_btn = ft.ElevatedButton(
-                    "✅ 完成上传",
-                    icon=ft.Icons.DONE,
+                    "✅ 完成上传", icon=ft.Icons.DONE,
                     on_click=lambda e: on_complete(selected_files) if on_complete else None,
-                    disabled=True,
-                    visible=False,
+                    disabled=True, visible=False,
                 )
 
                 def reset():
@@ -1576,8 +1283,7 @@ def main(page: ft.Page):
             subj_dd = ft.Dropdown(
                 label="科目",
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
-                value="数学",
-                width=150,
+                value="数学", width=150,
             )
             original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3)
             mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2)
@@ -1594,17 +1300,11 @@ def main(page: ft.Page):
                     analyze_images(selected_files)
 
             picker_col1, original_files, reset_picker1 = make_file_picker_button(
-                "📷 题目图片（可多选）", "image",
-                on_complete=on_picker_complete
-            )
+                "📷 题目图片（可多选）", "image", on_complete=on_picker_complete)
             picker_col2, answer_files, reset_picker2 = make_file_picker_button(
-                "📷 答案图片", "image",
-                on_complete=None
-            )
+                "📷 答案图片", "image", on_complete=None)
             picker_col3, idea_files, reset_picker3 = make_file_picker_button(
-                "📷 笔记图片（错题补充）", "image",
-                on_complete=None
-            )
+                "📷 笔记图片（错题补充）", "image", on_complete=None)
 
             def analyze_images(image_paths):
                 progress_row.visible = True
@@ -1648,7 +1348,7 @@ def main(page: ft.Page):
                 try:
                     with open(image_path, "rb") as f:
                         img_b64 = base64.b64encode(f.read()).decode("utf-8")
-                except:
+                except BaseException:
                     return None
                 prompt = """请分析这张图片中的题目内容，并返回以下 JSON 格式：
 {
@@ -1657,34 +1357,31 @@ def main(page: ft.Page):
   "difficulty": 1-5 的整数（1最简单，5最难）
 }
 只返回 JSON，不要其他文字。"""
-                messages = [
-                    {"role": "user", "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
-                    ]}
-                ]
+                messages = [{"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
+                ]}]
                 try:
                     resp = requests.post(
                         "https://open.bigmodel.cn/api/paas/v4/chat/completions",
                         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                         json={"model": "glm-4v-flash", "messages": messages, "max_tokens": 300},
-                        timeout=30
-                    )
+                        timeout=30)
                     if resp.status_code == 200:
                         content = resp.json()["choices"][0]["message"]["content"]
                         try:
                             result = json.loads(content)
                             return result
-                        except:
+                        except BaseException:
                             match = re.search(r'\{[^{}]*\}', content)
                             if match:
                                 try:
                                     result = json.loads(match.group())
                                     return result
-                                except:
+                                except BaseException:
                                     pass
                     return None
-                except:
+                except BaseException:
                     return None
 
             def submit_error(e):
@@ -1711,14 +1408,11 @@ def main(page: ft.Page):
             note_subject_dd = ft.Dropdown(
                 label="科目",
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
-                value="数学",
-                width=150,
+                value="数学", width=150,
             )
             note_content_input = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=4)
             note_picker_col, note_files, reset_note_picker = make_file_picker_button(
-                "📷 笔记图片（可多选）", "image",
-                on_complete=None
-            )
+                "📷 笔记图片（可多选）", "image", on_complete=None)
 
             def submit_note(e):
                 subj = note_subject_dd.value
@@ -1788,13 +1482,11 @@ def main(page: ft.Page):
             for subj_name, subj_icon in AI_SUBJECTS:
                 btn = ft.TextButton(
                     text=f"{subj_icon} {subj_name}",
-                    on_click=lambda e, s=subj_name: open_chat(s)
-                )
+                    on_click=lambda e, s=subj_name: open_chat(s))
                 contact_list.controls.append(btn)
             contact_panel.content = ft.Column(
                 [ft.Text("🧠 AI 助手", size=18), ft.Divider(), contact_list],
-                spacing=5
-            )
+                spacing=5)
 
             ai_ball = ft.Container(
                 content=ft.Text("AI", size=20, color="white", weight=ft.FontWeight.BOLD),
@@ -1806,9 +1498,7 @@ def main(page: ft.Page):
                 border=ft.border.all(1, ft.Colors.WHITE24),
                 shadow=ft.BoxShadow(blur_radius=16, color="#88000000"),
                 alignment=ft.alignment.center,
-                on_click=lambda e: (
-                    close_contact_panel() if contact_panel.visible else open_contact_panel(e)
-                ),
+                on_click=lambda e: (close_contact_panel() if contact_panel.visible else open_contact_panel(e)),
                 ink=True,
             )
             ball_container = ft.Container(content=ai_ball, right=10, bottom=10)
@@ -1848,31 +1538,16 @@ def main(page: ft.Page):
                 if not api_key:
                     on_chunk("❌ 未配置API密钥")
                     return
-
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": "glm-4-flash",
-                    "messages": messages,
-                    "temperature": 0.7,
-                    "max_tokens": 2048,
-                    "stream": True
-                }
-
+                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                payload = {"model": "glm-4-flash", "messages": messages,
+                           "temperature": 0.7, "max_tokens": 2048, "stream": True}
                 try:
                     resp = requests.post(
                         "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        stream=True,
-                        timeout=60
-                    )
+                        headers=headers, json=payload, stream=True, timeout=60)
                     if resp.status_code != 200:
                         on_chunk(f"❌ API错误 {resp.status_code}")
                         return
-
                     accumulated = ""
                     for line in resp.iter_lines(decode_unicode=True):
                         if stop_flag:
@@ -1885,7 +1560,7 @@ def main(page: ft.Page):
                                 if delta:
                                     accumulated += delta
                                     on_chunk(accumulated)
-                            except:
+                            except BaseException:
                                 continue
                     return accumulated
                 except Exception as e:
@@ -1894,28 +1569,20 @@ def main(page: ft.Page):
 
             def build_chat_window(subject, initial_message=None, auto_send=False):
                 nonlocal stop_flag, generation_active
-
                 display_name = subject if subject != "总AI" else "总AI"
                 history = load_chat_history(subject)
-
                 context_messages = []
                 for msg in history[-20:]:
-                    context_messages.append({
-                        "role": msg["role"],
-                        "content": msg["content"]
-                    })
-
+                    context_messages.append({"role": msg["role"], "content": msg["content"]})
                 memory_context = get_memory_context(subject if subject != "总AI" else None)
                 profile_summary = get_profile_summary()
                 strategy = get_teaching_strategy(subject if subject != "总AI" else None)
-
                 system_prompt = f"""你是{display_name}老师，请用结构化方式回答。
 - 对于知识类问题，请分点列出要点。
 - 对于解题类问题，请先给出思路，再给出步骤。
 - 对于作文类问题，请提供框架和例句。
 - 回答要简洁、准确、有条理。
 - 请主动引用你对这个学生的记忆，让学生感到你了解他。"""
-
                 custom_skill = load_custom_skill()
                 if custom_skill:
                     system_prompt += f"\n\n额外的教学指导：{custom_skill}"
@@ -1930,42 +1597,29 @@ def main(page: ft.Page):
                     for msg in context_messages[-15:]:
                         role_label = "学生" if msg["role"] == "user" else "老师"
                         system_prompt += f"[{role_label}]: {msg['content'][:200]}\n"
-
                 all_messages = [{"role": "system", "content": system_prompt}]
                 for msg in context_messages[-15:]:
                     all_messages.append(msg)
-
                 chat_history_display = ft.ListView(spacing=12, expand=True)
                 chat_input = ft.TextField(
                     label=f"向{display_name}老师提问...",
-                    multiline=True,
-                    min_lines=2,
-                    max_lines=5
-                )
+                    multiline=True, min_lines=2, max_lines=5)
                 send_btn = ft.ElevatedButton("发送", icon=ft.Icons.SEND)
                 stop_btn = ft.TextButton("停止生成", visible=False)
                 chat_status = ft.Text("", size=14)
-
                 for msg in history:
                     is_user = msg["role"] == "user"
                     chat_history_display.controls.append(
                         ft.Container(
                             content=ft.Column([
-                                ft.Text(
-                                    "你" if is_user else display_name,
-                                    size=12,
-                                    weight=ft.FontWeight.BOLD,
-                                    color="#FF8A65" if is_user else "#66BB6A"
-                                ),
+                                ft.Text("你" if is_user else display_name, size=12,
+                                        weight=ft.FontWeight.BOLD,
+                                        color="#FF8A65" if is_user else "#66BB6A"),
                                 ft.Text(msg["content"], size=14),
                             ], spacing=4),
-                            padding=10,
-                            border_radius=14,
+                            padding=10, border_radius=14,
                             bgcolor="#33FF8A65" if is_user else "#33226622",
-                            blur=8,
-                        )
-                    )
-
+                            blur=8))
                 if initial_message:
                     chat_input.value = initial_message
 
@@ -1976,34 +1630,20 @@ def main(page: ft.Page):
                         return
                     if not msg_text:
                         chat_input.value = ""
-
                     chat_history_display.controls.append(
                         ft.Container(
                             content=ft.Column([
-                                ft.Text(
-                                    "你",
-                                    size=12,
-                                    weight=ft.FontWeight.BOLD,
-                                    color="#FF8A65"
-                                ),
+                                ft.Text("你", size=12, weight=ft.FontWeight.BOLD, color="#FF8A65"),
                                 ft.Text(content, size=14),
                             ], spacing=4),
-                            padding=10,
-                            border_radius=14,
-                            bgcolor="#33FF8A65",
-                            blur=8,
-                        )
-                    )
+                            padding=10, border_radius=14, bgcolor="#33FF8A65", blur=8))
                     send_btn.visible = False
                     stop_btn.visible = True
                     chat_status.value = "⏳ 生成中..."
                     page.update()
-
                     save_chat_message(subject, "user", content)
-
                     current_messages = list(all_messages)
                     current_messages.append({"role": "user", "content": content})
-
                     ai_response = ""
 
                     def on_chunk(text):
@@ -2018,37 +1658,23 @@ def main(page: ft.Page):
                             call_ai_stream(current_messages, "glm-4-flash", on_chunk)
                         finally:
                             generation_active = False
-
                         if len(chat_history_display.controls) > 0:
                             last_child = chat_history_display.controls[-1]
                             if hasattr(last_child, 'bgcolor') and last_child.bgcolor == "#33226622":
                                 chat_history_display.controls.pop()
-
                         chat_history_display.controls.append(
                             ft.Container(
                                 content=ft.Column([
-                                    ft.Text(
-                                        display_name,
-                                        size=12,
-                                        weight=ft.FontWeight.BOLD,
-                                        color="#66BB6A"
-                                    ),
+                                    ft.Text(display_name, size=12, weight=ft.FontWeight.BOLD, color="#66BB6A"),
                                     ft.Text(ai_response if ai_response else "（无回应）", size=14),
                                 ], spacing=4),
-                                padding=10,
-                                border_radius=14,
-                                bgcolor="#33226622",
-                                blur=8,
-                            )
-                        )
+                                padding=10, border_radius=14, bgcolor="#33226622", blur=8))
                         send_btn.visible = True
                         stop_btn.visible = False
                         chat_status.value = ""
-
                         if ai_response:
                             save_chat_message(subject, "assistant", ai_response)
                             update_chat_memory(subject, content, ai_response)
-
                         update_chat_stats(subject)
                         page.update()
 
@@ -2072,26 +1698,19 @@ def main(page: ft.Page):
                     ft.Row([
                         ft.Text(f"💬 {display_name} 对话", size=20, weight=ft.FontWeight.BOLD),
                         ft.TextButton("🗑️ 清除历史", on_click=clear_history),
-                        ft.IconButton(
-                            icon=ft.Icons.CLOSE,
-                            on_click=lambda e: (
-                                setattr(chat_dialog, 'visible', False),
-                                page.update()
-                            )
-                        ),
+                        ft.IconButton(icon=ft.Icons.CLOSE,
+                                      on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     ft.Divider(),
                     ft.Container(content=chat_history_display, expand=True),
                     ft.Row([chat_input, send_btn, stop_btn], spacing=10),
                     chat_status,
                 ], spacing=10, expand=True)
-
                 if auto_send and initial_message:
                     def trigger():
                         time.sleep(0.4)
                         handle_send()
                     threading.Thread(target=trigger, daemon=True).start()
-
                 return result_col
 
             mine_msg = ft.Text("", size=16)
@@ -2119,426 +1738,640 @@ def main(page: ft.Page):
                     _save_user_new_words(nw)
                 return nw
 
-            def build_vocab_page(subject, mode="vocab"):
-                all_vocab = load_jsonl(VOCAB_FILE)
-                all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
+            def _needs_completion(w):
+                if not w.get("phonetic") or not w.get("meaning"):
+                    return True
+                if not w.get("example") or not w.get("forms"):
+                    return True
+                if not w.get("grammar") and not w.get("phrases"):
+                    return True
+                return False
 
-                vocab_list_view = ft.ListView(spacing=2, expand=True)
-                search_field = ft.TextField(label="🔍 搜索单词", hint_text="输入单词搜索...", expand=True)
-                count_text = ft.Text("", size=14, color=ft.Colors.GREY_600)
-
-                def _needs_completion(w):
-                    """判断单词是否需要 AI 补齐"""
-                    if not w.get("phonetic") or not w.get("meaning"):
-                        return True
-                    if not w.get("example") or not w.get("forms"):
-                        return True
-                    if not w.get("grammar") and not w.get("phrases"):
-                        return True
-                    return False
-
-                def _fill_word_with_ai(word_data):
-                    """点开单词时若字段缺失，自动调 AI 补齐"""
-                    word = word_data.get("word", "")
-                    if not word:
-                        return word_data
-                    if not _needs_completion(word_data):
-                        return word_data
-                    new_data = generate_word_info(word)
-                    if not new_data:
-                        return word_data
-                    existing = load_jsonl(VOCAB_FILE)
-                    for i, w in enumerate(existing):
-                        if w.get("word", "").lower() == word.lower():
-                            for k, v in new_data.items():
-                                if k == "grammar":
-                                    existing[i]["grammar"] = v if v else existing[i].get("grammar", {})
-                                elif k == "phrases":
-                                    existing[i]["phrases"] = v if v else existing[i].get("phrases", [])
-                                elif v:
-                                    existing[i][k] = v
-                            word_data = existing[i]
-                            break
-                    save_jsonl(VOCAB_FILE, existing)
+            def _fill_word_with_ai(word_data):
+                word = word_data.get("word", "")
+                if not word or not _needs_completion(word_data):
                     return word_data
+                new_data = generate_word_info(word)
+                if not new_data:
+                    return word_data
+                existing = load_jsonl(VOCAB_FILE)
+                for i, w in enumerate(existing):
+                    if w.get("word", "").lower() == word.lower():
+                        for k, v in new_data.items():
+                            if k == "grammar":
+                                existing[i]["grammar"] = v if v else existing[i].get("grammar", {})
+                            elif k == "phrases":
+                                existing[i]["phrases"] = v if v else existing[i].get("phrases", [])
+                            elif v:
+                                existing[i][k] = v
+                        word_data = existing[i]
+                        break
+                save_jsonl(VOCAB_FILE, existing)
+                return word_data
 
-                def _generate_and_add_word(word):
-                    existing = load_jsonl(VOCAB_FILE)
-                    if any(w.get("word", "").lower() == word.lower() for w in existing):
-                        return True
-                    new_data = generate_word_info(word)
-                    if new_data:
-                        existing.append(new_data)
-                        save_jsonl(VOCAB_FILE, existing)
-                        return True
-                    return False
+            def _open_word_detail(word_data, on_close=None):
+                word_data = _fill_word_with_ai(word_data)
+                word = word_data.get("word", "")
+                phonetic = word_data.get("phonetic", "")
+                meaning = word_data.get("meaning", "")
+                example = word_data.get("example", "")
+                forms = word_data.get("forms", "")
+                grammar = word_data.get("grammar", {})
+                phrases = word_data.get("phrases", [])
+                content_children = []
+                content_children.append(ft.Text(f"📖 {word}", size=24, weight=ft.FontWeight.BOLD))
+                if phonetic:
+                    content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#FF8A65"))
+                if meaning:
+                    content_children.append(ft.Text(meaning, size=16, color="#81C784"))
+                if example:
+                    content_children.append(ft.Text(f"例句：{example}", size=14, italic=True, color=ft.Colors.GREY_400))
+                if forms:
+                    forms_words = [f.strip() for f in forms.replace(',', ' ').split() if f.strip()]
+                    if forms_words:
+                        forms_row = ft.Row(spacing=8, wrap=True)
+                        forms_row.controls.append(ft.Text("变形：", size=14, weight=ft.FontWeight.BOLD))
+                        all_vocab_now = load_jsonl(VOCAB_FILE)
+                        for fw in forms_words:
+                            target_word_data = next((w for w in all_vocab_now if w.get("word", "").lower() == fw.lower()), None)
+                            if target_word_data:
+                                btn = ft.TextButton(
+                                    text=fw,
+                                    on_click=lambda e, wd=target_word_data: _open_word_detail(wd),
+                                    style=ft.ButtonStyle(color="#64B5F6",
+                                                         text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)))
+                            else:
+                                def make_gen_click(fw_word):
+                                    def on_click(e):
+                                        show_toast(f"⏳ 正在生成 {fw_word}...", "info")
+                                        new_d = generate_word_info(fw_word)
+                                        if new_d:
+                                            ev = load_jsonl(VOCAB_FILE)
+                                            ev.append(new_d)
+                                            save_jsonl(VOCAB_FILE, ev)
+                                            show_toast(f"✅ 已添加 {fw_word}", "green")
+                                        else:
+                                            show_toast(f"❌ 生成失败", "red")
+                                    return on_click
+                                btn = ft.TextButton(
+                                    text=fw, on_click=make_gen_click(fw),
+                                    style=ft.ButtonStyle(color="#FFB74D",
+                                                         text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)))
+                            forms_row.controls.append(btn)
+                        content_children.append(forms_row)
+                if grammar:
+                    gp_parts = []
+                    if grammar.get("collocations"):
+                        gp_parts.append(f"搭配：{', '.join(grammar['collocations'])}")
+                    if grammar.get("notes"):
+                        gp_parts.append(f"笔记：{' ; '.join(grammar['notes'])}")
+                    if grammar.get("test_points"):
+                        gp_parts.append(f"考点：{' ; '.join(grammar['test_points'])}")
+                    if gp_parts:
+                        content_children.append(ft.Text("📚 语法", size=14, weight=ft.FontWeight.BOLD))
+                        for gp in gp_parts:
+                            content_children.append(ft.Text(gp, size=13, color="#64B5F6"))
+                if phrases:
+                    content_children.append(ft.Text("🔗 短语", size=14, weight=ft.FontWeight.BOLD))
+                    for ph in phrases:
+                        content_children.append(ft.Text(f"• {ph}", size=13, color="#4DB6AC"))
+                nw_set = set(_load_user_new_words())
+                is_in_nw = word in nw_set
 
-                def _open_word_detail(word_data):
-                    # 自动补齐
-                    word_data = _fill_word_with_ai(word_data)
-                    word = word_data.get("word", "")
-                    phonetic = word_data.get("phonetic", "")
-                    meaning = word_data.get("meaning", "")
-                    example = word_data.get("example", "")
-                    forms = word_data.get("forms", "")
-                    grammar = word_data.get("grammar", {})
-                    phrases = word_data.get("phrases", [])
-
-                    content_children = []
-
-                    content_children.append(ft.Text(f"📖 {word}", size=24, weight=ft.FontWeight.BOLD))
-                    if phonetic:
-                        content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#FF8A65"))
-                    if meaning:
-                        content_children.append(ft.Text(meaning, size=16, color="#81C784"))
-                    if example:
-                        content_children.append(ft.Text(f"例句：{example}", size=14, italic=True, color=ft.Colors.GREY_400))
-
-                    if forms:
-                        forms_words = [f.strip() for f in forms.replace(',', ' ').split() if f.strip()]
-                        if forms_words:
-                            forms_row = ft.Row(spacing=8, wrap=True)
-                            forms_row.controls.append(ft.Text("变形：", size=14, weight=ft.FontWeight.BOLD))
-                            for fw in forms_words:
-                                target_word_data = next(
-                                    (w for w in all_vocab if w.get("word", "").lower() == fw.lower()), None)
-                                if target_word_data:
-                                    btn = ft.TextButton(
-                                        text=fw,
-                                        on_click=lambda e, wd=target_word_data: _open_word_detail(wd),
-                                        style=ft.ButtonStyle(color="#64B5F6",
-                                                             text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE))
-                                    )
-                                else:
-                                    def make_generate_click(fw_word):
-                                        def on_click(e):
-                                            show_toast(f"⏳ 正在生成单词 {fw_word}...", "info")
-                                            success = _generate_and_add_word(fw_word)
-                                            if success:
-                                                nonlocal all_vocab, all_words
-                                                all_vocab = load_jsonl(VOCAB_FILE)
-                                                all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
-                                                _render_list(search_field.value)
-                                                show_toast(f"✅ 已添加单词 {fw_word}", "green")
-                                            else:
-                                                show_toast(f"❌ 生成 {fw_word} 失败", "red")
-                                            _open_word_detail(word_data)
-
-                                        return on_click
-
-                                    btn = ft.TextButton(
-                                        text=fw,
-                                        on_click=make_generate_click(fw),
-                                        style=ft.ButtonStyle(color="#FFB74D",
-                                                             text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE))
-                                    )
-                                forms_row.controls.append(btn)
-                            content_children.append(forms_row)
-
-                    if grammar:
-                        grammar_parts = []
-                        if grammar.get("collocations"):
-                            grammar_parts.append(f"搭配：{', '.join(grammar['collocations'])}")
-                        if grammar.get("notes"):
-                            grammar_parts.append(f"笔记：{' ; '.join(grammar['notes'])}")
-                        if grammar.get("test_points"):
-                            grammar_parts.append(f"考点：{' ; '.join(grammar['test_points'])}")
-                        if grammar_parts:
-                            content_children.append(ft.Text("📚 语法", size=14, weight=ft.FontWeight.BOLD))
-                            for gp in grammar_parts:
-                                content_children.append(ft.Text(gp, size=13, color="#64B5F6"))
-
-                    if phrases:
-                        content_children.append(ft.Text("🔗 短语", size=14, weight=ft.FontWeight.BOLD))
-                        for ph in phrases:
-                            content_children.append(ft.Text(f"• {ph}", size=13, color="#4DB6AC"))
-
-                    nw_set = set(_load_user_new_words())
-                    is_in_nw = word in nw_set
-
-                    def toggle_nw(e, w=word):
-                        nw_list = _load_user_new_words()
-                        if w in nw_list:
-                            _remove_from_new_words(w)
-                            show_toast(f"已移出生词本：{w}", "info")
-                        else:
-                            _add_to_new_words(w)
-                            show_toast(f"已加入生词本：{w}", "green")
-                        _render_list(search_field.value)
-                        page.close(dialog)
-                        _open_word_detail(word_data)
-                        page.update()
-
-                    content_children.append(
-                        ft.Container(
-                            content=ft.Text(
-                                "✅ 已在生词本" if is_in_nw else "➕ 加入生词本",
-                                size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE
-                            ),
-                            bgcolor="#66BB6A" if is_in_nw else "#FF8A65",
-                            border_radius=20,
-                            padding=ft.Padding(left=16, right=16, top=8, bottom=8),
-                            on_click=toggle_nw,
-                            ink=True,
-                        )
-                    )
-
-                    dialog = ft.AlertDialog(
-                        title=ft.Text(""),
-                        content=ft.Container(
-                            content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                            width=400,
-                            height=None,
-                            padding=10,
-                        ),
-                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dialog))],
-                    )
-                    page.open(dialog)
+                def toggle_nw(e, w=word):
+                    if w in _load_user_new_words():
+                        _remove_from_new_words(w)
+                        show_toast(f"已移出生词本：{w}", "info")
+                    else:
+                        _add_to_new_words(w)
+                        show_toast(f"已加入生词本：{w}", "green")
+                    page.close(dialog)
+                    if on_close:
+                        on_close()
                     page.update()
 
-                def _render_list(keyword=""):
-                    vocab_list_view.controls.clear()
-                    kw = keyword.strip().lower()
-                    filtered = all_words
-                    if kw:
-                        filtered = [w for w in all_words if kw in w.get("word", "").lower()
-                                    or kw in w.get("meaning", "").lower()]
-                    BATCH = 100
-                    total = len(filtered)
-                    shown = min(BATCH, total)
-                    count_text.value = f"共 {total} 词" + (
-                        f"（显示前 {shown} 条，请搜索缩小范围）" if total > BATCH else "")
-                    nw_set = set(_load_user_new_words())
+                content_children.append(
+                    ft.Container(
+                        content=ft.Text("✅ 已在生词本" if is_in_nw else "➕ 加入生词本",
+                                        size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                        bgcolor="#66BB6A" if is_in_nw else "#FF8A65",
+                        border_radius=20,
+                        padding=ft.Padding(left=16, right=16, top=8, bottom=8),
+                        on_click=toggle_nw, ink=True))
+                dialog = ft.AlertDialog(
+                    title=ft.Text(""),
+                    content=ft.Container(
+                        content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
+                        width=400, height=None, padding=10),
+                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dialog))])
+                page.open(dialog)
+                page.update()
 
-                    for w in filtered[:BATCH]:
-                        word = w.get("word", "")
-                        phonetic = w.get("phonetic", "")
-                        meaning_short = w.get("meaning", "")[:50]
-                        is_new = word in nw_set
+            def build_vocab_page(subject):
+                settings = load_vocab_settings()
+                tab_index = [0]
+                tab_content = ft.Container(expand=True)
+                tab_row = ft.Row(spacing=6)
+                tab_defs = [("📚", "词库"), ("⭐", "生词"), ("🧠", "学习"), ("✍️", "考核"), ("❌", "错词")]
+                tab_buttons = []
 
-                        def _show_detail(e, wd=w):
-                            _open_word_detail(wd)
-
-                        tile = ft.ListTile(
-                            leading=ft.Icon(ft.Icons.BOOKMARK if is_new else ft.Icons.CIRCLE, size=16,
-                                            color="#FFB74D" if is_new else ft.Colors.GREY_500),
-                            title=ft.Text(f"{word}  {phonetic}", size=15),
-                            subtitle=ft.Text(meaning_short, size=12, color=ft.Colors.GREY_400),
-                            trailing=ft.IconButton(
-                                icon=ft.Icons.PLAY_ARROW, icon_size=20,
-                                tooltip="查看详情",
-                                on_click=_show_detail,
-                            ),
-                            on_click=_show_detail,
-                            dense=True,
-                        )
-                        vocab_list_view.controls.append(tile)
+                def set_tab(idx):
+                    tab_index[0] = idx
+                    for i, btn in enumerate(tab_buttons):
+                        btn.bgcolor = "#FF8A65" if i == idx else "#2A2A2A"
+                        for c in btn.content.controls:
+                            if isinstance(c, ft.Text):
+                                c.color = "#FFFFFF" if i == idx else "#CCCCCC"
+                    render_tab()
                     page.update()
 
-                def _on_search(e):
-                    _render_list(search_field.value)
-                    page.update()
+                def make_tab_btn(icon, label, idx):
+                    return ft.Container(
+                        content=ft.Row([
+                            ft.Text(icon, size=14),
+                            ft.Text(label, size=13, weight=ft.FontWeight.BOLD, color="#CCCCCC"),
+                        ], spacing=3, tight=True),
+                        padding=ft.Padding(left=10, right=10, top=6, bottom=6),
+                        border_radius=10, bgcolor="#2A2A2A",
+                        on_click=lambda e, i=idx: set_tab(i), ink=True)
 
-                search_field.on_change = _on_search
+                for i, (ic, lb) in enumerate(tab_defs):
+                    btn = make_tab_btn(ic, lb, i)
+                    tab_buttons.append(btn)
+                    tab_row.controls.append(btn)
 
-                add_word_input = ft.TextField(label="新增单词", hint_text="输入英文或中文", expand=True)
-
-                def _add_custom_word(e):
-                    raw = add_word_input.value.strip()
-                    if not raw:
-                        return
-                    word = raw.lower()
-                    existing = load_jsonl(VOCAB_FILE)
-                    if any(w.get("word", "").lower() == word for w in existing):
-                        show_toast(f"单词 {word} 已存在", "info")
-                        add_word_input.value = ""
-                        page.update()
-                        return
-                    new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "", "forms": "", "grammar": {}, "phrases": []}
-                    existing.append(new_entry)
-                    save_jsonl(VOCAB_FILE, existing)
-                    show_toast(f"已添加 {word}，点开自动补齐", "green")
-                    add_word_input.value = ""
-                    nonlocal all_vocab, all_words
+                def build_lib_tab():
                     all_vocab = load_jsonl(VOCAB_FILE)
                     all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
-                    _render_list(search_field.value)
-                    page.update()
+                    vocab_list_view = ft.ListView(spacing=2, expand=True)
+                    search_field = ft.TextField(label="🔍 搜索单词", hint_text="输入英文或中文", expand=True)
+                    count_text = ft.Text(f"共 {len(all_words)} 词", size=13, color=ft.Colors.GREY_500)
 
-                _render_list()
+                    def _render_list(keyword=""):
+                        vocab_list_view.controls.clear()
+                        kw = keyword.strip().lower()
+                        filtered = all_words
+                        if kw:
+                            filtered = [w for w in all_words if kw in w.get("word", "").lower() or kw in w.get("meaning", "").lower()]
+                        BATCH = 100
+                        total = len(filtered)
+                        shown = min(BATCH, total)
+                        count_text.value = f"共 {total} 词" + (f"（前 {shown} 条）" if total > BATCH else "")
+                        nw_set = set(_load_user_new_words())
+                        for w in filtered[:BATCH]:
+                            word = w.get("word", "")
+                            phonetic = w.get("phonetic", "")
+                            meaning_short = w.get("meaning", "")[:50]
+                            is_new = word in nw_set
 
-                import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
-                page.overlay.append(import_picker)
+                            def _show_detail(e, wd=w):
+                                _open_word_detail(wd, on_close=lambda: _render_list(search_field.value))
 
-                def on_import_result(e: ft.FilePickerResultEvent):
-                    if e.files:
-                        file_path = e.files[0].path
-                        if not file_path.lower().endswith('.jsonl'):
-                            show_toast("请选择 .jsonl 文件", "red")
+                            tile = ft.ListTile(
+                                leading=ft.Icon(ft.Icons.BOOKMARK if is_new else ft.Icons.CIRCLE, size=16,
+                                                color="#FFB74D" if is_new else ft.Colors.GREY_500),
+                                title=ft.Text(f"{word}  {phonetic}", size=15),
+                                subtitle=ft.Text(meaning_short, size=12, color=ft.Colors.GREY_400),
+                                trailing=ft.IconButton(icon=ft.Icons.PLAY_ARROW, icon_size=20,
+                                                       tooltip="查看详情", on_click=_show_detail),
+                                on_click=_show_detail, dense=True)
+                            vocab_list_view.controls.append(tile)
+                        page.update()
+
+                    search_field.on_change = lambda e: _render_list(search_field.value)
+                    add_word_input = ft.TextField(label="新增单词", hint_text="英文或中文", expand=True)
+
+                    def _add_custom_word(e):
+                        raw = add_word_input.value.strip()
+                        if not raw:
                             return
-                        try:
-                            shutil.copy(file_path, VOCAB_FILE)
-                            show_toast("✅ 词汇导入成功！", "green")
-                            nonlocal all_vocab, all_words
-                            all_vocab = load_jsonl(VOCAB_FILE)
-                            all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
-                            _render_list(search_field.value)
-                        except Exception as ex:
-                            show_toast(f"❌ 导入失败: {str(ex)[:50]}", "red")
+                        word = raw.lower()
+                        existing = load_jsonl(VOCAB_FILE)
+                        if any(w.get("word", "").lower() == word for w in existing):
+                            show_toast(f"单词 {word} 已存在", "info")
+                            add_word_input.value = ""
+                            return
+                        new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "",
+                                     "forms": "", "grammar": {}, "phrases": []}
+                        ensure_learning_field(new_entry)
+                        existing.append(new_entry)
+                        save_jsonl(VOCAB_FILE, existing)
+                        show_toast(f"已添加 {word}，点开自动补齐", "green")
+                        add_word_input.value = ""
+                        nonlocal all_vocab, all_words
+                        all_vocab = load_jsonl(VOCAB_FILE)
+                        all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
+                        _render_list(search_field.value)
 
-                import_btn = ft.ElevatedButton("📥 导入词汇文件", icon=ft.Icons.UPLOAD_FILE,
-                                               on_click=lambda e: import_picker.pick_files(
-                                                   file_type=ft.FilePickerFileType.CUSTOM,
-                                                   allowed_extensions=["jsonl"]))
+                    _render_list()
+                    import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
+                    page.overlay.append(import_picker)
 
+                    def on_import_result(e: ft.FilePickerResultEvent):
+                        if e.files:
+                            file_path = e.files[0].path
+                            if not file_path.lower().endswith('.jsonl'):
+                                show_toast("请选择 .jsonl 文件", "red")
+                                return
+                            try:
+                                shutil.copy(file_path, VOCAB_FILE)
+                                show_toast("✅ 词汇导入成功！", "green")
+                                nonlocal all_vocab, all_words
+                                all_vocab = load_jsonl(VOCAB_FILE)
+                                all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
+                                _render_list(search_field.value)
+                            except Exception as ex:
+                                show_toast(f"❌ 导入失败: {str(ex)[:50]}", "red")
+
+                    import_btn = ft.ElevatedButton(
+                        "📥 导入词汇文件", icon=ft.Icons.UPLOAD_FILE,
+                        on_click=lambda e: import_picker.pick_files(
+                            file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["jsonl"]))
+                    return ft.Column([
+                        import_btn,
+                        ft.Text("点击单词查看详情，缺字段自动 AI 补齐", size=13, color=ft.Colors.GREY_500),
+                        ft.Row([search_field, count_text], spacing=10),
+                        ft.Divider(height=1),
+                        ft.Container(content=vocab_list_view, expand=True),
+                        ft.Divider(height=1),
+                        ft.Row([add_word_input, ft.ElevatedButton("添加", on_click=_add_custom_word)], spacing=10),
+                    ], spacing=8, expand=True)
+
+                def build_nw_tab():
+                    nw_list_view = ft.ListView(spacing=2, expand=True)
+
+                    def refresh_nw():
+                        nw_list_view.controls.clear()
+                        user_nw2 = set(_load_user_new_words())
+                        all_v2 = load_jsonl(VOCAB_FILE)
+                        nw2 = sorted([w for w in all_v2 if w.get("word", "") in user_nw2],
+                                     key=lambda x: x.get("word", "").lower())
+                        if not nw2:
+                            nw_list_view.controls.append(ft.Container(
+                                content=ft.Text("  生词本还是空的\n  在词库中点开单词，点「加入生词本」即可",
+                                                size=14, color=ft.Colors.GREY_500), padding=20))
+                        else:
+                            for w in nw2:
+                                word = w.get("word", "")
+                                tile = ft.ListTile(
+                                    leading=ft.Icon(ft.Icons.BOOKMARK, size=18, color="#FFB74D"),
+                                    title=ft.Text(f"{word}  {w.get('phonetic', '')}", size=15),
+                                    subtitle=ft.Text(w.get("meaning", "")[:50], size=12, color=ft.Colors.GREY_400),
+                                    trailing=ft.IconButton(
+                                        icon=ft.Icons.DELETE_OUTLINE, icon_size=18,
+                                        on_click=lambda e, ww=word: (
+                                            _remove_from_new_words(ww),
+                                            show_toast(f"已移出：{ww}", "info"), refresh_nw())),
+                                    on_click=lambda e, wd=w: _open_word_detail(wd, on_close=refresh_nw),
+                                    dense=True)
+                                nw_list_view.controls.append(tile)
+                        page.update()
+
+                    refresh_nw()
+                    return ft.Column([
+                        ft.Text(f"你标记的待背生词", size=13, color=ft.Colors.GREY_500),
+                        ft.Divider(height=1),
+                        ft.Container(content=nw_list_view, expand=True),
+                    ], spacing=8, expand=True)
+
+                def build_study_tab():
+                    today_new_limit = settings.get("daily_new", 20)
+                    today_new = get_today_new_words(today_new_limit)
+                    today_review = get_today_review_words(settings.get("daily_review_limit", 100))
+                    queue = [{"word": w, "mode": "review"} for w in today_review] + \
+                            [{"word": w, "mode": "new"} for w in today_new]
+                    state = {"idx": 0, "flipped": False}
+                    card_area = ft.Container(expand=True)
+                    progress_text = ft.Text("", size=13, color=ft.Colors.GREY_500)
+                    counter_text = ft.Text("", size=15, weight=ft.FontWeight.BOLD)
+                    action_area = ft.Container()
+
+                    def render_card():
+                        card_area.content = None
+                        action_area.content = None
+                        if state["idx"] >= len(queue):
+                            card_area.content = ft.Container(
+                                content=ft.Column([
+                                    ft.Text("🎉", size=60),
+                                    ft.Text("今日学习任务完成！", size=22, weight=ft.FontWeight.BOLD, color="#81C784"),
+                                    ft.Text(f"共复习 {len(today_review)} 词，新学 {len(today_new)} 词",
+                                            size=14, color=ft.Colors.GREY_500),
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    alignment=ft.MainAxisAlignment.CENTER, spacing=10),
+                                alignment=ft.alignment.center, expand=True)
+                            progress_text.value = ""
+                            counter_text.value = ""
+                            page.update()
+                            return
+                        item = queue[state["idx"]]
+                        w = item["word"]
+                        word = w.get("word", "")
+                        phonetic = w.get("phonetic", "")
+                        meaning = w.get("meaning", "")
+                        example = w.get("example", "")
+                        forms = w.get("forms", "")
+                        counter_text.value = f"{state['idx']+1} / {len(queue)}"
+                        progress_text.value = "复习" if item["mode"] == "review" else "新词"
+                        if not state["flipped"]:
+                            front = ft.Container(
+                                content=ft.Column([
+                                    ft.Text("🔊" if settings.get("show_phonetic") else "", size=30),
+                                    ft.Text(word, size=42, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                                    ft.Container(height=20),
+                                    ft.Text("点击卡片显示释义", size=13, color=ft.Colors.GREY_500),
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    alignment=ft.MainAxisAlignment.CENTER, spacing=10),
+                                alignment=ft.alignment.center, expand=True,
+                                bgcolor="#2A2A2A", border_radius=20,
+                                border=ft.border.all(1, ft.Colors.WHITE10),
+                                padding=30, ink=True,
+                                on_click=lambda e: (state.update({"flipped": True}), render_card()))
+                            card_area.content = front
+                            action_area.content = ft.Row([
+                                ft.ElevatedButton("显示答案", icon=ft.Icons.VISIBILITY,
+                                                  on_click=lambda e: (state.update({"flipped": True}), render_card()),
+                                                  bgcolor="#FF8A65", color="#FFFFFF", expand=True)
+                            ], spacing=10)
+                        else:
+                            back = ft.Container(
+                                content=ft.Column([
+                                    ft.Text(word, size=30, weight=ft.FontWeight.BOLD),
+                                    ft.Text(phonetic, size=16, color="#FF8A65") if phonetic else ft.Text(""),
+                                    ft.Divider(),
+                                    ft.Text(meaning, size=18, color="#81C784"),
+                                    ft.Text(f"例句：{example}", size=13, italic=True, color=ft.Colors.GREY_400) if example else ft.Text(""),
+                                    ft.Text(f"变形：{forms}", size=13, color=ft.Colors.GREY_400) if forms else ft.Text(""),
+                                ], spacing=8, scroll=ft.ScrollMode.AUTO),
+                                alignment=ft.alignment.top_left,
+                                bgcolor="#2A2A2A", border_radius=20,
+                                border=ft.border.all(1, ft.Colors.WHITE10),
+                                padding=20, expand=True)
+                            card_area.content = back
+                            action_area.content = ft.Row([
+                                ft.ElevatedButton("❌ 不认识", on_click=lambda e: mark("forget"),
+                                                  bgcolor="#EF5350", color="#FFFFFF", expand=True),
+                                ft.ElevatedButton("🤔 模糊", on_click=lambda e: mark("fuzzy"),
+                                                  bgcolor="#FFB74D", color="#FFFFFF", expand=True),
+                                ft.ElevatedButton("✅ 认识", on_click=lambda e: mark("know"),
+                                                  bgcolor="#66BB6A", color="#FFFFFF", expand=True),
+                            ], spacing=10)
+                        page.update()
+
+                    def mark(result):
+                        if state["idx"] >= len(queue):
+                            return
+                        item = queue[state["idx"]]
+                        word = item["word"].get("word", "")
+                        update_word_learning(word, result)
+                        log_learning_event("vocab_study", "英语", kp=word,
+                                           detail=f"{item['mode']} - {result}",
+                                           correct=(result == "know"))
+                        state["idx"] += 1
+                        state["flipped"] = False
+                        render_card()
+
+                    render_card()
+                    return ft.Column([
+                        ft.Row([counter_text, progress_text], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Container(content=card_area, expand=True),
+                        action_area,
+                    ], spacing=12, expand=True)
+
+                def build_quiz_tab():
+                    today_review = get_today_review_words(50)
+                    if not today_review:
+                        return ft.Container(
+                            content=ft.Column([
+                                ft.Text("📭", size=60),
+                                ft.Text("今天没有需要考核的词", size=18, color=ft.Colors.GREY_500),
+                                ft.Text("先去「学习」tab 学几个新词吧", size=13, color=ft.Colors.GREY_500),
+                            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                alignment=ft.MainAxisAlignment.CENTER, spacing=10),
+                            alignment=ft.alignment.center, expand=True)
+                    queue = today_review[:20]
+                    state = {"idx": 0, "answered": False}
+                    quiz_area = ft.Container(expand=True)
+                    counter_text = ft.Text("", size=15, weight=ft.FontWeight.BOLD)
+                    score_text = ft.Text("", size=13, color=ft.Colors.GREY_500)
+                    score = {"correct": 0, "total": 0}
+
+                    def next_question():
+                        state["answered"] = False
+                        state["idx"] += 1
+                        render_question()
+
+                    def render_question():
+                        quiz_area.content = None
+                        if state["idx"] >= len(queue):
+                            quiz_area.content = ft.Container(
+                                content=ft.Column([
+                                    ft.Text("🏆", size=60),
+                                    ft.Text("考核完成！", size=22, weight=ft.FontWeight.BOLD, color="#81C784"),
+                                    ft.Text(f"正确率 {score['correct']}/{score['total']}", size=16, color=ft.Colors.GREY_400),
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    alignment=ft.MainAxisAlignment.CENTER, spacing=10),
+                                alignment=ft.alignment.center, expand=True)
+                            page.update()
+                            return
+                        w = queue[state["idx"]]
+                        word = w.get("word", "")
+                        meaning = w.get("meaning", "")
+                        phonetic = w.get("phonetic", "")
+                        counter_text.value = f"{state['idx']+1} / {len(queue)}"
+                        score_text.value = f"✅ {score['correct']} / {score['total']}"
+                        mode = settings.get("quiz_mode", "mix")
+                        if mode == "mix":
+                            mode = random.choice(["word2meaning", "meaning2word"])
+                        if mode == "word2meaning":
+                            options = [meaning]
+                            others = random.sample([x for x in queue if x.get("word", "") != word],
+                                                   min(3, max(0, len(queue) - 1))) if len(queue) > 1 else []
+                            for o in others:
+                                options.append(o.get("meaning", ""))
+                            random.shuffle(options)
+                            correct = meaning
+                            opt_btns = []
+                            result_text = ft.Text("", size=14)
+
+                            def make_click(opt, is_correct):
+                                def click(e):
+                                    if state["answered"]:
+                                        return
+                                    state["answered"] = True
+                                    score["total"] += 1
+                                    if is_correct:
+                                        score["correct"] += 1
+                                        update_word_learning(word, "quiz_correct")
+                                        result_text.value = "✅ 答对了！"
+                                        result_text.color = "#66BB6A"
+                                    else:
+                                        update_word_learning(word, "quiz_wrong")
+                                        result_text.value = f"❌ 错了，正确答案：{correct}"
+                                        result_text.color = "#EF5350"
+                                    log_learning_event("vocab_test", "英语", kp=word,
+                                                       detail="word2meaning", correct=is_correct)
+                                    page.update()
+                                return click
+
+                            for opt in options:
+                                b = ft.ElevatedButton(opt, on_click=make_click(opt, opt == correct),
+                                                      expand=True, bgcolor="#2A2A2A", color="#FFFFFF")
+                                opt_btns.append(b)
+                            quiz_area.content = ft.Column([
+                                ft.Text("选择正确的中文释义", size=13, color=ft.Colors.GREY_500),
+                                ft.Text(word, size=36, weight=ft.FontWeight.BOLD),
+                                ft.Text(phonetic, size=14, color="#FF8A65") if phonetic else ft.Text(""),
+                                ft.Container(height=20),
+                                ft.Column(opt_btns, spacing=8),
+                                ft.Container(height=10),
+                                result_text,
+                                ft.Container(height=10),
+                                ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+                                                          bgcolor="#FF8A65", color="#FFFFFF")],
+                                       alignment=ft.MainAxisAlignment.CENTER),
+                            ], spacing=8, scroll=ft.ScrollMode.AUTO)
+                        elif mode == "meaning2word":
+                            options = [word]
+                            others = random.sample([x for x in queue if x.get("word", "") != word],
+                                                   min(3, max(0, len(queue) - 1))) if len(queue) > 1 else []
+                            for o in others:
+                                options.append(o.get("word", ""))
+                            random.shuffle(options)
+                            correct = word
+                            opt_btns = []
+                            result_text = ft.Text("", size=14)
+
+                            def make_click2(opt, is_correct):
+                                def click(e):
+                                    if state["answered"]:
+                                        return
+                                    state["answered"] = True
+                                    score["total"] += 1
+                                    if is_correct:
+                                        score["correct"] += 1
+                                        update_word_learning(word, "quiz_correct")
+                                        result_text.value = "✅ 答对了！"
+                                        result_text.color = "#66BB6A"
+                                    else:
+                                        update_word_learning(word, "quiz_wrong")
+                                        result_text.value = f"❌ 错了，正确答案：{correct}"
+                                        result_text.color = "#EF5350"
+                                    log_learning_event("vocab_test", "英语", kp=word,
+                                                       detail="meaning2word", correct=is_correct)
+                                    page.update()
+                                return click
+
+                            for opt in options:
+                                b = ft.ElevatedButton(opt, on_click=make_click2(opt, opt == correct),
+                                                      expand=True, bgcolor="#2A2A2A", color="#FFFFFF")
+                                opt_btns.append(b)
+                            quiz_area.content = ft.Column([
+                                ft.Text("选择正确的英文单词", size=13, color=ft.Colors.GREY_500),
+                                ft.Text(meaning, size=22, weight=ft.FontWeight.BOLD),
+                                ft.Container(height=20),
+                                ft.Column(opt_btns, spacing=8),
+                                ft.Container(height=10),
+                                result_text,
+                                ft.Container(height=10),
+                                ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+                                                          bgcolor="#FF8A65", color="#FFFFFF")],
+                                       alignment=ft.MainAxisAlignment.CENTER),
+                            ], spacing=8, scroll=ft.ScrollMode.AUTO)
+                        else:
+                            input_field = ft.TextField(label="输入英文单词", autofocus=True)
+                            result_text = ft.Text("", size=14)
+
+                            def check(e):
+                                if state["answered"]:
+                                    return
+                                state["answered"] = True
+                                user_ans = input_field.value.strip().lower()
+                                score["total"] += 1
+                                is_correct = user_ans == word.lower()
+                                if is_correct:
+                                    score["correct"] += 1
+                                    update_word_learning(word, "quiz_correct")
+                                    result_text.value = "✅ 拼写正确！"
+                                    result_text.color = "#66BB6A"
+                                else:
+                                    update_word_learning(word, "quiz_wrong")
+                                    result_text.value = f"❌ 正确拼写：{word}"
+                                    result_text.color = "#EF5350"
+                                log_learning_event("vocab_test", "英语", kp=word,
+                                                   detail="spelling", correct=is_correct)
+                                page.update()
+
+                            quiz_area.content = ft.Column([
+                                ft.Text("根据释义拼写单词", size=13, color=ft.Colors.GREY_500),
+                                ft.Text(meaning, size=20, weight=ft.FontWeight.BOLD),
+                                ft.Container(height=20),
+                                input_field,
+                                ft.Container(height=10),
+                                ft.Row([
+                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#FF8A65", color="#FFFFFF"),
+                                    ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+                                                      bgcolor="#2A2A2A", color="#FFFFFF"),
+                                ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
+                                ft.Container(height=10),
+                                result_text,
+                            ], spacing=8, scroll=ft.ScrollMode.AUTO)
+                        page.update()
+
+                    render_question()
+                    return ft.Column([
+                        ft.Row([counter_text, score_text], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Container(content=quiz_area, expand=True),
+                    ], spacing=12, expand=True)
+
+                def build_wrong_tab():
+                    wrong_words = get_wrong_words(200)
+                    ww_list = ft.ListView(spacing=2, expand=True)
+                    if not wrong_words:
+                        ww_list.controls.append(ft.Container(
+                            content=ft.Text("  暂无错词，去「考核」tab 练练吧", size=14, color=ft.Colors.GREY_500),
+                            padding=20))
+                    else:
+                        for w in wrong_words:
+                            word = w.get("word", "")
+                            L = w.get("learning", {})
+                            wrong_count = L.get("wrong_count", 0)
+                            tile = ft.ListTile(
+                                leading=ft.Container(
+                                    content=ft.Text(str(wrong_count), size=12, color=ft.Colors.WHITE,
+                                                    weight=ft.FontWeight.BOLD),
+                                    width=30, height=30, border_radius=15, bgcolor="#EF5350",
+                                    alignment=ft.alignment.center),
+                                title=ft.Text(f"{word}  {w.get('phonetic', '')}", size=15),
+                                subtitle=ft.Text(w.get("meaning", "")[:50], size=12, color=ft.Colors.GREY_400),
+                                on_click=lambda e, wd=w: _open_word_detail(wd, on_close=lambda: build_wrong_tab()),
+                                dense=True)
+                            ww_list.controls.append(tile)
+                    return ft.Column([
+                        ft.Text(f"错词本（{len(wrong_words)} 个）", size=13, color=ft.Colors.GREY_500),
+                        ft.Divider(height=1),
+                        ft.Container(content=ww_list, expand=True),
+                    ], spacing=8, expand=True)
+
+                def render_tab():
+                    idx = tab_index[0]
+                    if idx == 0:
+                        tab_content.content = build_lib_tab()
+                    elif idx == 1:
+                        tab_content.content = build_nw_tab()
+                    elif idx == 2:
+                        tab_content.content = build_study_tab()
+                    elif idx == 3:
+                        tab_content.content = build_quiz_tab()
+                    elif idx == 4:
+                        tab_content.content = build_wrong_tab()
+
+                set_tab(0)
                 return ft.Column([
                     ft.Text("📖 单词本", size=20, weight=ft.FontWeight.BOLD),
-                    import_btn,
-                    ft.Text("点击单词查看详情，缺少信息自动 AI 补齐", size=13, color=ft.Colors.GREY_500),
-                    ft.Row([search_field, count_text], spacing=10),
+                    tab_row,
                     ft.Divider(height=1),
-                    ft.Container(content=vocab_list_view, expand=True),
-                    ft.Divider(height=1),
-                    ft.Row([add_word_input, ft.ElevatedButton("添加", on_click=_add_custom_word)], spacing=10),
+                    ft.Container(content=tab_content, expand=True),
                 ], spacing=8, expand=True)
-
-            def build_new_words_page(subject):
-                all_vocab = load_jsonl(VOCAB_FILE)
-                user_nw = set(_load_user_new_words())
-                new_words = sorted([w for w in all_vocab if w.get("word", "") in user_nw],
-                                   key=lambda x: x.get("word", "").lower())
-
-                nw_list_view = ft.ListView(spacing=2, expand=True)
-                count_text = ft.Text(f"共 {len(new_words)} 个生词", size=14, color=ft.Colors.GREY_600)
-
-                def _open_detail(word_data):
-                    # 复用单词本详情逻辑
-                    vocab_page_view = build_vocab_page(subject, mode="vocab")
-                    # 简化：直接显示基本信息
-                    content = ft.Column([
-                        ft.Text(f"📖 {word_data.get('word', '')}", size=22, weight=ft.FontWeight.BOLD),
-                        ft.Text(f"🔊 {word_data.get('phonetic', '')}", size=15, color="#FF8A65"),
-                        ft.Text(word_data.get("meaning", ""), size=15, color="#81C784"),
-                        ft.Text(f"例句：{word_data.get('example', '')}", size=13, italic=True, color=ft.Colors.GREY_400),
-                    ], spacing=8, scroll=ft.ScrollMode.AUTO)
-                    dlg = ft.AlertDialog(
-                        title=ft.Text(""),
-                        content=ft.Container(content=content, width=400, height=300),
-                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
-                    )
-                    page.open(dlg)
-
-                def _remove_nw(e, w):
-                    _remove_from_new_words(w)
-                    build_new_words_page(subject)
-                    page.update()
-                    show_toast(f"已移出生词本：{w}", "info")
-
-                if not new_words:
-                    nw_list_view.controls.append(
-                        ft.Container(
-                            content=ft.Text("  生词本还是空的\n  在单词本里点开任意单词，点「加入生词本」即可", size=14, color=ft.Colors.GREY_500),
-                            padding=20,
-                        )
-                    )
-                else:
-                    for w in new_words:
-                        word = w.get("word", "")
-                        tile = ft.ListTile(
-                            leading=ft.Icon(ft.Icons.BOOKMARK, size=18, color="#FFB74D"),
-                            title=ft.Text(f"{word}  {w.get('phonetic', '')}", size=15),
-                            subtitle=ft.Text(w.get("meaning", "")[:50], size=12, color=ft.Colors.GREY_400),
-                            trailing=ft.IconButton(
-                                icon=ft.Icons.DELETE_OUTLINE, icon_size=18,
-                                on_click=lambda e, ww=word: _remove_nw(e, ww),
-                                tooltip="移出生词本"
-                            ),
-                            on_click=lambda e, wd=w: _open_detail(wd),
-                            dense=True,
-                        )
-                        nw_list_view.controls.append(tile)
-
-                return ft.Column([
-                    ft.Text("📘 生词本", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text("你标记的待背生词", size=13, color=ft.Colors.GREY_500),
-                    count_text,
-                    ft.Divider(height=1),
-                    ft.Container(content=nw_list_view, expand=True),
-                ], spacing=8, expand=True)
-
-            selected_subject_for_page = "数学"
-
-            def build_function_card_grid(subject):
-                # 删除了「智能复习」和「生词表」独立卡片
-                all_cards = [
-                    ("📋", "错题本", "#3A2A22"),
-                    ("📝", "笔记本", "#223A22"),
-                    ("📖", "单词本", "#3A2F22"),
-                    ("💬", "金句", "#3A2233"),
-                ]
-                if subject == "英语":
-                    cards_config = all_cards
-                else:
-                    cards_config = all_cards[:2]
-
-                grid = ft.ResponsiveRow(
-                    spacing=20,
-                    run_spacing=20,
-                    expand=True,
-                )
-
-                for icon, name, bg in cards_config:
-                    card = ft.Container(
-                        content=ft.Column([
-                            ft.Text(icon, size=36),
-                            ft.Text(name, size=16, weight=ft.FontWeight.BOLD),
-                        ], alignment=ft.MainAxisAlignment.CENTER,
-                           horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                           spacing=5),
-                        bgcolor=bg,
-                        border_radius=18,
-                        padding=20,
-                        border=ft.border.all(1, ft.Colors.WHITE10),
-                        shadow=ft.BoxShadow(blur_radius=12, color="#44000000"),
-                        ink=True,
-                        on_click=lambda e, subj=subject, fn=name: open_function_page(subj, fn),
-                        expand=True,
-                    )
-                    grid.controls.append(
-                        ft.Container(
-                            content=card,
-                            col={"xs": 12, "sm": 6, "md": 6, "lg": 4, "xl": 3},
-                        )
-                    )
-
-                return grid
-
-            def open_function_page(subject, function_name):
-                def go_back(e):
-                    nonlocal selected_subject_for_page
-                    selected_subject_for_page = subject
-                    subject_page_content.content = build_subject_page()
-                    page.update()
-
-                func_pages = {
-                    "错题本": build_error_list_page(subject),
-                    "笔记本": build_note_list_page(subject),
-                    "单词本": build_vocab_page(subject, mode="vocab"),
-                    "生词本": build_new_words_page(subject),
-                    "金句": build_sentence_page(subject, page),
-                }
-                func_content = func_pages.get(function_name)
-                full_page = ft.Column([
-                    ft.Row([
-                        ft.IconButton(icon=ft.Icons.ARROW_BACK, on_click=go_back),
-                        ft.Text(f"{subject} - {function_name}", size=20, weight=ft.FontWeight.BOLD),
-                    ]),
-                    ft.Divider(),
-                    ft.Container(content=func_content, expand=True) if func_content else ft.Container(
-                        content=ft.Text("暂无内容"), expand=True),
-                ], spacing=10, expand=True)
-                subject_page_content.content = full_page
-                page.update()
 
             def build_error_list_page(subject):
                 items = load_jsonl(ERRORS_FILE)
@@ -2553,15 +2386,12 @@ def main(page: ft.Page):
                 search_input = ft.TextField(
                     label="🔍 智能搜索错题",
                     hint_text="输入知识点或描述，如：我想复习导数",
-                    expand=True,
-                    border_color="#FF8A65",
-                    border_width=2,
-                )
-                search_btn = ft.ElevatedButton("搜索", on_click=lambda e: perform_search(e), icon=ft.Icons.SEARCH,
-                                               bgcolor="#FF8A65", color=ft.Colors.WHITE)
+                    expand=True, border_color="#FF8A65", border_width=2)
+                search_btn = ft.ElevatedButton("搜索", on_click=lambda e: perform_search(e),
+                                               icon=ft.Icons.SEARCH, bgcolor="#FF8A65",
+                                               color=ft.Colors.WHITE)
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
                 search_row = ft.Row([search_input, search_btn], spacing=10)
-
                 list_view = ft.ListView(spacing=10, expand=True)
 
                 def render_list(items_to_show=None, highlight_set=None):
@@ -2570,14 +2400,12 @@ def main(page: ft.Page):
                         items_to_show = subject_items
                     if highlight_set is None:
                         highlight_set = set()
-
                     if not items_to_show:
                         list_view.controls.append(ft.Container(
-                            content=ft.Text("  暂无错题", size=16, color=ft.Colors.GREY_500), padding=20
-                        ))
+                            content=ft.Text("  暂无错题", size=16, color=ft.Colors.GREY_500),
+                            padding=20))
                         page.update()
                         return
-
                     for idx, item in enumerate(items_to_show):
                         try:
                             original = item.get("original", "")
@@ -2590,48 +2418,32 @@ def main(page: ft.Page):
                             tag_text = "、".join(tags) if tags else "未分类"
                             is_highlighted = idx in highlight_set
                             bg_color = "#3A3522" if is_highlighted else "#242424"
-
                             status = item.get("status", "未看")
-                            status_color = {
-                                "未看": "#9E9E9E",
-                                "已看": "#4CAF50",
-                                "重要": "#F44336",
-                                "已掌握": "#2196F3",
-                            }.get(status, "#9E9E9E")
-                            status_dot = ft.Container(
-                                width=12, height=12, border_radius=6,
-                                bgcolor=status_color, tooltip=status,
-                            )
-
-                            # 缩略图：没图就不显示，有图加载失败显示占位
+                            status_color = {"未看": "#9E9E9E", "已看": "#4CAF50",
+                                            "重要": "#F44336", "已掌握": "#2196F3"}.get(status, "#9E9E9E")
+                            status_dot = ft.Container(width=12, height=12, border_radius=6,
+                                                      bgcolor=status_color, tooltip=status)
                             thumb_container = None
                             if q_media and len(q_media) > 0:
                                 first_img = q_media[0]
                                 full_path = first_img if os.path.isabs(first_img) else os.path.join(DATA_DIR, first_img)
                                 if os.path.exists(full_path):
                                     try:
-                                        thumb_img = ft.Image(src=full_path, width=80, height=80, fit=ft.ImageFit.COVER)
+                                        thumb_img = ft.Image(src=full_path, width=80, height=80,
+                                                             fit=ft.ImageFit.COVER)
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
                                                 content=thumb_img, width=80, height=80,
-                                                border_radius=10, clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-                                            ),
-                                            on_long_press=lambda e, paths=q_media: show_image_gallery(paths, 0),
-                                        )
+                                                border_radius=10,
+                                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+                                            on_long_press=lambda e, paths=q_media: show_image_gallery(paths, 0))
                                     except Exception as e:
                                         print(f"缩略图加载失败: {e}")
-                                        thumb_container = ft.Container(
-                                            width=80, height=80, border_radius=10,
-                                            bgcolor="#333333", alignment=ft.alignment.center,
-                                            content=ft.Text("🖼️", size=28),
-                                        )
                                 else:
                                     thumb_container = ft.Container(
                                         width=80, height=80, border_radius=10,
                                         bgcolor="#333333", alignment=ft.alignment.center,
-                                        content=ft.Text("🖼️", size=28, opacity=0.4),
-                                    )
-
+                                        content=ft.Text("🖼️", size=28, opacity=0.4))
                             detail_lines = []
                             if original:
                                 detail_lines.append(f"📝 {original[:80]}")
@@ -2646,48 +2458,40 @@ def main(page: ft.Page):
                             if not detail_lines:
                                 detail_lines.append("点击查看详情")
                             detail_text = "\n".join(detail_lines[:2])
-
                             tag_display = ft.Container(
                                 content=ft.Text(f"🏷️ {tag_text}", size=11, color=ft.Colors.GREY_400),
                                 padding=ft.Padding(left=6, right=6, top=2, bottom=2),
-                                bgcolor="#333333", border_radius=8,
-                            )
+                                bgcolor="#333333", border_radius=8)
 
                             def make_show_detail_card(item_data=item):
                                 def show(e):
                                     detail_children = []
-                                    detail_children.append(
-                                        ft.Text("📋 错题详情", size=20, weight=ft.FontWeight.BOLD)
-                                    )
+                                    detail_children.append(ft.Text("📋 错题详情", size=20,
+                                                                   weight=ft.FontWeight.BOLD))
                                     time_str = clean_time_str(item_data.get("time", ""))
                                     detail_children.append(
                                         ft.Text(f"科目：{item_data.get('subject', '未知')}  时间：{time_str}",
-                                                size=14, color=ft.Colors.GREY_400)
-                                    )
+                                                size=14, color=ft.Colors.GREY_400))
                                     orig_val = item_data.get("original", "") or item_data.get("question", "")
                                     if orig_val:
                                         detail_children.append(
-                                            ft.Text(f"📝 题目：{clean_latex(orig_val)}", size=15, selectable=True)
-                                        )
+                                            ft.Text(f"📝 题目：{clean_latex(orig_val)}", size=15, selectable=True))
                                     if item_data.get("mistake"):
                                         detail_children.append(
                                             ft.Text(f"❌ 错因：{item_data['mistake']}", size=14,
-                                                    color="#EF9A9A", selectable=True)
-                                        )
+                                                    color="#EF9A9A", selectable=True))
                                     if item_data.get("answer"):
                                         detail_children.append(
-                                            ft.Text(f"✅ 答案：{clean_latex(item_data['answer'])}", size=14,
-                                                    color="#A5D6A7", selectable=True)
-                                        )
+                                            ft.Text(f"✅ 答案：{clean_latex(item_data['answer'])}",
+                                                    size=14, color="#A5D6A7", selectable=True))
                                     if item_data.get("idea"):
                                         detail_children.append(
-                                            ft.Text(f"💡 理解：{item_data['idea']}", size=14,
-                                                    color="#90CAF9", selectable=True)
-                                        )
+                                            ft.Text(f"💡 理解：{item_data['idea']}",
+                                                    size=14, color="#90CAF9", selectable=True))
                                     if tags:
                                         detail_children.append(
-                                            ft.Text(f"🏷️ 标签：{', '.join(tags)}", size=13, color=ft.Colors.GREY_400)
-                                        )
+                                            ft.Text(f"🏷️ 标签：{', '.join(tags)}",
+                                                    size=13, color=ft.Colors.GREY_400))
                                     all_media = []
                                     all_media.extend(item_data.get("question_media", []))
                                     all_media.extend(item_data.get("original_media", []))
@@ -2703,8 +2507,7 @@ def main(page: ft.Page):
                                         detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
                                         detail_children.append(
                                             ft.Text(f"🖼️ 图片附件（{len(unique_media)}张，点击查看）",
-                                                    size=14, weight=ft.FontWeight.BOLD)
-                                        )
+                                                    size=14, weight=ft.FontWeight.BOLD))
                                         img_row = ft.Row(spacing=8, wrap=True)
                                         for img_path in unique_media:
                                             full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
@@ -2715,11 +2518,10 @@ def main(page: ft.Page):
                                                                          fit=ft.ImageFit.COVER, border_radius=8),
                                                         on_click=lambda e, paths=unique_media,
                                                                        idx=unique_media.index(img_path): show_image_gallery(paths, idx),
-                                                        ink=True, border_radius=8,
-                                                    )
+                                                        ink=True, border_radius=8)
                                                     img_row.controls.append(img)
-                                                except Exception as e:
-                                                    print(f"[图片加载错误] {full_path}: {e}")
+                                                except BaseException:
+                                                    pass
                                         if img_row.controls:
                                             detail_children.append(img_row)
 
@@ -2728,7 +2530,6 @@ def main(page: ft.Page):
                                         make_show_detail(item_data)(e)
 
                                     def open_ask_teacher(e):
-                                        """问老师：把错题信息打包发给 AI"""
                                         page.close(detail_dlg)
                                         subj_ask = item_data.get("subject", "总AI")
                                         orig_val2 = item_data.get("original", "") or item_data.get("question", "")
@@ -2745,18 +2546,13 @@ def main(page: ft.Page):
 2. 用我容易懂的方式把这道题讲一遍
 3. 告诉我这类题的通用解法
 4. 出一两道类似的题，验证我是否真的懂了"""
-
-                                        # 记录一条学习事件
                                         log_learning_event("ask_teacher", subj_ask,
                                                            kp=item_data.get("tags", [""])[0] if item_data.get("tags") else "",
                                                            detail=f"问老师：{orig_val2[:60]}")
-
-                                        # 把错题内容写入长记忆
                                         add_error_memory(subj_ask,
                                                          summary=f"{orig_val2[:80]} | 错因：{item_data.get('mistake', '')[:60]}",
                                                          knowledge_point=item_data.get("tags", [""])[0] if item_data.get("tags") else "",
                                                          discussed=True)
-
                                         open_chat(subj_ask, initial_message=prompt, auto_send=True)
 
                                     action_row = ft.Row([
@@ -2769,11 +2565,10 @@ def main(page: ft.Page):
                                     detail_dlg = ft.AlertDialog(
                                         title=ft.Text(""),
                                         content=ft.Container(
-                                            content=ft.Column(detail_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                                            width=450, height=500, padding=10,
-                                        ),
-                                        actions=[action_row],
-                                    )
+                                            content=ft.Column(detail_children, spacing=8,
+                                                              scroll=ft.ScrollMode.AUTO),
+                                            width=450, height=500, padding=10),
+                                        actions=[action_row])
                                     page.open(detail_dlg)
                                     page.update()
                                 return show
@@ -2790,20 +2585,21 @@ def main(page: ft.Page):
                                     current_status = item_data.get("status", "未看")
                                     orig_input = ft.TextField(label="题目 🔒（锁定中）", value=orig_val,
                                                               multiline=True, min_lines=2, disabled=True)
-                                    mis_input = ft.TextField(label="错因", value=mis_val, multiline=True, min_lines=2)
-                                    ans_input = ft.TextField(label="答案", value=ans_val, multiline=True, min_lines=2)
+                                    mis_input = ft.TextField(label="错因", value=mis_val,
+                                                             multiline=True, min_lines=2)
+                                    ans_input = ft.TextField(label="答案", value=ans_val,
+                                                             multiline=True, min_lines=2)
                                     idea_input = ft.TextField(label="我的理解 ✏️（可编辑）", value=idea_val,
                                                               multiline=True, min_lines=2)
+                                    tags_input_edit = ft.TextField(
+                                        label="标签（逗号分隔）",
+                                        value=", ".join(item_data.get("tags", [])),
+                                        multiline=False)
                                     status_dropdown = ft.Dropdown(
                                         label="标记状态",
-                                        options=[
-                                            ft.dropdown.Option("未看"),
-                                            ft.dropdown.Option("已看"),
-                                            ft.dropdown.Option("重要"),
-                                            ft.dropdown.Option("已掌握"),
-                                        ],
-                                        value=current_status,
-                                    )
+                                        options=[ft.dropdown.Option("未看"), ft.dropdown.Option("已看"),
+                                                 ft.dropdown.Option("重要"), ft.dropdown.Option("已掌握")],
+                                        value=current_status)
                                     unlock_btn = ft.TextButton("🔓 解锁题目", icon=ft.Icons.LOCK_OPEN)
 
                                     def toggle_unlock(e):
@@ -2823,6 +2619,11 @@ def main(page: ft.Page):
 
                                     def save_edit(e):
                                         all_items = load_jsonl(ERRORS_FILE)
+                                        new_tags = [t.strip() for t in tags_input_edit.value.split(",") if t.strip()]
+                                        if not new_tags:
+                                            new_tags = [item_data.get("subject", "未知")]
+                                        elif item_data.get("subject") not in new_tags:
+                                            new_tags.insert(0, item_data.get("subject", "未知"))
                                         for d in all_items:
                                             if d.get("timestamp") == ts_int or (
                                                     d.get("question") == q_val and d.get("time") == time_val):
@@ -2831,6 +2632,7 @@ def main(page: ft.Page):
                                                 d["mistake"] = mis_input.value
                                                 d["answer"] = ans_input.value
                                                 d["idea"] = idea_input.value
+                                                d["tags"] = new_tags
                                                 d["status"] = status_dropdown.value
                                                 d["update_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
                                                 break
@@ -2859,14 +2661,14 @@ def main(page: ft.Page):
                                             mis_input,
                                             ans_input,
                                             idea_input,
+                                            tags_input_edit,
                                             status_dropdown,
-                                        ], scroll=ft.ScrollMode.AUTO, width=400, height=450),
+                                        ], scroll=ft.ScrollMode.AUTO, width=400, height=480),
                                         actions=[
                                             ft.TextButton("🗑️ 删除", on_click=delete_item),
                                             ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
                                             ft.ElevatedButton("💾 保存", on_click=save_edit),
-                                        ]
-                                    )
+                                        ])
                                     page.open(edit_dlg)
                                 return show
 
@@ -2874,26 +2676,21 @@ def main(page: ft.Page):
                                 ft.Row([
                                     status_dot,
                                     ft.Text(f"📋 {ts_clean}", size=12, color=ft.Colors.GREY_500,
-                                            expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                                            expand=True, max_lines=1,
+                                            overflow=ft.TextOverflow.ELLIPSIS),
                                     tag_display,
                                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                             ]
                             if thumb_container is not None:
                                 inner_children.append(thumb_container)
                             inner_children.append(
-                                ft.Text(detail_text, size=14, max_lines=2, color=ft.Colors.WHITE70)
-                            )
-
+                                ft.Text(detail_text, size=14, max_lines=2, color=ft.Colors.WHITE70))
                             container = ft.Container(
                                 content=ft.Column(inner_children, spacing=4),
-                                padding=12,
-                                border_radius=14,
-                                bgcolor=bg_color,
+                                padding=12, border_radius=14, bgcolor=bg_color,
                                 border=ft.border.all(2 if is_highlighted else 1,
                                                      "#FF8A65" if is_highlighted else "#333333"),
-                                on_click=make_show_detail_card(item),
-                                ink=True,
-                            )
+                                on_click=make_show_detail_card(item), ink=True)
                             container.key = str(idx)
                             list_view.controls.append(container)
                         except Exception as e:
@@ -2901,9 +2698,8 @@ def main(page: ft.Page):
                             continue
                     if not list_view.controls:
                         list_view.controls.append(ft.Container(
-                            content=ft.Text("  数据加载失败，请检查数据文件", size=16, color="#EF5350"),
-                            padding=20
-                        ))
+                            content=ft.Text("  数据加载失败，请检查数据文件", size=16,
+                                            color="#EF5350"), padding=20))
                     page.update()
 
                 def perform_search(e):
@@ -2927,11 +2723,11 @@ def main(page: ft.Page):
                         prompt = f"""请分析以下错题列表，找出与用户查询匹配的题目。
 用户查询：{query}
 
-错题列表（仅显示题目摘要）：
+错题列表：
 {chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(subject_items)])}
 
 返回匹配的题目序号（从1开始），JSON数组格式，如：[1, 3, 5]
-只返回JSON数组，不要其他文字。"""
+只返回JSON数组。"""
                         try:
                             resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
                                                  headers={"Authorization": f"Bearer {api_key}",
@@ -2943,15 +2739,15 @@ def main(page: ft.Page):
                                 content = resp.json()["choices"][0]["message"]["content"]
                                 try:
                                     matches = json.loads(content)
-                                except:
+                                except BaseException:
                                     match = re.search(r'\[[0-9,\s]*\]', content)
                                     matches = json.loads(match.group()) if match else []
                                 if matches and isinstance(matches, list):
                                     highlight_indices = [m - 1 for m in matches if 1 <= m <= len(subject_items)]
                                     if highlight_indices:
                                         matched_items = [subject_items[i] for i in highlight_indices]
-                                        other_items = [item for i, item in enumerate(subject_items) if
-                                                       i not in highlight_indices]
+                                        other_items = [item for i, item in enumerate(subject_items)
+                                                       if i not in highlight_indices]
                                         sorted_items = matched_items + other_items
                                         highlight_set = set(range(len(matched_items)))
                                         render_list(sorted_items, highlight_set)
@@ -2969,8 +2765,6 @@ def main(page: ft.Page):
                         except Exception as ex:
                             search_status.value = f"❌ 搜索失败: {str(ex)[:50]}"
                             search_status.color = "#EF5350"
-                            print("[搜索错误]")
-                            traceback.print_exc()
                         page.update()
 
                     threading.Thread(target=do_search, daemon=True).start()
@@ -2978,7 +2772,8 @@ def main(page: ft.Page):
                 render_list()
                 return ft.Column([
                     ft.Text("📋 错题本", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text("🔍 智能搜索：输入知识点或描述，AI自动匹配并置顶", size=13, color="#FF8A65"),
+                    ft.Text("🔍 智能搜索：输入知识点或描述，AI自动匹配并置顶", size=13,
+                            color="#FF8A65"),
                     search_row,
                     search_status,
                     ft.Divider(height=1),
@@ -2989,11 +2784,11 @@ def main(page: ft.Page):
                 items = load_jsonl(NOTES_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
                 subject_items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
-
                 list_view = ft.ListView(spacing=10, expand=True)
                 if not subject_items:
-                    list_view.controls.append(
-                        ft.Container(content=ft.Text("  暂无笔记", size=16, color=ft.Colors.GREY_500), padding=20))
+                    list_view.controls.append(ft.Container(
+                        content=ft.Text("  暂无笔记", size=16, color=ft.Colors.GREY_500),
+                        padding=20))
                 else:
                     for item in subject_items:
                         try:
@@ -3001,49 +2796,42 @@ def main(page: ft.Page):
                             images = item.get("images", []) or item.get("media", [])
                             ts = item.get("time", "")
                             ts_int = item.get("timestamp", 0)
-
                             thumb_container = None
                             if images and len(images) > 0:
                                 first_img = images[0]
                                 full_path = first_img if os.path.isabs(first_img) else os.path.join(DATA_DIR, first_img)
                                 if os.path.exists(full_path):
                                     try:
-                                        thumb_img = ft.Image(src=full_path, width=80, height=80, fit=ft.ImageFit.COVER)
+                                        thumb_img = ft.Image(src=full_path, width=80, height=80,
+                                                             fit=ft.ImageFit.COVER)
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
                                                 content=thumb_img, width=80, height=80,
-                                                border_radius=10, clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-                                            ),
-                                            on_long_press=lambda e, paths=images: show_image_gallery(paths, 0),
-                                        )
-                                    except Exception as e:
-                                        print(f"笔记缩略图加载失败: {e}")
+                                                border_radius=10,
+                                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+                                            on_long_press=lambda e, paths=images: show_image_gallery(paths, 0))
+                                    except BaseException:
+                                        pass
 
                             def make_show_note(item_data=item):
                                 def show(e):
-                                    detail_children = []
-                                    detail_children.append(
-                                        ft.Text("📝 笔记详情", size=20, weight=ft.FontWeight.BOLD)
-                                    )
-                                    detail_children.append(
-                                        ft.Text(f"时间：{ts}", size=13, color=ft.Colors.GREY_500)
-                                    )
+                                    detail_children = [ft.Text("📝 笔记详情", size=20,
+                                                               weight=ft.FontWeight.BOLD),
+                                                       ft.Text(f"时间：{ts}", size=13,
+                                                               color=ft.Colors.GREY_500)]
                                     if content:
                                         detail_children.append(ft.Text(content, size=15, selectable=True))
                                     else:
-                                        detail_children.append(
-                                            ft.Text("（无文字内容）", size=14, color=ft.Colors.GREY_500)
-                                        )
+                                        detail_children.append(ft.Text("（无文字内容）", size=14,
+                                                                       color=ft.Colors.GREY_500))
                                     if images:
                                         detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
                                         detail_children.append(
-                                            ft.Text(f"🖼️ 图片附件（{len(images)}张，点击查看）", size=14,
-                                                    weight=ft.FontWeight.BOLD)
-                                        )
+                                            ft.Text(f"🖼️ 图片附件（{len(images)}张）", size=14,
+                                                    weight=ft.FontWeight.BOLD))
                                         img_row = ft.Row(spacing=8, wrap=True)
                                         for img_path in images:
-                                            full_path = img_path if os.path.isabs(
-                                                img_path) else os.path.join(DATA_DIR, img_path)
+                                            full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
                                             if os.path.exists(full_path):
                                                 try:
                                                     img = ft.Container(
@@ -3051,11 +2839,10 @@ def main(page: ft.Page):
                                                                          fit=ft.ImageFit.COVER, border_radius=8),
                                                         on_click=lambda e, paths=images,
                                                                        idx=images.index(img_path): show_image_gallery(paths, idx),
-                                                        ink=True, border_radius=8,
-                                                    )
+                                                        ink=True, border_radius=8)
                                                     img_row.controls.append(img)
-                                                except Exception as e:
-                                                    print(f"[图片加载错误] {full_path}: {e}")
+                                                except BaseException:
+                                                    pass
                                         if img_row.controls:
                                             detail_children.append(img_row)
 
@@ -3070,19 +2857,18 @@ def main(page: ft.Page):
                                     detail_dlg = ft.AlertDialog(
                                         title=ft.Text(""),
                                         content=ft.Container(
-                                            content=ft.Column(detail_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                                            width=450, height=500, padding=10,
-                                        ),
-                                        actions=[action_row],
-                                    )
+                                            content=ft.Column(detail_children, spacing=8,
+                                                              scroll=ft.ScrollMode.AUTO),
+                                            width=450, height=500, padding=10),
+                                        actions=[action_row])
                                     page.open(detail_dlg)
                                     page.update()
-
                                 return show
 
                             def make_edit_note(item_data=item):
                                 def show(e):
-                                    content_input = ft.TextField(label="笔记内容", value=item_data.get("content", ""),
+                                    content_input = ft.TextField(label="笔记内容",
+                                                                 value=item_data.get("content", ""),
                                                                  multiline=True, min_lines=4)
 
                                     def save_edit(e):
@@ -3108,22 +2894,19 @@ def main(page: ft.Page):
 
                                     edit_dlg = ft.AlertDialog(
                                         title=ft.Text("编辑笔记"),
-                                        content=ft.Column([content_input], scroll=ft.ScrollMode.AUTO, width=400,
-                                                          height=300),
+                                        content=ft.Column([content_input], scroll=ft.ScrollMode.AUTO,
+                                                          width=400, height=300),
                                         actions=[
                                             ft.TextButton("🗑️ 删除", on_click=delete_item),
                                             ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
                                             ft.ElevatedButton("💾 保存", on_click=save_edit),
-                                        ]
-                                    )
+                                        ])
                                     page.open(edit_dlg)
                                     page.update()
-
                                 return show
 
                             preview = content[:80] if content else "（空）"
                             img_hint = f" 🖼️{len(images)}张" if images else ""
-
                             inner_children = [
                                 ft.Row([
                                     ft.Text(f"📝 {ts}{img_hint}", size=13, color=ft.Colors.GREY_500),
@@ -3133,20 +2916,295 @@ def main(page: ft.Page):
                             if thumb_container is not None:
                                 inner_children.append(thumb_container)
                             inner_children.append(ft.Text(preview, size=14, max_lines=3))
-
                             list_view.controls.append(ft.Container(
                                 content=ft.Column(inner_children, spacing=4),
-                                padding=12,
-                                border_radius=14,
-                                bgcolor="#2A2416",
-                                border=ft.border.all(1, "#5D4A28"),
-                                on_click=make_show_note(),
-                                ink=True,
-                            ))
+                                padding=12, border_radius=14,
+                                bgcolor="#2A2416", border=ft.border.all(1, "#5D4A28"),
+                                on_click=make_show_note(), ink=True))
                         except Exception as e:
                             print(f"⚠️ 加载笔记条目失败，已跳过: {e}")
                             continue
                 return list_view
+
+            def build_sentence_page(subject):
+                CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
+                category_colors = {"开头": "#1A2840", "转折": "#3A2A18", "结尾": "#1A2E1A",
+                                   "观点": "#3A1A28", "举例": "#2E1A3A", "读后续写": "#1A2E3A",
+                                   "其他": "#2A2A2A"}
+                search_input = ft.TextField(label="🔍 搜索句子", hint_text="输入关键词...", expand=True)
+                category_dropdown = ft.Dropdown(
+                    label="分类", options=[ft.dropdown.Option(c) for c in CATEGORIES],
+                    value="全部", width=120)
+                fav_switch = ft.Switch(label="仅收藏", value=False)
+                sentence_list = ft.ListView(spacing=8, expand=True)
+                status_text = ft.Text("", size=14)
+
+                def show_add_dialog(edit_data=None):
+                    is_edit = edit_data is not None
+                    cat_drop = ft.Dropdown(
+                        label="分类",
+                        options=[ft.dropdown.Option(c) for c in CATEGORIES if c != "全部"],
+                        value=edit_data.get("category", "观点") if is_edit else "观点",
+                        width=150)
+                    sent_input = ft.TextField(
+                        label="英文句子",
+                        value=edit_data.get("sentence", "") if is_edit else "",
+                        multiline=True, min_lines=3, max_lines=5, expand=True)
+                    trans_input = ft.TextField(
+                        label="中文翻译（可选）",
+                        value=edit_data.get("translation", "") if is_edit else "",
+                        multiline=True, min_lines=2, max_lines=3, expand=True)
+
+                    def do_save(e):
+                        cat = cat_drop.value
+                        sent = sent_input.value.strip()
+                        trans = trans_input.value.strip()
+                        if not sent:
+                            show_toast("请输入句子内容", "red")
+                            return
+                        if is_edit:
+                            update_sentence(edit_data["id"], cat, sent, trans)
+                        else:
+                            add_sentence(cat, sent, trans)
+                        page.close(dialog)
+                        refresh_list()
+                        show_toast("✅ 已保存" if not is_edit else "✅ 已更新", "green")
+
+                    dialog = ft.AlertDialog(
+                        title=ft.Text("编辑金句" if is_edit else "添加金句"),
+                        content=ft.Column([cat_drop, sent_input, trans_input], spacing=10, width=400),
+                        actions=[ft.TextButton("取消", on_click=lambda e: page.close(dialog)),
+                                 ft.ElevatedButton("保存", on_click=do_save)])
+                    page.open(dialog)
+
+                def show_ai_dialog():
+                    topic_input = ft.TextField(label="输入主题",
+                                               hint_text="例如：环境保护、科技发展...",
+                                               multiline=True, min_lines=2, max_lines=3, expand=True)
+                    count_row = ft.Row(spacing=10)
+                    count_drop = ft.Dropdown(
+                        label="快速选择",
+                        options=[ft.dropdown.Option(str(i)) for i in [3, 5, 8, 10]],
+                        value="5", width=120)
+                    count_input = ft.TextField(label="自定义", width=100,
+                                               text_align=ft.TextAlign.CENTER)
+                    count_row.controls.extend([count_drop, ft.Text("或", size=14), count_input])
+
+                    def do_generate(e):
+                        topic = topic_input.value.strip()
+                        if not topic:
+                            show_toast("请输入主题", "red")
+                            return
+                        custom_val = count_input.value.strip()
+                        count = int(custom_val) if custom_val and custom_val.isdigit() else int(count_drop.value)
+                        count = max(1, min(count, 20))
+                        page.close(dialog)
+                        status_text.value = f"⏳ AI正在生成 {count} 个金句..."
+                        status_text.color = "#FF8A65"
+                        page.update()
+
+                        def gen_thread():
+                            api_key = load_ai_config().get("api_key_free", "").strip()
+                            if not api_key:
+                                status_text.value = "❌ 未配置API密钥"
+                                status_text.color = "#EF5350"
+                                page.update()
+                                return
+                            prompt = f"""请为主题 "{topic}" 生成 {count} 个高考英语作文万能金句。
+输出 JSON 数组：[{{"sentence": "英文", "translation": "中文", "category": "开头/转折/结尾/观点/举例/读后续写"}}]
+只返回 JSON。"""
+                            try:
+                                resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                                                     headers={"Authorization": f"Bearer {api_key}",
+                                                              "Content-Type": "application/json"},
+                                                     json={"model": "glm-4-flash",
+                                                           "messages": [{"role": "user", "content": prompt}],
+                                                           "temperature": 0.7, "max_tokens": 1500}, timeout=45)
+                                if resp.status_code == 200:
+                                    content = resp.json()["choices"][0]["message"]["content"]
+                                    try:
+                                        items = json.loads(content)
+                                    except BaseException:
+                                        match = re.search(r'\[.*\]', content, re.DOTALL)
+                                        items = json.loads(match.group()) if match else None
+                                    if items:
+                                        added = 0
+                                        for item in items:
+                                            cat = item.get("category", "其他")
+                                            if cat not in CATEGORIES:
+                                                cat = "其他"
+                                            add_sentence(cat, item.get("sentence", ""),
+                                                         item.get("translation", ""))
+                                            added += 1
+                                        refresh_list()
+                                        status_text.value = f"✅ 成功添加 {added} 个金句"
+                                        status_text.color = "#81C784"
+                                    else:
+                                        status_text.value = "❌ AI返回格式异常"
+                                        status_text.color = "#EF5350"
+                                else:
+                                    status_text.value = f"❌ API错误: {resp.status_code}"
+                                    status_text.color = "#EF5350"
+                            except Exception as ex:
+                                status_text.value = f"❌ 失败: {str(ex)[:50]}"
+                                status_text.color = "#EF5350"
+                            page.update()
+
+                        threading.Thread(target=gen_thread, daemon=True).start()
+
+                    dialog = ft.AlertDialog(
+                        title=ft.Text("🤖 AI生成金句"),
+                        content=ft.Column([topic_input, count_row], spacing=10, width=400),
+                        actions=[ft.TextButton("取消", on_click=lambda e: page.close(dialog)),
+                                 ft.ElevatedButton("生成并添加", on_click=do_generate)])
+                    page.open(dialog)
+
+                def render_list(filter_category="全部", keyword="", only_fav=False):
+                    sentence_list.controls.clear()
+                    sentences = load_sentences()
+                    sentences.sort(key=lambda x: (not x.get("favorite", False),
+                                                  x.get("updated", x.get("created", ""))), reverse=True)
+                    filtered = []
+                    for s in sentences:
+                        if only_fav and not s.get("favorite", False):
+                            continue
+                        if filter_category != "全部" and s.get("category") != filter_category:
+                            continue
+                        if keyword:
+                            kw = keyword.lower()
+                            if kw not in s.get("sentence", "").lower() and \
+                               kw not in s.get("translation", "").lower():
+                                continue
+                        filtered.append(s)
+                    if not filtered:
+                        sentence_list.controls.append(ft.Container(
+                            content=ft.Text("  暂无金句", size=14, color=ft.Colors.GREY_500),
+                            padding=20))
+                        page.update()
+                        return
+                    for s in filtered:
+                        sid = s.get("id")
+                        cat = s.get("category", "其他")
+                        sentence = s.get("sentence", "")
+                        translation = s.get("translation", "")
+                        favorite = s.get("favorite", False)
+                        updated = s.get("updated", s.get("created", ""))
+                        bg_color = category_colors.get(cat, "#2A2A2A")
+                        card = ft.Container(
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Container(
+                                        content=ft.Text(cat, size=11, color=ft.Colors.WHITE,
+                                                        weight=ft.FontWeight.BOLD),
+                                        bgcolor="#2196F3", border_radius=10,
+                                        padding=ft.Padding(left=8, right=8, top=2, bottom=2)),
+                                    ft.Row([
+                                        ft.IconButton(
+                                            icon=ft.Icons.STAR if favorite else ft.Icons.STAR_BORDER,
+                                            icon_color="#FFB74D" if favorite else ft.Colors.GREY_500,
+                                            icon_size=20,
+                                            on_click=lambda e, sid=sid: (toggle_favorite(sid), refresh_list())),
+                                        ft.IconButton(
+                                            icon=ft.Icons.COPY, icon_size=18,
+                                            on_click=lambda e, text=sentence: page.set_clipboard(text)),
+                                        ft.IconButton(
+                                            icon=ft.Icons.EDIT, icon_size=18,
+                                            on_click=lambda e, data=s: show_add_dialog(data)),
+                                        ft.IconButton(
+                                            icon=ft.Icons.DELETE, icon_size=18,
+                                            on_click=lambda e, sid=sid: (delete_sentence(sid), refresh_list())),
+                                    ], spacing=2),
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                ft.Text(sentence, size=15, selectable=True),
+                                ft.Text(translation, size=13, color=ft.Colors.GREY_400,
+                                        italic=True, selectable=True) if translation else ft.Text(""),
+                                ft.Text(f"📅 {updated}", size=10, color=ft.Colors.GREY_500),
+                            ], spacing=4),
+                            padding=10, border_radius=12, bgcolor=bg_color,
+                            margin=ft.margin.only(bottom=4),
+                            border=ft.border.all(1, "#FFB74D" if favorite else "#333333"))
+                        sentence_list.controls.append(card)
+                    page.update()
+
+                def refresh_list():
+                    render_list(category_dropdown.value, search_input.value.strip(), fav_switch.value)
+
+                search_input.on_change = lambda e: refresh_list()
+                category_dropdown.on_change = lambda e: refresh_list()
+                fav_switch.on_change = lambda e: refresh_list()
+                render_list()
+                return ft.Column([
+                    ft.Row([
+                        ft.Text("💬 金句列表", size=20, weight=ft.FontWeight.BOLD),
+                        ft.Row([
+                            ft.ElevatedButton("➕ 添加", on_click=lambda e: show_add_dialog(),
+                                              icon=ft.Icons.ADD),
+                            ft.ElevatedButton("🤖 AI生成", on_click=lambda e: show_ai_dialog(),
+                                              icon=ft.Icons.AUTO_AWESOME),
+                        ], spacing=8),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    ft.Text("英语作文万能句子", size=14, color=ft.Colors.GREY_500),
+                    ft.Row([search_input, category_dropdown, fav_switch], spacing=10),
+                    status_text,
+                    ft.Divider(height=1),
+                    ft.Container(content=sentence_list, expand=True),
+                ], spacing=8, expand=True)
+
+            selected_subject_for_page = "数学"
+
+            def build_function_card_grid(subject):
+                all_cards = [
+                    ("📋", "错题本", "#3A2A22"),
+                    ("📝", "笔记本", "#223A22"),
+                    ("📖", "单词本", "#3A2F22"),
+                    ("💬", "金句", "#3A2233"),
+                ]
+                cards_config = all_cards if subject == "英语" else all_cards[:2]
+                grid = ft.ResponsiveRow(spacing=20, run_spacing=20, expand=True)
+                for icon, name, bg in cards_config:
+                    card = ft.Container(
+                        content=ft.Column([
+                            ft.Text(icon, size=36),
+                            ft.Text(name, size=16, weight=ft.FontWeight.BOLD),
+                        ], alignment=ft.MainAxisAlignment.CENTER,
+                           horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
+                        bgcolor=bg, border_radius=18, padding=20,
+                        border=ft.border.all(1, ft.Colors.WHITE10),
+                        shadow=ft.BoxShadow(blur_radius=12, color="#44000000"),
+                        ink=True,
+                        on_click=lambda e, subj=subject, fn=name: open_function_page(subj, fn),
+                        expand=True)
+                    grid.controls.append(
+                        ft.Container(content=card,
+                                     col={"xs": 12, "sm": 6, "md": 6, "lg": 4, "xl": 3}))
+                return grid
+
+            def open_function_page(subject, function_name):
+                def go_back(e):
+                    nonlocal selected_subject_for_page
+                    selected_subject_for_page = subject
+                    subject_page_content.content = build_subject_page()
+                    page.update()
+
+                func_pages = {
+                    "错题本": build_error_list_page(subject),
+                    "笔记本": build_note_list_page(subject),
+                    "单词本": build_vocab_page(subject),
+                    "金句": build_sentence_page(subject),
+                }
+                func_content = func_pages.get(function_name)
+                full_page = ft.Column([
+                    ft.Row([
+                        ft.IconButton(icon=ft.Icons.ARROW_BACK, on_click=go_back),
+                        ft.Text(f"{subject} - {function_name}", size=20,
+                                weight=ft.FontWeight.BOLD),
+                    ]),
+                    ft.Divider(),
+                    ft.Container(content=func_content, expand=True) if func_content
+                    else ft.Container(content=ft.Text("暂无内容"), expand=True),
+                ], spacing=10, expand=True)
+                subject_page_content.content = full_page
+                page.update()
 
             def build_subject_left_panel(subj):
                 subjects = ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]
@@ -3159,8 +3217,7 @@ def main(page: ft.Page):
                         padding=ft.Padding(left=16, top=12, right=16, bottom=12),
                         border_radius=12,
                         bgcolor="#FF8A65" if is_selected else "#2A2A2A",
-                        on_click=lambda e, ss=s: on_subject_selected(ss),
-                    )
+                        on_click=lambda e, ss=s: on_subject_selected(ss))
                     subj_buttons.append(btn)
                 return ft.Container(content=ft.Column(subj_buttons, spacing=6), width=100, padding=10)
 
@@ -3188,6 +3245,7 @@ def main(page: ft.Page):
                 ft.Text("📚 学科浏览", size=24, weight=ft.FontWeight.BOLD),
                 ft.Container(content=subject_page_content, expand=True),
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
+
             @retry_request(max_retries=3, base_delay=2)
             def generate_today_plan(result_text=None):
                 target = result_text
@@ -3202,12 +3260,14 @@ def main(page: ft.Page):
                     errors = load_jsonl(ERRORS_FILE)
                     try:
                         days_left = (datetime(2026, 6, 7) - datetime.now()).days
-                    except:
+                    except BaseException:
                         days_left = 365
                     subject_errors = {}
                     for err in errors:
-                        subject_errors[err.get("subject", "未知")] = subject_errors.get(err.get("subject", "未知"), 0) + 1
-                    weak_know = sorted(profile.get("weak_knowledge", {}).items(), key=lambda x: x[1], reverse=True)[:5]
+                        subject_errors[err.get("subject", "未知")] = \
+                            subject_errors.get(err.get("subject", "未知"), 0) + 1
+                    weak_know = sorted(profile.get("weak_knowledge", {}).items(),
+                                       key=lambda x: x[1], reverse=True)[:5]
                     prompt = f"""你是高三学习规划师。距离高考{days_left}天。请生成今日学习计划（纯文本）：
 各科错题数：{json.dumps(subject_errors, ensure_ascii=False)}
 薄弱知识点：{json.dumps(weak_know, ensure_ascii=False)}
@@ -3220,8 +3280,10 @@ def main(page: ft.Page):
                         return
                     try:
                         resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                                             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                                             json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
+                                             headers={"Authorization": f"Bearer {api_key}",
+                                                      "Content-Type": "application/json"},
+                                             json={"model": "glm-4-flash",
+                                                   "messages": [{"role": "user", "content": prompt}],
                                                    "temperature": 0.7, "max_tokens": 800}, timeout=30)
                         if resp.status_code == 200:
                             target.value = resp.json()["choices"][0]["message"]["content"]
@@ -3236,7 +3298,8 @@ def main(page: ft.Page):
 
                 threading.Thread(target=do_generate, daemon=True).start()
 
-            today_plan_text = ft.Text("点击「生成今日计划」获取 AI 学习建议", size=15, color="#888888", selectable=True)
+            today_plan_text = ft.Text("点击「生成今日计划」获取 AI 学习建议", size=15,
+                                      color="#888888", selectable=True)
             today_plan_card = ft.Container(
                 content=ft.Column([
                     ft.Row([ft.Text("📅 今日学习计划", size=18),
@@ -3245,9 +3308,9 @@ def main(page: ft.Page):
                                               height=30)]),
                     ft.Divider(height=5), today_plan_text
                 ], spacing=8),
-                padding=15, border_radius=16, bgcolor="#2A2416", border=ft.border.all(1, "#5D4A28"),
-                shadow=ft.BoxShadow(blur_radius=12, color="#44000000"),
-            )
+                padding=15, border_radius=16, bgcolor="#2A2416",
+                border=ft.border.all(1, "#5D4A28"),
+                shadow=ft.BoxShadow(blur_radius=12, color="#44000000"))
 
             task_list = ft.Column(spacing=6)
             new_task_input = ft.TextField(label="新学习任务", expand=True)
@@ -3256,7 +3319,8 @@ def main(page: ft.Page):
                 text = new_task_input.value.strip()
                 if text:
                     tasks = load_jsonl(TASKS_FILE)
-                    tasks.append({"text": text, "done": False, "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+                    tasks.append({"text": text, "done": False,
+                                  "created": time.strftime("%Y-%m-%d %H:%M:%S")})
                     save_jsonl(TASKS_FILE, tasks)
                     new_task_input.value = ""
                     refresh_tasks()
@@ -3282,8 +3346,8 @@ def main(page: ft.Page):
                             ft.Checkbox(value=task.get("done", False), on_change=toggle_task),
                             ft.Text(task["text"], size=16, expand=True),
                             ft.TextButton("删除", on_click=lambda e, t=task: (
-                                save_jsonl(TASKS_FILE, [d for d in load_jsonl(TASKS_FILE) if
-                                                        d.get("created") != t.get("created")]),
+                                save_jsonl(TASKS_FILE, [d for d in load_jsonl(TASKS_FILE)
+                                                        if d.get("created") != t.get("created")]),
                                 refresh_tasks()))
                         ], spacing=10))
                 page.update()
@@ -3299,16 +3363,19 @@ def main(page: ft.Page):
                     preview = data.get("original", data.get("content", ""))[:40]
                     ts = item.get("delete_ts", 0)
                     recycle_list.controls.append(ft.Row([
-                        ft.Text(f"[{data.get('subject', '未知')}] {preview}", size=16, expand=True),
+                        ft.Text(f"[{data.get('subject', '未知')}] {preview}",
+                                size=16, expand=True),
                         ft.TextButton("恢复", on_click=lambda e, t=ts: (
-                            restore_from_recycle(t), refresh_recycle(), show_toast("已恢复", "green")))
+                            restore_from_recycle(t), refresh_recycle(),
+                            show_toast("已恢复", "green")))
                     ], spacing=10))
                 page.update()
 
             refresh_recycle()
 
             ai_config = load_ai_config()
-            free_key_input = ft.TextField(label="免费模型 API 密钥", value=ai_config.get("api_key_free", ""),
+            free_key_input = ft.TextField(label="免费模型 API 密钥",
+                                          value=ai_config.get("api_key_free", ""),
                                           password=True)
 
             def save_keys(e):
@@ -3332,7 +3399,8 @@ def main(page: ft.Page):
                         page.update()
                         return
                     try:
-                        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                        headers = {"Authorization": f"Bearer {api_key}",
+                                   "Content-Type": "application/json"}
                         payload = {"model": "glm-4-flash",
                                    "messages": [{"role": "user", "content": "仅回复OK"}],
                                    "max_tokens": 5, "temperature": 0}
@@ -3344,102 +3412,93 @@ def main(page: ft.Page):
                                 test_conn_result.value = f"✅ 连接成功！返回：{content.strip()}"
                                 test_conn_result.color = "#81C784"
                             else:
-                                test_conn_result.value = "⚠️ 连接成功但返回内容为空"
+                                test_conn_result.value = "⚠️ 连接成功但返回为空"
                                 test_conn_result.color = "#FFB74D"
                         else:
                             test_conn_result.value = f"❌ 连接失败 (HTTP {resp.status_code})"
                             test_conn_result.color = "#EF5350"
                     except requests.exceptions.Timeout:
-                        test_conn_result.value = "❌ 连接超时，请检查网络"
+                        test_conn_result.value = "❌ 连接超时"
                         test_conn_result.color = "#EF5350"
                     except Exception as ex:
-                        test_conn_result.value = f"❌ 连接异常: {str(ex)[:50]}"
+                        test_conn_result.value = f"❌ 异常: {str(ex)[:50]}"
                         test_conn_result.color = "#EF5350"
                     page.update()
 
                 threading.Thread(target=_test, daemon=True).start()
 
-            skill_input = ft.TextField(label="自定义 AI Skill", multiline=True, min_lines=4, max_lines=10,
-                                       value=load_custom_skill())
+            skill_input = ft.TextField(label="自定义 AI Skill", multiline=True,
+                                       min_lines=4, max_lines=10, value=load_custom_skill())
 
             def save_skill(e):
                 save_custom_skill(skill_input.value)
                 show_toast("Skill 已保存", "green")
 
             def show_learning_profile(e):
-                """展示精准画像"""
                 profile = load_user_profile()
                 events = load_jsonl(LEARNING_EVENTS_FILE)
                 error_types = profile.get("error_types", {})
                 km = profile.get("knowledge_memory", {})
-
                 content_children = []
                 content_children.append(
-                    ft.Text(f"🎯 学习画像（总事件：{len(events)}）", size=18, weight=ft.FontWeight.BOLD)
-                )
+                    ft.Text(f"🎯 学习画像（总事件：{len(events)}）", size=18,
+                            weight=ft.FontWeight.BOLD))
                 content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
-
-                # 错因分布
                 if error_types:
-                    content_children.append(ft.Text("📊 错因分布", size=15, weight=ft.FontWeight.BOLD))
+                    content_children.append(ft.Text("📊 错因分布", size=15,
+                                                    weight=ft.FontWeight.BOLD))
                     max_count = max(error_types.values())
-                    color_map = {
-                        "计算错误": "#EF5350", "概念不清": "#FFA726", "审题偏差": "#AB47BC",
-                        "公式遗忘": "#42A5F5", "方法错误": "#26A69A", "其他": "#78909C",
-                    }
+                    color_map = {"计算错误": "#EF5350", "概念不清": "#FFA726",
+                                 "审题偏差": "#AB47BC", "公式遗忘": "#42A5F5",
+                                 "方法错误": "#26A69A", "其他": "#78909C"}
                     for et, count in sorted(error_types.items(), key=lambda x: x[1], reverse=True):
                         pct = count / max_count
                         bar = ft.ProgressBar(value=pct, width=200, height=8,
                                              color=color_map.get(et, "#78909C"),
                                              bgcolor="#333333", border_radius=4)
                         content_children.append(ft.Row([
-                            ft.Text(f"{et}：{count}", size=13, width=110),
-                            bar,
+                            ft.Text(f"{et}：{count}", size=13, width=110), bar,
                         ], spacing=8))
                 else:
                     content_children.append(ft.Text("暂无错因数据", size=13, color="#888888"))
-
                 content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
-
-                # 知识点掌握度 TOP
                 if km:
-                    content_children.append(ft.Text("📚 知识点掌握度（低 → 高）", size=15, weight=ft.FontWeight.BOLD))
+                    content_children.append(ft.Text("📚 知识点掌握度（低 → 高）", size=15,
+                                                    weight=ft.FontWeight.BOLD))
                     sorted_km = sorted(km.items(), key=lambda x: x[1].get("level", 0.3))[:8]
                     for kp, info in sorted_km:
                         level = info.get("level", 0.3)
                         events_count = info.get("events", 0)
                         summary = info.get("summary", "")[:40]
                         bar_color = "#EF5350" if level < 0.4 else ("#FFA726" if level < 0.7 else "#81C784")
-                        content_children.append(ft.Text(f"{kp}（{events_count}次，掌握 {level:.0%}）", size=13))
-                        content_children.append(ft.ProgressBar(value=level, width=300, height=6,
-                                                               color=bar_color, bgcolor="#333333"))
+                        content_children.append(
+                            ft.Text(f"{kp}（{events_count}次，掌握 {level:.0%}）", size=13))
+                        content_children.append(
+                            ft.ProgressBar(value=level, width=300, height=6,
+                                           color=bar_color, bgcolor="#333333"))
                         if summary:
-                            content_children.append(ft.Text(f"  → {summary}", size=11, color="#888888"))
+                            content_children.append(
+                                ft.Text(f"  → {summary}", size=11, color="#888888"))
                 else:
                     content_children.append(ft.Text("暂无知识点数据", size=13, color="#888888"))
-
                 content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
-
-                # 最近事件
                 if events:
-                    content_children.append(ft.Text("🕒 最近学习事件", size=15, weight=ft.FontWeight.BOLD))
+                    content_children.append(ft.Text("🕒 最近学习事件", size=15,
+                                                    weight=ft.FontWeight.BOLD))
                     for ev in reversed(events[-10:]):
                         t = ev.get("time", "")[5:16]
                         tp = ev.get("type", "")
                         subj = ev.get("subject", "")
                         detail = ev.get("detail", "")[:50]
                         content_children.append(
-                            ft.Text(f"[{t}] {subj} · {tp}\n  {detail}", size=12, color="#CCCCCC")
-                        )
-
+                            ft.Text(f"[{t}] {subj} · {tp}\n  {detail}", size=12,
+                                    color="#CCCCCC"))
                 dlg = ft.AlertDialog(
                     title=ft.Text("🎯 学习画像"),
                     content=ft.Container(
                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                        width=420, height=500, padding=10,
-                    ),
-                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
-                )
+                        width=420, height=500, padding=10),
+                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                 page.open(dlg)
                 page.update()
 
@@ -3448,50 +3507,35 @@ def main(page: ft.Page):
                 error_counts = data.get("error_counts", {})
                 total = data.get("total_errors", 0)
                 sorted_subjects = sorted(error_counts.items(), key=lambda x: x[1], reverse=True)
-                content_children = []
-                content_children.append(
-                    ft.Text(f"📊 知识框架（总错题：{total} 道）", size=18, weight=ft.FontWeight.BOLD)
-                )
-                content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
+                content_children = [
+                    ft.Text(f"📊 知识框架（总错题：{total} 道）", size=18,
+                            weight=ft.FontWeight.BOLD),
+                    ft.Divider(height=1, color=ft.Colors.GREY_700),
+                ]
                 max_count = max([c for _, c in error_counts.items()]) if error_counts else 1
-                color_map = {
-                    "语文": "#64B5F6", "数学": "#EF5350", "英语": "#81C784",
-                    "物理": "#BA68C8", "化学": "#FFA726", "生物": "#4DB6AC",
-                    "历史": "#FFD54F", "政治": "#F06292", "地理": "#4DD0E1",
-                }
+                color_map = {"语文": "#64B5F6", "数学": "#EF5350", "英语": "#81C784",
+                             "物理": "#BA68C8", "化学": "#FFA726", "生物": "#4DB6AC",
+                             "历史": "#FFD54F", "政治": "#F06292", "地理": "#4DD0E1"}
                 for subject, count in sorted_subjects:
                     percentage = min((count / max_count) * 100, 100) if max_count > 0 else 0
                     color = color_map.get(subject, "#78909C")
-                    progress_bar = ft.ProgressBar(
-                        value=percentage / 100,
-                        width=200,
-                        height=8,
-                        color=color,
-                        bgcolor="#333333",
-                        border_radius=4,
-                    )
-                    row = ft.Row([
+                    progress_bar = ft.ProgressBar(value=percentage / 100, width=200,
+                                                  height=8, color=color, bgcolor="#333333",
+                                                  border_radius=4)
+                    content_children.append(ft.Row([
                         ft.Text(f"{subject}：{count} 题", size=14, width=80),
                         progress_bar,
                         ft.Text(f"{int(percentage)}%", size=12, color="#888888", width=40),
-                    ], spacing=10, alignment=ft.MainAxisAlignment.START)
-                    content_children.append(row)
+                    ], spacing=10, alignment=ft.MainAxisAlignment.START))
                 if not error_counts:
-                    content_children.append(
-                        ft.Text("暂无错题数据，继续加油！", size=14, color="#888888")
-                    )
-
-                def close_dlg(e):
-                    page.close(dlg)
-
+                    content_children.append(ft.Text("暂无错题数据，继续加油！", size=14,
+                                                    color="#888888"))
                 dlg = ft.AlertDialog(
                     title=ft.Text("📊 知识框架"),
                     content=ft.Container(
                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                        width=400, height=300, padding=10,
-                    ),
-                    actions=[ft.TextButton("关闭", on_click=close_dlg)],
-                )
+                        width=400, height=300, padding=10),
+                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                 page.open(dlg)
                 page.update()
 
@@ -3551,28 +3595,76 @@ def main(page: ft.Page):
 
                     threading.Thread(target=do_restore, daemon=True).start()
 
+            def show_vocab_settings_dialog(e):
+                settings_now = load_vocab_settings()
+                daily_new_field = ft.TextField(label="每日新词数",
+                                               value=str(settings_now.get("daily_new", 20)),
+                                               keyboard_type=ft.KeyboardType.NUMBER)
+                review_limit_field = ft.TextField(
+                    label="每日复习上限",
+                    value=str(settings_now.get("daily_review_limit", 100)),
+                    keyboard_type=ft.KeyboardType.NUMBER)
+                mode_dropdown = ft.Dropdown(
+                    label="考核模式",
+                    options=[ft.dropdown.Option("mix", "混合"),
+                             ft.dropdown.Option("word2meaning", "看词选义"),
+                             ft.dropdown.Option("meaning2word", "看义选词"),
+                             ft.dropdown.Option("spelling", "拼写")],
+                    value=settings_now.get("quiz_mode", "mix"))
+
+                def do_save(e):
+                    try:
+                        new_settings = {
+                            "daily_new": int(daily_new_field.value or 20),
+                            "daily_review_limit": int(review_limit_field.value or 100),
+                            "quiz_mode": mode_dropdown.value,
+                            "show_phonetic": True,
+                        }
+                        save_vocab_settings(new_settings)
+                        page.close(dlg)
+                        show_toast("✅ 设置已保存", "green")
+                    except Exception as ex:
+                        show_toast(f"❌ 保存失败: {ex}", "red")
+
+                dlg = ft.AlertDialog(
+                    title=ft.Text("⚙️ 单词本设置"),
+                    content=ft.Column([daily_new_field, review_limit_field, mode_dropdown],
+                                      spacing=10, width=350),
+                    actions=[ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                             ft.ElevatedButton("保存", on_click=do_save)])
+                page.open(dlg)
+
             mine_page = ft.Column([
                 ft.Container(height=10),
                 ft.Text("⚙️ 个人中心", size=24, weight=ft.FontWeight.BOLD),
                 today_plan_card,
                 ft.Divider(),
-                ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e), icon=ft.Icons.PERSON_OUTLINE),
-                ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e), icon=ft.Icons.BAR_CHART),
-                mine_msg, ft.Divider(),
+                ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
+                                  icon=ft.Icons.PERSON_OUTLINE),
+                ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
+                                  icon=ft.Icons.BAR_CHART),
+                ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
+                                  icon=ft.Icons.SETTINGS),
+                mine_msg,
+                ft.Divider(),
                 ft.Text("✅ 学习任务清单", size=20),
                 ft.Row([new_task_input, ft.ElevatedButton("添加", on_click=add_task)]),
                 task_list,
-                ft.Divider(), ft.Text("🗑️ 回收站", size=20), recycle_list,
-                ft.ElevatedButton("清空回收站",
-                                  on_click=lambda e: (empty_recycle(), refresh_recycle(), show_toast("已清空", "green"))),
-                ft.Divider(), ft.Text("🧠 AI 引擎设置", size=20),
+                ft.Divider(),
+                ft.Text("🗑️ 回收站", size=20), recycle_list,
+                ft.ElevatedButton("清空回收站", on_click=lambda e: (
+                    empty_recycle(), refresh_recycle(), show_toast("已清空", "green"))),
+                ft.Divider(),
+                ft.Text("🧠 AI 引擎设置", size=20),
                 free_key_input, ft.ElevatedButton("保存密钥", on_click=save_keys),
-                ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection), test_conn_result]),
-                ft.Divider(), ft.Text("🎓 自定义教学 Skill", size=18),
+                ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
+                        test_conn_result]),
+                ft.Divider(),
+                ft.Text("🎓 自定义教学 Skill", size=18),
                 skill_input, ft.ElevatedButton("保存 Skill", on_click=save_skill),
                 ft.Divider(),
                 ft.Text("📁 数据文件夹", size=18, weight=ft.FontWeight.BOLD),
-                ft.Text("所有数据（错题、笔记、单词等）都保存在此文件夹中", size=13, color="#888888"),
+                ft.Text("所有数据都保存在此文件夹中", size=13, color="#888888"),
                 ft.Row([
                     ft.Text(f"📂 {DATA_DIR}", size=14, expand=True, selectable=True),
                     ft.ElevatedButton("📂 切换文件夹",
@@ -3584,9 +3676,11 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ft.Text("💾 数据备份与恢复", size=18, weight=ft.FontWeight.BOLD),
                 ft.Row([
-                    ft.ElevatedButton("📤 备份数据", on_click=lambda e: backup_picker.get_directory_path(),
+                    ft.ElevatedButton("📤 备份数据",
+                                      on_click=lambda e: backup_picker.get_directory_path(),
                                       icon=ft.Icons.BACKUP),
-                    ft.ElevatedButton("📥 恢复数据", on_click=lambda e: restore_picker.get_directory_path(),
+                    ft.ElevatedButton("📥 恢复数据",
+                                      on_click=lambda e: restore_picker.get_directory_path(),
                                       icon=ft.Icons.RESTORE),
                 ], spacing=10),
                 backup_status,
@@ -3609,9 +3703,8 @@ def main(page: ft.Page):
                 destinations=[
                     ft.NavigationBarDestination(icon=ft.Icons.ADD, label="首页"),
                     ft.NavigationBarDestination(icon=ft.Icons.SCHOOL, label="学科"),
-                    ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="我的")
-                ]
-            )
+                    ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="我的"),
+                ])
             switch_page(0)
             page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
             print("步骤7: UI 加载完成")
@@ -3626,5 +3719,6 @@ def main(page: ft.Page):
         print("=== 启动异常 ===")
         traceback.print_exc()
 
+
 if __name__ == "__main__":
-    ft.app(target=main)   
+    ft.app(target=main)
