@@ -303,6 +303,8 @@ def add_error_memory(subject, summary, knowledge_point="", discussed=False):
     em = em[-50:]
     profile["error_memory"] = em
     save_user_profile(profile)
+
+
 @retry_request(max_retries=2, base_delay=1)
 def update_chat_memory(subject, user_msg, ai_response):
     def do_update():
@@ -356,7 +358,6 @@ AI回答：{ai_response[:500]}
         except BaseException:
             pass
     threading.Thread(target=do_update, daemon=True).start()
-
 
 
 def get_memory_context(subject=None):
@@ -454,11 +455,26 @@ def load_user_profile():
         }
     with open(USER_PROFILE_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
+        data.setdefault("name", "学生")
+        data.setdefault("grade", "高三")
+        data.setdefault("weak_subjects", {})
+        data.setdefault("weak_knowledge", {})
+        data.setdefault("error_types", {})
+        data.setdefault("recent_focus", [])
+        data.setdefault("total_errors", 0)
+        data.setdefault("total_chats", 0)
+        data.setdefault("knowledge_memory", {})
+        data.setdefault("error_memory", [])
         if "chat_memory" not in data:
             data["chat_memory"] = {"last_update": "", "recent_topics": [], "weak_points": [],
                                    "discussed_errors": [], "last_question_summary": ""}
-        data.setdefault("knowledge_memory", {})
-        data.setdefault("error_memory", [])
+        else:
+            cm = data["chat_memory"]
+            cm.setdefault("last_update", "")
+            cm.setdefault("recent_topics", [])
+            cm.setdefault("weak_points", [])
+            cm.setdefault("discussed_errors", [])
+            cm.setdefault("last_question_summary", "")
         return data
 
 
@@ -584,7 +600,12 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
         idea_media = []
     user_tags = [t.strip() for t in manual_tags.split(",") if t.strip()] if manual_tags.strip() else []
     data = load_jsonl(ERRORS_FILE)
-    question_media = list(set(original_media))
+    seen = set()
+    question_media = []
+    for m in original_media:
+        if m not in seen:
+            seen.add(m)
+            question_media.append(m)
     entry = {
         "type": "error", "subject": subject, "original": original, "original_media": original_media,
         "answer": answer, "answer_media": answer_media, "mistake": mistake, "idea": idea,
@@ -2463,7 +2484,7 @@ def main(page: ft.Page):
                                 padding=ft.Padding(left=6, right=6, top=2, bottom=2),
                                 bgcolor="#333333", border_radius=8)
 
-                            def make_show_detail_card(item_data=item):
+                            def make_show_detail_card(item_data=item, tags=tags):
                                 def show(e):
                                     detail_children = []
                                     detail_children.append(ft.Text("📋 错题详情", size=20,
