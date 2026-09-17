@@ -30,9 +30,21 @@ jobs:
         run: |
           pip install flet==0.28.3 requests
 
+      - name: 检查 Secrets 是否存在
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then echo "❌ KEYSTORE_BASE64 为空！"; exit 1; fi
+          if [ -z "${{ secrets.ALIAS }}" ]; then echo "❌ ALIAS 为空！"; exit 1; fi
+          if [ -z "${{ secrets.ALIAS_PASSWORD }}" ]; then echo "❌ ALIAS_PASSWORD 为空！"; exit 1; fi
+          if [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]; then echo "❌ KEYSTORE_PASSWORD 为空！"; exit 1; fi
+          echo "✅ 4 个 Secrets 都有值"
+
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-release-key.keystore
+          echo "📦 keystore 文件大小："
+          ls -la my-release-key.keystore
+          echo "🔑 keystore 自检："
+          keytool -list -keystore my-release-key.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" 2>&1 || true
 
       - name: 打包 APK（正式签名）
         env:
@@ -44,6 +56,12 @@ jobs:
           flet build apk \
             --build-number ${{ github.run_number }} \
             --build-version 1.0.${{ github.run_number }}
+
+      - name: 检查 APK 签名指纹
+        run: |
+          APK=$(find build/apk -name "*.apk" | head -1)
+          echo "📱 APK: $APK"
+          keytool -printcert -jarfile "$APK" 2>&1 | head -20 || true
 
       - name: 创建 Tag
         id: tag
