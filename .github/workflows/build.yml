@@ -30,7 +30,7 @@ jobs:
         run: |
           pip install flet==0.28.3 requests
 
-      - name: 检查 Secrets 是否存在
+      - name: 检查 Secrets
         run: |
           if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then echo "❌ KEYSTORE_BASE64 为空！"; exit 1; fi
           if [ -z "${{ secrets.ALIAS }}" ]; then echo "❌ ALIAS 为空！"; exit 1; fi
@@ -43,24 +43,24 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-release-key.keystore
           echo "📦 keystore 文件大小："
           ls -la my-release-key.keystore
-          echo "🔑 keystore 自检："
+          echo "🔑 keystore 自检（注意看这里的 SHA-256 指纹）："
           keytool -list -keystore my-release-key.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" 2>&1 || true
 
-      - name: 打包 APK（正式签名）
-        env:
-          FLET_ANDROID_SIGNING_KEY_STORE: ${{ github.workspace }}/my-release-key.keystore
-          FLET_ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ALIAS }}
-          FLET_ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ALIAS_PASSWORD }}
-          FLET_ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      - name: 打包 APK（用命令行参数传签名）
         run: |
           flet build apk \
             --build-number ${{ github.run_number }} \
-            --build-version 1.0.${{ github.run_number }}
+            --build-version 1.0.${{ github.run_number }} \
+            --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
+            --android-signing-key-alias "${{ secrets.ALIAS }}" \
+            --android-signing-key-password "${{ secrets.ALIAS_PASSWORD }}" \
+            --android-signing-store-password "${{ secrets.KEYSTORE_PASSWORD }}"
 
-      - name: 检查 APK 签名指纹
+      - name: 检查 APK 签名指纹（关键！）
         run: |
           APK=$(find build/apk -name "*.apk" | head -1)
           echo "📱 APK: $APK"
+          echo "🔍 下面这个 SHA256 必须和你 keystore 的 SHA256 一模一样："
           keytool -printcert -jarfile "$APK" 2>&1 | head -20 || true
 
       - name: 创建 Tag
