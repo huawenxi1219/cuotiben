@@ -927,7 +927,7 @@ def main(page: ft.Page):
         splash_view = ft.Container(
             content=ft.Image(src="splash.png", fit=ft.ImageFit.CONTAIN, expand=True),
             expand=True,
-            bgcolor="#17171A",
+            bgcolor="#131318",
             alignment=ft.alignment.center,
         )
         page.add(splash_view)
@@ -1018,9 +1018,9 @@ def main(page: ft.Page):
                     primary="#FF8A65",
                     primary_container="#3A2A22",
                     secondary="#FFB74D",
-                    surface="#222228",
-                    surface_variant="#2C2C33",
-                    background="#17171A",
+                    surface="#1C1C22",
+                    surface_variant="#26262E",
+                    background="#131318",
                     on_surface="#FFFFFF",
                     on_background="#FFFFFF",
                 ),
@@ -1552,9 +1552,26 @@ def main(page: ft.Page):
                 page.update()
 
             def open_contact_panel(e):
-                chat_dialog.visible = False
-                contact_panel.right = 10
-                contact_panel.bottom = 76
+                try:
+                    w = page.width or (page.window.width if page.window else None) or 360
+                    h = page.height or (page.window.height if page.window else None) or 640
+                except Exception:
+                    w, h = 360, 640
+                panel_w = 220
+                panel_h = 420
+                bx = ball_state["ball_x"]
+                by = ball_state["ball_y"]
+                if bx < w / 2:
+                    panel_x = bx + 64
+                else:
+                    panel_x = bx - panel_w - 8
+                panel_y = by
+                panel_x = max(8, min(panel_x, w - panel_w - 8))
+                panel_y = max(8, min(panel_y, h - panel_h - 8))
+                contact_panel.left = panel_x
+                contact_panel.top = panel_y
+                contact_panel.right = None
+                contact_panel.bottom = None
                 contact_panel.visible = True
                 page.update()
 
@@ -1568,20 +1585,83 @@ def main(page: ft.Page):
                 [ft.Text("🧠 AI 助手", size=18), ft.Divider(), contact_list],
                 spacing=5)
 
-            ai_ball = ft.Container(
-                content=ft.Text("AI", size=20, color="white", weight=ft.FontWeight.BOLD),
-                width=56,
-                height=56,
-                border_radius=28,
-                bgcolor="#CCFF8A65",
-                blur=12,
-                border=ft.border.all(1, ft.Colors.WHITE24),
-                shadow=ft.BoxShadow(blur_radius=16, color="#88000000"),
-                alignment=ft.alignment.center,
-                on_click=lambda e: (close_contact_panel() if contact_panel.visible else open_contact_panel(e)),
-                ink=True,
+            ball_state = {"dragging": False, "moved": False, "ball_x": 300, "ball_y": 500}
+
+            def on_ball_pan_start(e):
+                ball_state["dragging"] = True
+                ball_state["moved"] = False
+
+            def on_ball_pan_update(e):
+                if not ball_state["dragging"]:
+                    return
+                if abs(e.delta_x) + abs(e.delta_y) > 2:
+                    ball_state["moved"] = True
+                ball_state["ball_x"] += e.delta_x
+                ball_state["ball_y"] += e.delta_y
+                try:
+                    w = page.width or (page.window.width if page.window else None) or 360
+                    h = page.height or (page.window.height if page.window else None) or 640
+                except Exception:
+                    w, h = 360, 640
+                ball_state["ball_x"] = max(0, min(ball_state["ball_x"], w - 56))
+                ball_state["ball_y"] = max(0, min(ball_state["ball_y"], h - 56))
+                ball_container.left = ball_state["ball_x"]
+                ball_container.top = ball_state["ball_y"]
+                ball_container.right = None
+                ball_container.bottom = None
+                page.update()
+
+            def on_ball_pan_end(e):
+                ball_state["dragging"] = False
+                try:
+                    w = page.width or (page.window.width if page.window else None) or 360
+                    h = page.height or (page.window.height if page.window else None) or 640
+                except Exception:
+                    w, h = 360, 640
+                if ball_state["ball_x"] + 28 < w / 2:
+                    ball_state["ball_x"] = 8
+                else:
+                    ball_state["ball_x"] = w - 56 - 8
+                ball_state["ball_y"] = max(80, min(ball_state["ball_y"], h - 56 - 100))
+                ball_container.left = ball_state["ball_x"]
+                ball_container.top = ball_state["ball_y"]
+                ball_container.animate_left = ft.Animation(250, ft.AnimationCurve.EASE_OUT)
+                ball_container.animate_top = ft.Animation(250, ft.AnimationCurve.EASE_OUT)
+                page.update()
+
+            def on_ball_tap(e):
+                if ball_state.get("moved"):
+                    ball_state["moved"] = False
+                    return
+                if contact_panel.visible:
+                    close_contact_panel()
+                else:
+                    open_contact_panel(e)
+
+            ai_ball = ft.GestureDetector(
+                content=ft.Container(
+                    content=ft.Text("AI", size=20, color="white", weight=ft.FontWeight.BOLD),
+                    width=56,
+                    height=56,
+                    border_radius=28,
+                    bgcolor="#DD1C1C22",
+                    blur=12,
+                    border=ft.border.all(1, ft.Colors.WHITE24),
+                    shadow=ft.BoxShadow(blur_radius=22, color="#99000000"),
+                    alignment=ft.alignment.center,
+                    ink=True,
+                ),
+                drag_interval=20,
+                on_tap=on_ball_tap,
+                on_pan_start=on_ball_pan_start,
+                on_pan_update=on_ball_pan_update,
+                on_pan_end=on_ball_pan_end,
             )
-            ball_container = ft.Container(content=ai_ball, right=10, bottom=10)
+            ball_container = ft.Container(
+                content=ai_ball,
+                left=ball_state["ball_x"],
+                top=ball_state["ball_y"],
+            )
 
             chat_dialog = ft.Container(
                 visible=False,
@@ -1958,7 +2038,7 @@ def main(page: ft.Page):
                 def set_tab(idx):
                     tab_index[0] = idx
                     for i, btn in enumerate(tab_buttons):
-                        btn.bgcolor = "#FF8A65" if i == idx else "#2C2C33"
+                        btn.bgcolor = "#FF8A65" if i == idx else "#26262E"
                         for c in btn.content.controls:
                             if isinstance(c, ft.Text):
                                 c.color = "#FFFFFF" if i == idx else "#CCCCCC"
@@ -1972,7 +2052,7 @@ def main(page: ft.Page):
                             ft.Text(label, size=13, weight=ft.FontWeight.BOLD, color="#CCCCCC"),
                         ], spacing=3, tight=True),
                         padding=ft.Padding(left=10, right=10, top=6, bottom=6),
-                        border_radius=10, bgcolor="#2C2C33",
+                        border_radius=10, bgcolor="#26262E",
                         on_click=lambda e, i=idx: set_tab(i), ink=True)
 
                 for i, (ic, lb) in enumerate(tab_defs):
@@ -2162,7 +2242,7 @@ def main(page: ft.Page):
                                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                                     alignment=ft.MainAxisAlignment.CENTER, spacing=10),
                                 alignment=ft.alignment.center, expand=True,
-                                bgcolor="#2C2C33", border_radius=20,
+                                bgcolor="#26262E", border_radius=20,
                                 border=ft.border.all(1, ft.Colors.WHITE10),
                                 padding=30, ink=True,
                                 on_click=lambda e: (state.update({"flipped": True}), render_card()))
@@ -2183,7 +2263,7 @@ def main(page: ft.Page):
                                     ft.Text(f"变形：{forms}", size=13, color=ft.Colors.GREY_400) if forms else ft.Text(""),
                                 ], spacing=8, scroll=ft.ScrollMode.AUTO),
                                 alignment=ft.alignment.top_left,
-                                bgcolor="#2C2C33", border_radius=20,
+                                bgcolor="#26262E", border_radius=20,
                                 border=ft.border.all(1, ft.Colors.WHITE10),
                                 padding=20, expand=True)
                             card_area.content = back
@@ -2295,7 +2375,7 @@ def main(page: ft.Page):
 
                             for opt in options:
                                 b = ft.ElevatedButton(opt, on_click=make_click(opt, opt == correct),
-                                                      expand=True, bgcolor="#2C2C33", color="#FFFFFF")
+                                                      expand=True, bgcolor="#26262E", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的中文释义", size=13, color=ft.Colors.GREY_500),
@@ -2343,7 +2423,7 @@ def main(page: ft.Page):
 
                             for opt in options:
                                 b = ft.ElevatedButton(opt, on_click=make_click2(opt, opt == correct),
-                                                      expand=True, bgcolor="#2C2C33", color="#FFFFFF")
+                                                      expand=True, bgcolor="#26262E", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的英文单词", size=13, color=ft.Colors.GREY_500),
@@ -2390,7 +2470,7 @@ def main(page: ft.Page):
                                 ft.Row([
                                     ft.ElevatedButton("提交", on_click=check, bgcolor="#FF8A65", color="#FFFFFF"),
                                     ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                      bgcolor="#2C2C33", color="#FFFFFF"),
+                                                      bgcolor="#26262E", color="#FFFFFF"),
                                 ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
                                 ft.Container(height=10),
                                 result_text,
@@ -2497,7 +2577,7 @@ def main(page: ft.Page):
                             tags = item.get("tags", [])
                             tag_text = "、".join(tags) if tags else "未分类"
                             is_highlighted = idx in highlight_set
-                            bg_color = "#3D3A28" if is_highlighted else "#262630"
+                            bg_color = "#3D3A28" if is_highlighted else "#1F1F26"
                             status = item.get("status", "未看")
                             status_color = {"未看": "#9E9E9E", "已看": "#4CAF50",
                                             "重要": "#F44336", "已掌握": "#2196F3"}.get(status, "#9E9E9E")
@@ -2522,7 +2602,7 @@ def main(page: ft.Page):
                                 else:
                                     thumb_container = ft.Container(
                                         width=80, height=80, border_radius=10,
-                                        bgcolor="#333333", alignment=ft.alignment.center,
+                                        bgcolor="#2F2F38", alignment=ft.alignment.center,
                                         content=ft.Text("🖼️", size=28, opacity=0.4))
                             detail_lines = []
                             if original:
@@ -2541,7 +2621,7 @@ def main(page: ft.Page):
                             tag_display = ft.Container(
                                 content=ft.Text(f"🏷️ {tag_text}", size=11, color=ft.Colors.GREY_400),
                                 padding=ft.Padding(left=6, right=6, top=2, bottom=2),
-                                bgcolor="#333333", border_radius=8)
+                                bgcolor="#2F2F38", border_radius=8)
 
                             def make_show_detail_card(item_data=item, tags=tags):
                                 def show(e):
@@ -2769,7 +2849,7 @@ def main(page: ft.Page):
                                 content=ft.Column(inner_children, spacing=4),
                                 padding=12, border_radius=14, bgcolor=bg_color,
                                 border=ft.border.all(2 if is_highlighted else 1,
-                                                     "#FF8A65" if is_highlighted else "#333333"),
+                                                    "#FF8A65" if is_highlighted else "#4A4A55"),
                                 on_click=make_show_detail_card(item), ink=True)
                             container.key = str(idx)
                             list_view.controls.append(container)
@@ -3013,7 +3093,7 @@ def main(page: ft.Page):
                 CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
                 category_colors = {"开头": "#1A2840", "转折": "#3A2A18", "结尾": "#1A2E1A",
                                    "观点": "#3A1A28", "举例": "#2E1A3A", "读后续写": "#1A2E3A",
-                                   "其他": "#2C2C33"}
+                                   "其他": "#26262E"}
                 search_input = ft.TextField(label="🔍 搜索句子", hint_text="输入关键词...", expand=True)
                 category_dropdown = ft.Dropdown(
                     label="分类", options=[ft.dropdown.Option(c) for c in CATEGORIES],
@@ -3172,7 +3252,7 @@ def main(page: ft.Page):
                         translation = s.get("translation", "")
                         favorite = s.get("favorite", False)
                         updated = s.get("updated", s.get("created", ""))
-                        bg_color = category_colors.get(cat, "#2C2C33")
+                        bg_color = category_colors.get(cat, "#26262E")
                         card = ft.Container(
                             content=ft.Column([
                                 ft.Row([
@@ -3205,7 +3285,7 @@ def main(page: ft.Page):
                             ], spacing=4),
                             padding=10, border_radius=12, bgcolor=bg_color,
                             margin=ft.margin.only(bottom=4),
-                            border=ft.border.all(1, "#FFB74D" if favorite else "#333333"))
+                            border=ft.border.all(1, "#FFB74D" if favorite else "#2F2F38"))
                         sentence_list.controls.append(card)
                     page.update()
 
@@ -3299,7 +3379,7 @@ def main(page: ft.Page):
                                         color="white" if is_selected else "#CCCCCC"),
                         padding=ft.Padding(left=16, top=12, right=16, bottom=12),
                         border_radius=12,
-                        bgcolor="#FF8A65" if is_selected else "#2C2C33",
+                        bgcolor="#FF8A65" if is_selected else "#26262E",
                         on_click=lambda e, ss=s: on_subject_selected(ss))
                     subj_buttons.append(btn)
                 return ft.Container(content=ft.Column(subj_buttons, spacing=6), width=100, padding=10)
@@ -3310,7 +3390,7 @@ def main(page: ft.Page):
                 right_panel = build_function_card_grid(selected_subject_for_page)
                 return ft.Row([
                     left_panel,
-                    ft.VerticalDivider(width=1, color="#333333"),
+                    ft.VerticalDivider(width=1, color="#2F2F38"),
                     ft.Container(content=right_panel, expand=True,
                                  padding=ft.Padding(left=20, right=20, top=20, bottom=20)),
                 ], expand=True)
@@ -3538,7 +3618,7 @@ def main(page: ft.Page):
                         pct = count / max_count
                         bar = ft.ProgressBar(value=pct, width=200, height=8,
                                              color=color_map.get(et, "#78909C"),
-                                             bgcolor="#333333", border_radius=4)
+                                             bgcolor="#2F2F38", border_radius=4)
                         content_children.append(ft.Row([
                             ft.Text(f"{et}：{count}", size=13, width=110), bar,
                         ], spacing=8))
@@ -3558,7 +3638,7 @@ def main(page: ft.Page):
                             ft.Text(f"{kp}（{events_count}次，掌握 {level:.0%}）", size=13))
                         content_children.append(
                             ft.ProgressBar(value=level, width=300, height=6,
-                                           color=bar_color, bgcolor="#333333"))
+                                           color=bar_color, bgcolor="#2F2F38"))
                         if summary:
                             content_children.append(
                                 ft.Text(f"  → {summary}", size=11, color="#888888"))
@@ -3603,7 +3683,7 @@ def main(page: ft.Page):
                     percentage = min((count / max_count) * 100, 100) if max_count > 0 else 0
                     color = color_map.get(subject, "#78909C")
                     progress_bar = ft.ProgressBar(value=percentage / 100, width=200,
-                                                  height=8, color=color, bgcolor="#333333",
+                                                  height=8, color=color, bgcolor="#2F2F38",
                                                   border_radius=4)
                     content_children.append(ft.Row([
                         ft.Text(f"{subject}：{count} 题", size=14, width=80),
