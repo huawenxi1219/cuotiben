@@ -43,7 +43,7 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-release-key.keystore
           echo "📦 keystore 文件大小："
           ls -la my-release-key.keystore
-          echo "🔑 keystore 自检（注意看这里的 SHA-256 指纹）："
+          echo "🔑 keystore 自检（记住这个 SHA-256）："
           keytool -list -keystore my-release-key.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" 2>&1 || true
 
       - name: 打包 APK（用命令行参数传签名）
@@ -54,13 +54,13 @@ jobs:
             --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
             --android-signing-key-alias "${{ secrets.ALIAS }}" \
             --android-signing-key-password "${{ secrets.ALIAS_PASSWORD }}" \
-            --android-signing-store-password "${{ secrets.KEYSTORE_PASSWORD }}"
+            --android-signing-key-store-password "${{ secrets.KEYSTORE_PASSWORD }}"
 
       - name: 检查 APK 签名指纹（关键！）
         run: |
           APK=$(find build/apk -name "*.apk" | head -1)
           echo "📱 APK: $APK"
-          echo "🔍 下面这个 SHA256 必须和你 keystore 的 SHA256 一模一样："
+          echo "🔍 下面这个 SHA256 必须和上面 keystore 的 SHA256 一模一样："
           keytool -printcert -jarfile "$APK" 2>&1 | head -20 || true
 
       - name: 创建 Tag
