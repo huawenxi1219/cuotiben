@@ -675,6 +675,10 @@ def auto_tag_error(timestamp):
                 tags.append(tag_data["knowledge_point"])
             if tag_data.get("sub_knowledge"):
                 tags.append(tag_data["sub_knowledge"])
+            if len(tags) <= 1:
+                fallback_kp = extract_keywords_fallback(content_text)
+                if fallback_kp:
+                    tags.append(fallback_kp)
             error_type = tag_data.get("error_type", "")
             difficulty = tag_data.get("difficulty", 0)
             errors = load_jsonl(ERRORS_FILE)
@@ -800,7 +804,44 @@ def update_sentence(sentence_id, category=None, sentence=None, translation=None)
             break
     save_sentences(sentences)
 
-
+def extract_keywords_fallback(text):
+    if not text:
+        return ""
+    patterns = [
+        (r'二次函数', '二次函数'), (r'一次函数', '一次函数'),
+        (r'反比例函数', '反比例函数'), (r'指数函数', '指数函数'),
+        (r'对数函数', '对数函数'), (r'三角函数', '三角函数'),
+        (r'数列', '数列'), (r'导数', '导数'), (r'不等式', '不等式'),
+        (r'立体几何', '立体几何'), (r'解析几何', '解析几何'),
+        (r'概率', '概率'), (r'排列组合', '排列组合'),
+        (r'集合', '集合'), (r'复数', '复数'),
+        (r'向量', '向量'), (r'圆锥曲线', '圆锥曲线'),
+        (r'牛顿|力学', '力学'), (r'电场|电路|电流|欧姆', '电学'),
+        (r'磁场|电磁', '电磁学'), (r'运动学|匀变速', '运动学'),
+        (r'动量', '动量'), (r'动能|机械能', '机械能'),
+        (r'热学|热力学', '热学'), (r'光学|折射|反射', '光学'),
+        (r'氧化还原', '氧化还原'), (r'离子方程', '离子方程式'),
+        (r'化学平衡', '化学平衡'), (r'有机化学|烃|醇|酸', '有机化学'),
+        (r'摩尔|物质的量', '物质的量'),
+        (r'定语从句', '定语从句'), (r'状语从句', '状语从句'),
+        (r'名词性从句', '名词性从句'), (r'虚拟语气', '虚拟语气'),
+        (r'时态', '时态'), (r'非谓语', '非谓语动词'),
+        (r'文言文', '文言文'), (r'诗歌鉴赏', '诗歌鉴赏'),
+        (r'阅读理解', '阅读理解'), (r'作文', '作文'),
+        (r'遗传|基因|DNA|RNA', '遗传学'), (r'细胞', '细胞'),
+        (r'光合作用', '光合作用'), (r'呼吸作用', '呼吸作用'),
+        (r'生态系统', '生态系统'),
+        (r'近代史|鸦片战争|戊戌|辛亥', '中国近代史'),
+        (r'古代史|先秦|秦汉|唐宋', '中国古代史'),
+        (r'经济生活', '经济生活'), (r'政治生活', '政治生活'),
+        (r'文化生活', '文化生活'), (r'哲学', '哲学'),
+        (r'气候|季风|气压', '气候'), (r'地形|地貌', '地形'),
+        (r'人口|城市|城市化', '人文地理'),
+    ]
+    for pattern, kp in patterns:
+        if re.search(pattern, text):
+            return kp
+    return ""
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
                        '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
@@ -865,6 +906,7 @@ def init_content_lib():
 
 
 def load_content_lib(subject):
+    
     filename = CONTENT_LIB_FILES.get(subject)
     if not filename:
         return {"subject": subject}
@@ -879,6 +921,22 @@ def load_content_lib(subject):
 
 
 def main(page: ft.Page):
+    page.padding = 0
+    page.spacing = 0
+    try:
+        splash_view = ft.Container(
+            content=ft.Image(src="splash.png", fit=ft.ImageFit.CONTAIN, expand=True),
+            expand=True,
+            bgcolor="#17171A",
+            alignment=ft.alignment.center,
+        )
+        page.add(splash_view)
+        page.update()
+        time.sleep(1.2)
+        page.controls.clear()
+        page.update()
+    except Exception as splash_err:
+        print(f"splash 加载失败：{splash_err}")
     page.add(ft.Text("⏳ 应用启动中..."))
     page.update()
     print("=== main 函数开始 ===")
@@ -960,9 +1018,9 @@ def main(page: ft.Page):
                     primary="#FF8A65",
                     primary_container="#3A2A22",
                     secondary="#FFB74D",
-                    surface="#1E1E1E",
-                    surface_variant="#2A2A2A",
-                    background="#121212",
+                    surface="#222228",
+                    surface_variant="#2C2C33",
+                    background="#17171A",
                     on_surface="#FFFFFF",
                     on_background="#FFFFFF",
                 ),
@@ -1494,6 +1552,7 @@ def main(page: ft.Page):
                 page.update()
 
             def open_contact_panel(e):
+                chat_dialog.visible = False
                 contact_panel.right = 10
                 contact_panel.bottom = 76
                 contact_panel.visible = True
@@ -1899,7 +1958,7 @@ def main(page: ft.Page):
                 def set_tab(idx):
                     tab_index[0] = idx
                     for i, btn in enumerate(tab_buttons):
-                        btn.bgcolor = "#FF8A65" if i == idx else "#2A2A2A"
+                        btn.bgcolor = "#FF8A65" if i == idx else "#2C2C33"
                         for c in btn.content.controls:
                             if isinstance(c, ft.Text):
                                 c.color = "#FFFFFF" if i == idx else "#CCCCCC"
@@ -1913,7 +1972,7 @@ def main(page: ft.Page):
                             ft.Text(label, size=13, weight=ft.FontWeight.BOLD, color="#CCCCCC"),
                         ], spacing=3, tight=True),
                         padding=ft.Padding(left=10, right=10, top=6, bottom=6),
-                        border_radius=10, bgcolor="#2A2A2A",
+                        border_radius=10, bgcolor="#2C2C33",
                         on_click=lambda e, i=idx: set_tab(i), ink=True)
 
                 for i, (ic, lb) in enumerate(tab_defs):
@@ -2103,7 +2162,7 @@ def main(page: ft.Page):
                                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                                     alignment=ft.MainAxisAlignment.CENTER, spacing=10),
                                 alignment=ft.alignment.center, expand=True,
-                                bgcolor="#2A2A2A", border_radius=20,
+                                bgcolor="#2C2C33", border_radius=20,
                                 border=ft.border.all(1, ft.Colors.WHITE10),
                                 padding=30, ink=True,
                                 on_click=lambda e: (state.update({"flipped": True}), render_card()))
@@ -2124,7 +2183,7 @@ def main(page: ft.Page):
                                     ft.Text(f"变形：{forms}", size=13, color=ft.Colors.GREY_400) if forms else ft.Text(""),
                                 ], spacing=8, scroll=ft.ScrollMode.AUTO),
                                 alignment=ft.alignment.top_left,
-                                bgcolor="#2A2A2A", border_radius=20,
+                                bgcolor="#2C2C33", border_radius=20,
                                 border=ft.border.all(1, ft.Colors.WHITE10),
                                 padding=20, expand=True)
                             card_area.content = back
@@ -2236,7 +2295,7 @@ def main(page: ft.Page):
 
                             for opt in options:
                                 b = ft.ElevatedButton(opt, on_click=make_click(opt, opt == correct),
-                                                      expand=True, bgcolor="#2A2A2A", color="#FFFFFF")
+                                                      expand=True, bgcolor="#2C2C33", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的中文释义", size=13, color=ft.Colors.GREY_500),
@@ -2284,7 +2343,7 @@ def main(page: ft.Page):
 
                             for opt in options:
                                 b = ft.ElevatedButton(opt, on_click=make_click2(opt, opt == correct),
-                                                      expand=True, bgcolor="#2A2A2A", color="#FFFFFF")
+                                                      expand=True, bgcolor="#2C2C33", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的英文单词", size=13, color=ft.Colors.GREY_500),
@@ -2331,7 +2390,7 @@ def main(page: ft.Page):
                                 ft.Row([
                                     ft.ElevatedButton("提交", on_click=check, bgcolor="#FF8A65", color="#FFFFFF"),
                                     ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                      bgcolor="#2A2A2A", color="#FFFFFF"),
+                                                      bgcolor="#2C2C33", color="#FFFFFF"),
                                 ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
                                 ft.Container(height=10),
                                 result_text,
@@ -2438,7 +2497,7 @@ def main(page: ft.Page):
                             tags = item.get("tags", [])
                             tag_text = "、".join(tags) if tags else "未分类"
                             is_highlighted = idx in highlight_set
-                            bg_color = "#3A3522" if is_highlighted else "#242424"
+                            bg_color = "#3D3A28" if is_highlighted else "#262630"
                             status = item.get("status", "未看")
                             status_color = {"未看": "#9E9E9E", "已看": "#4CAF50",
                                             "重要": "#F44336", "已掌握": "#2196F3"}.get(status, "#9E9E9E")
@@ -2836,30 +2895,33 @@ def main(page: ft.Page):
 
                             def make_show_note(item_data=item):
                                 def show(e):
+                                    note_ts = item_data.get("time", "")
+                                    note_content = item_data.get("content", "")
+                                    note_images = item_data.get("images", []) or item_data.get("media", [])
                                     detail_children = [ft.Text("📝 笔记详情", size=20,
                                                                weight=ft.FontWeight.BOLD),
-                                                       ft.Text(f"时间：{ts}", size=13,
+                                                       ft.Text(f"时间：{note_ts}", size=13,
                                                                color=ft.Colors.GREY_500)]
-                                    if content:
-                                        detail_children.append(ft.Text(content, size=15, selectable=True))
+                                    if note_content:
+                                        detail_children.append(ft.Text(note_content, size=15, selectable=True))
                                     else:
                                         detail_children.append(ft.Text("（无文字内容）", size=14,
                                                                        color=ft.Colors.GREY_500))
-                                    if images:
+                                    if note_images:
                                         detail_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
                                         detail_children.append(
-                                            ft.Text(f"🖼️ 图片附件（{len(images)}张）", size=14,
+                                            ft.Text(f"🖼️ 图片附件（{len(note_images)}张）", size=14,
                                                     weight=ft.FontWeight.BOLD))
                                         img_row = ft.Row(spacing=8, wrap=True)
-                                        for img_path in images:
+                                        for img_path in note_images:
                                             full_path = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
                                             if os.path.exists(full_path):
                                                 try:
                                                     img = ft.Container(
                                                         content=ft.Image(src=full_path, width=100, height=100,
                                                                          fit=ft.ImageFit.COVER, border_radius=8),
-                                                        on_click=lambda e, paths=images,
-                                                                       idx=images.index(img_path): show_image_gallery(paths, idx),
+                                                        on_click=lambda e, paths=note_images,
+                                                                       idx=note_images.index(img_path): show_image_gallery(paths, idx),
                                                         ink=True, border_radius=8)
                                                     img_row.controls.append(img)
                                                 except BaseException:
@@ -2940,7 +3002,7 @@ def main(page: ft.Page):
                             list_view.controls.append(ft.Container(
                                 content=ft.Column(inner_children, spacing=4),
                                 padding=12, border_radius=14,
-                                bgcolor="#2A2416", border=ft.border.all(1, "#5D4A28"),
+                                bgcolor="#2A2620", border=ft.border.all(1, "#6B5838"),
                                 on_click=make_show_note(), ink=True))
                         except Exception as e:
                             print(f"⚠️ 加载笔记条目失败，已跳过: {e}")
@@ -2951,7 +3013,7 @@ def main(page: ft.Page):
                 CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
                 category_colors = {"开头": "#1A2840", "转折": "#3A2A18", "结尾": "#1A2E1A",
                                    "观点": "#3A1A28", "举例": "#2E1A3A", "读后续写": "#1A2E3A",
-                                   "其他": "#2A2A2A"}
+                                   "其他": "#2C2C33"}
                 search_input = ft.TextField(label="🔍 搜索句子", hint_text="输入关键词...", expand=True)
                 category_dropdown = ft.Dropdown(
                     label="分类", options=[ft.dropdown.Option(c) for c in CATEGORIES],
@@ -3110,7 +3172,7 @@ def main(page: ft.Page):
                         translation = s.get("translation", "")
                         favorite = s.get("favorite", False)
                         updated = s.get("updated", s.get("created", ""))
-                        bg_color = category_colors.get(cat, "#2A2A2A")
+                        bg_color = category_colors.get(cat, "#2C2C33")
                         card = ft.Container(
                             content=ft.Column([
                                 ft.Row([
@@ -3237,7 +3299,7 @@ def main(page: ft.Page):
                                         color="white" if is_selected else "#CCCCCC"),
                         padding=ft.Padding(left=16, top=12, right=16, bottom=12),
                         border_radius=12,
-                        bgcolor="#FF8A65" if is_selected else "#2A2A2A",
+                        bgcolor="#FF8A65" if is_selected else "#2C2C33",
                         on_click=lambda e, ss=s: on_subject_selected(ss))
                     subj_buttons.append(btn)
                 return ft.Container(content=ft.Column(subj_buttons, spacing=6), width=100, padding=10)
@@ -3329,8 +3391,8 @@ def main(page: ft.Page):
                                               height=30)]),
                     ft.Divider(height=5), today_plan_text
                 ], spacing=8),
-                padding=15, border_radius=16, bgcolor="#2A2416",
-                border=ft.border.all(1, "#5D4A28"),
+                padding=15, border_radius=16, bgcolor="#2A2620",
+                border=ft.border.all(1, "#6B5838"),
                 shadow=ft.BoxShadow(blur_radius=12, color="#44000000"))
 
             task_list = ft.Column(spacing=6)
@@ -3727,7 +3789,7 @@ def main(page: ft.Page):
                     ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="我的"),
                 ])
             switch_page(0)
-            page.add(ft.Stack([current_page, contact_panel, chat_dialog, ball_container], expand=True))
+            page.add(ft.Stack([current_page, chat_dialog, contact_panel, ball_container], expand=True))
             print("步骤7: UI 加载完成")
 
         load_ui()
