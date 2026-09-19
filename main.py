@@ -17,11 +17,32 @@ import traceback
 DEBUG = True
 
 if getattr(sys, 'frozen', False):
-    DATA_DIR = "/storage/emulated/0/智能错题笔记"
+    _home = os.path.expanduser("~")
+    if (not _home) or ("flet/app" in _home) or ("flet\\app" in _home):
+        _home = "/data/data/com.flet.chiyu_study/files"
+    DATA_DIR = os.path.join(_home, "智能错题笔记")
 else:
     DATA_DIR = os.path.join(os.getcwd(), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
+def try_migrate_old_data():
+    old_candidates = [
+        "/data/data/com.flet.chiyu_study/files/flet/app/智能错题笔记",
+        os.path.join(os.path.expanduser("~"), "flet", "app", "智能错题笔记"),
+    ]
+    for old in old_candidates:
+        try:
+            if old == DATA_DIR or not os.path.exists(old):
+                continue
+            if (not os.path.exists(DATA_DIR)) or (not os.listdir(DATA_DIR)):
+                shutil.copytree(old, DATA_DIR, dirs_exist_ok=True)
+                print(f"✅ 已从旧路径迁移数据: {old} -> {DATA_DIR}")
+                return True
+        except Exception as e:
+            print(f"迁移失败 {old}: {e}")
+    return False
 
+
+try_migrate_old_data()
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -942,37 +963,9 @@ def main(page: ft.Page):
     print("=== main 函数开始 ===")
 
     try:
-        storage_dir = os.getcwd()
-        print(f"工作目录: {storage_dir}")
-
-        global DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, ERRORS_FILE, NOTES_FILE
-        global RECYCLE_FILE, REVIEW_CARDS_FILE, TASKS_FILE, AI_CONFIG_FILE, USER_PROFILE_FILE
-        global CUSTOM_SKILL_FILE, CHAT_HISTORY_DIR, CONTENT_LIB_DIR, NEW_WORDS_FILE
-        global VOCAB_FILE, SENTENCES_FILE, LEARNING_EVENTS_FILE, VOCAB_SETTINGS_FILE
-
-        DATA_DIR = os.path.join(storage_dir, "智能错题笔记")
-        IMAGES_DIR = os.path.join(DATA_DIR, "images")
-        VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
-        DOCS_DIR = os.path.join(DATA_DIR, "documents")
-        ERRORS_FILE = os.path.join(DATA_DIR, "errors.jsonl")
-        NOTES_FILE = os.path.join(DATA_DIR, "notes.jsonl")
-        RECYCLE_FILE = os.path.join(DATA_DIR, "recycle.jsonl")
-        REVIEW_CARDS_FILE = os.path.join(DATA_DIR, "review_cards.jsonl")
-        TASKS_FILE = os.path.join(DATA_DIR, "tasks.jsonl")
-        AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
-        USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
-        CUSTOM_SKILL_FILE = os.path.join(DATA_DIR, "custom_skill.txt")
-        CHAT_HISTORY_DIR = os.path.join(DATA_DIR, "chat_history")
-        CONTENT_LIB_DIR = os.path.join(DATA_DIR, "content_lib")
-        NEW_WORDS_FILE = os.path.join(DATA_DIR, "vocabulary.jsonl")
-        VOCAB_FILE = NEW_WORDS_FILE
-        SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
-        LEARNING_EVENTS_FILE = os.path.join(DATA_DIR, "learning_events.jsonl")
-        VOCAB_SETTINGS_FILE = os.path.join(DATA_DIR, "vocab_settings.json")
-
         for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
             os.makedirs(d, exist_ok=True)
-        print("数据目录已创建:", DATA_DIR)
+        print("数据目录:", DATA_DIR)
 
         init_vocabulary()
         init_content_lib()
