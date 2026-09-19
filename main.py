@@ -17,12 +17,37 @@ import traceback
 DEBUG = True
 
 if getattr(sys, 'frozen', False):
-    _home = os.path.expanduser("~")
-    if (not _home) or ("flet/app" in _home) or ("flet\\app" in _home):
-        _home = "/data/data/com.flet.chiyu_study/files"
-    DATA_DIR = os.path.join(_home, "智能错题笔记")
+    _diag = []
+    try:
+        _diag.append(f"home={os.path.expanduser('~')}")
+    except Exception as _e:
+        _diag.append(f"home=err:{_e}")
+    try:
+        _diag.append(f"cwd={os.getcwd()}")
+    except Exception as _e:
+        _diag.append(f"cwd=err:{_e}")
+    try:
+        _diag.append(f"HOME={os.environ.get('HOME', '(未设置)')}")
+    except Exception as _e:
+        _diag.append(f"HOME=err:{_e}")
+
+    DATA_DIR = "/data/data/com.flet.chiyu_study/files/智能错题笔记"
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        _t = os.path.join(DATA_DIR, ".wtest")
+        with open(_t, "w") as _f:
+            _f.write("ok")
+        os.remove(_t)
+        _diag.append("target=OK")
+    except Exception as _e:
+        _diag.append(f"target=FAIL:{_e}")
+        DATA_DIR = "/data/data/com.flet.chiyu_study/files/flet/app/智能错题笔记"
+        os.makedirs(DATA_DIR, exist_ok=True)
+
+    DIAG_TEXT = " | ".join(_diag)
 else:
     DATA_DIR = os.path.join(os.getcwd(), "data")
+    DIAG_TEXT = "dev mode"
 os.makedirs(DATA_DIR, exist_ok=True)
 def try_migrate_old_data():
     old_candidates = [
@@ -3823,6 +3848,7 @@ def main(page: ft.Page):
                 ft.Text("所有数据都保存在此文件夹中", size=13, color="#888888"),
                 ft.Row([
                     ft.Text(f"📂 {DATA_DIR}", size=14, expand=True, selectable=True),
+                    ft.Text(f"🔍 {DIAG_TEXT}", size=10, color="#888888", selectable=True),
                     ft.ElevatedButton("📂 切换文件夹",
                                       on_click=lambda e: sync_folder_picker.get_directory_path(),
                                       icon=ft.Icons.FOLDER_OPEN),
