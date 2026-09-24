@@ -11,6 +11,7 @@ import threading
 import sys
 import base64
 import uuid
+import zipfile
 from datetime import datetime, timedelta
 import traceback
 
@@ -19,42 +20,34 @@ DEBUG = True
 _IS_ANDROID = os.path.exists("/system/build.prop")
 
 if _IS_ANDROID:
-    DIAG_TEXT = "android mode"
-    DATA_DIR = "/data/data/com.flet.chiyu_study/files/智能错题笔记"
-    try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        _t = os.path.join(DATA_DIR, ".wtest")
-        with open(_t, "w") as _f:
-            _f.write("ok")
-        os.remove(_t)
-        DIAG_TEXT += " | target=OK"
-    except Exception as _e:
-        DIAG_TEXT += f" | target=FAIL:{_e}"
-        DATA_DIR = "/data/data/com.flet.chiyu_study/files/flet/app/智能错题笔记"
-        os.makedirs(DATA_DIR, exist_ok=True)
+    _pkg = "com.flet.chiyu_study"
+    _try_dirs = [
+        f"/storage/emulated/0/Android/data/{_pkg}/files/智能错题笔记",
+        f"/sdcard/Android/data/{_pkg}/files/智能错题笔记",
+        f"/data/data/{_pkg}/files/智能错题笔记",
+    ]
+    DATA_DIR = None
+    DIAG_TEXT = ""
+    for _d in _try_dirs:
+        try:
+            os.makedirs(_d, exist_ok=True)
+            _t = os.path.join(_d, ".wtest")
+            with open(_t, "w") as _f:
+                _f.write("ok")
+            os.remove(_t)
+            DATA_DIR = _d
+            DIAG_TEXT = f"OK: {_d}"
+            break
+        except Exception as _e:
+            DIAG_TEXT += f" | FAIL: {str(_e)[:60]}"
+    if DATA_DIR is None:
+        DATA_DIR = f"/data/data/{_pkg}/files/flet/app/data"
+        DIAG_TEXT = "ALL FAIL -> fallback"
 else:
     DATA_DIR = os.path.join(os.getcwd(), "data")
     DIAG_TEXT = "dev mode"
 os.makedirs(DATA_DIR, exist_ok=True)
-def try_migrate_old_data():
-    old_candidates = [
-        "/data/data/com.flet.chiyu_study/files/flet/app/智能错题笔记",
-        os.path.join(os.path.expanduser("~"), "flet", "app", "智能错题笔记"),
-    ]
-    for old in old_candidates:
-        try:
-            if old == DATA_DIR or not os.path.exists(old):
-                continue
-            if (not os.path.exists(DATA_DIR)) or (not os.listdir(DATA_DIR)):
-                shutil.copytree(old, DATA_DIR, dirs_exist_ok=True)
-                print(f"✅ 已从旧路径迁移数据: {old} -> {DATA_DIR}")
-                return True
-        except Exception as e:
-            print(f"迁移失败 {old}: {e}")
-    return False
 
-
-try_migrate_old_data()
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -341,7 +334,10 @@ def add_error_memory(subject, summary, knowledge_point="", discussed=False):
 @retry_request(max_retries=2, base_delay=1)
 def update_chat_memory(subject, user_msg, ai_response):
     def do_update():
-        api_key = load_ai_config().get("api_key_free", "").strip()
+        _cfg = load_ai_config()
+        _provider = _cfg.get("provider", "zhipu")
+        _info = PROVIDERS.get(_provider, PROVIDERS["zhipu"])
+        api_key = _cfg.get(_info["key_field"], "").strip()
         if not api_key:
             return
         prompt = f"""请从以下对话中提取关键学习信息，返回JSON格式：
@@ -355,9 +351,9 @@ def update_chat_memory(subject, user_msg, ai_response):
 AI回答：{ai_response[:500]}
 只返回JSON。"""
         try:
-            resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            resp = requests.post(_info["url"],
                                  headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                                 json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
+                                 json={"model": _info["model"], "messages": [{"role": "user", "content": prompt}],
                                        "temperature": 0.3, "max_tokens": 300}, timeout=15)
             if resp.status_code == 200:
                 content = resp.json()["choices"][0]["message"]["content"]
@@ -544,7 +540,8 @@ def add_recent_focus(kp):
 
 def load_ai_config():
     if not os.path.exists(AI_CONFIG_FILE):
-        return {"model": "free", "api_key_free": "", "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
+        return {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
+                "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -552,6 +549,32 @@ def load_ai_config():
 def save_ai_config(config):
     with open(AI_CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+PROVIDERS = {
+    "zhipu": {
+        "name": "智谱 GLM",
+        "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+        "model": "glm-4-flash",
+        "vision_model": "glm-4v-flash",
+        "key_field": "api_key_free",
+    },
+    "deepseek": {
+        "name": "DeepSeek",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "model": "deepseek-chat",
+        "vision_model": "deepseek-chat",
+        "key_field": "api_key_deepseek",
+    },
+}
+
+
+def get_api_endpoint():
+    cfg = load_ai_config()
+    provider = cfg.get("provider", "zhipu")
+    info = PROVIDERS.get(provider, PROVIDERS["zhipu"])
+    key = cfg.get(info["key_field"], "").strip()
+    return key, info["url"], info["model"], info["vision_model"]
 
 
 def get_chat_history_file(subject):
@@ -677,7 +700,10 @@ def auto_tag_error(timestamp):
     content_text = "\n".join(content_parts)
     if not content_text:
         return
-    api_key = load_ai_config().get("api_key_free", "").strip()
+    _cfg = load_ai_config()
+    _provider = _cfg.get("provider", "zhipu")
+    _info = PROVIDERS.get(_provider, PROVIDERS["zhipu"])
+    api_key = _cfg.get(_info["key_field"], "").strip()
     if not api_key:
         return
     prompt = f"""你是一个专业的高中教师。请分析以下错题，并严格按照JSON格式输出标签信息：
@@ -692,9 +718,9 @@ def auto_tag_error(timestamp):
 {content_text[:500]}
 只输出JSON。"""
     try:
-        resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+        resp = requests.post(_info["url"],
                              headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                             json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
+                             json={"model": _info["model"], "messages": [{"role": "user", "content": prompt}],
                                    "temperature": 0.3, "max_tokens": 300}, timeout=30)
         if resp.status_code == 200:
             content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -751,7 +777,10 @@ def save_note(subject, content, media):
 
 @retry_request(max_retries=3, base_delay=2)
 def generate_word_info(word):
-    api_key = load_ai_config().get("api_key_free", "").strip()
+    _cfg = load_ai_config()
+    _provider = _cfg.get("provider", "zhipu")
+    _info = PROVIDERS.get(_provider, PROVIDERS["zhipu"])
+    api_key = _cfg.get(_info["key_field"], "").strip()
     if not api_key:
         return None
     prompt = f"""请为英语单词 "{word}" 生成词条信息，格式为 JSON：
@@ -766,9 +795,9 @@ def generate_word_info(word):
 }}
 只返回 JSON 对象。"""
     try:
-        resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+        resp = requests.post(_info["url"],
                              headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                             json={"model": "glm-4-flash", "messages": [{"role": "user", "content": prompt}],
+                             json={"model": _info["model"], "messages": [{"role": "user", "content": prompt}],
                                    "temperature": 0.3, "max_tokens": 600}, timeout=20)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"]
@@ -837,6 +866,7 @@ def update_sentence(sentence_id, category=None, sentence=None, translation=None)
             break
     save_sentences(sentences)
 
+
 def extract_keywords_fallback(text):
     if not text:
         return ""
@@ -875,6 +905,8 @@ def extract_keywords_fallback(text):
         if re.search(pattern, text):
             return kp
     return ""
+
+
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
                        '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
@@ -939,7 +971,6 @@ def init_content_lib():
 
 
 def load_content_lib(subject):
-    
     filename = CONTENT_LIB_FILES.get(subject)
     if not filename:
         return {"subject": subject}
@@ -958,14 +989,14 @@ def main(page: ft.Page):
     page.spacing = 0
     try:
         splash_view = ft.Container(
-            content=ft.Image(src="splash.png", fit=ft.ImageFit.CONTAIN, expand=True),
+            content=ft.Image(src="splash.png", fit=ft.ImageFit.COVER, expand=True),
             expand=True,
             bgcolor="#131318",
             alignment=ft.alignment.center,
         )
         page.add(splash_view)
         page.update()
-        time.sleep(1.2)
+        time.sleep(0.6)
         page.controls.clear()
         page.update()
     except Exception as splash_err:
@@ -1426,7 +1457,7 @@ def main(page: ft.Page):
 
             @retry_request(max_retries=2, base_delay=2)
             def analyze_single_image(image_path):
-                api_key = load_ai_config().get("api_key_free", "").strip()
+                api_key, api_url, _m, vision_model = get_api_endpoint()
                 if not api_key:
                     return None
                 try:
@@ -1447,9 +1478,9 @@ def main(page: ft.Page):
                 ]}]
                 try:
                     resp = requests.post(
-                        "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                        api_url,
                         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                        json={"model": "glm-4v-flash", "messages": messages, "max_tokens": 300},
+                        json={"model": vision_model, "messages": messages, "max_tokens": 300},
                         timeout=30)
                     if resp.status_code == 200:
                         content = resp.json()["choices"][0]["message"]["content"]
@@ -1699,16 +1730,16 @@ def main(page: ft.Page):
                 page.update()
 
             def call_ai_stream(messages, model_name, on_chunk):
-                api_key = load_ai_config().get("api_key_free", "").strip()
+                api_key, api_url, api_model, _v = get_api_endpoint()
                 if not api_key:
                     on_chunk("❌ 未配置API密钥")
                     return
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                payload = {"model": "glm-4-flash", "messages": messages,
+                payload = {"model": api_model, "messages": messages,
                            "temperature": 0.7, "max_tokens": 2048, "stream": True}
                 try:
                     resp = requests.post(
-                        "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                        api_url,
                         headers=headers, json=payload, stream=True, timeout=60)
                     if resp.status_code != 200:
                         on_chunk(f"❌ API错误 {resp.status_code}")
@@ -1820,7 +1851,7 @@ def main(page: ft.Page):
                         generation_active = True
                         stop_flag = False
                         try:
-                            call_ai_stream(current_messages, "glm-4-flash", on_chunk)
+                            call_ai_stream(current_messages, "auto", on_chunk)
                         finally:
                             generation_active = False
                         if len(chat_history_display.controls) > 0:
@@ -2879,7 +2910,7 @@ def main(page: ft.Page):
                     page.update()
 
                     def do_search():
-                        api_key = load_ai_config().get("api_key_free", "").strip()
+                        api_key, api_url, api_model, _v = get_api_endpoint()
                         if not api_key:
                             search_status.value = "❌ 未配置API密钥"
                             search_status.color = "#EF5350"
@@ -2894,10 +2925,10 @@ def main(page: ft.Page):
 返回匹配的题目序号（从1开始），JSON数组格式，如：[1, 3, 5]
 只返回JSON数组。"""
                         try:
-                            resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                            resp = requests.post(api_url,
                                                  headers={"Authorization": f"Bearer {api_key}",
                                                           "Content-Type": "application/json"},
-                                                 json={"model": "glm-4-flash",
+                                                 json={"model": api_model,
                                                        "messages": [{"role": "user", "content": prompt}],
                                                        "temperature": 0.3, "max_tokens": 500}, timeout=30)
                             if resp.status_code == 200:
@@ -3172,7 +3203,7 @@ def main(page: ft.Page):
                         page.update()
 
                         def gen_thread():
-                            api_key = load_ai_config().get("api_key_free", "").strip()
+                            api_key, api_url, api_model, _v = get_api_endpoint()
                             if not api_key:
                                 status_text.value = "❌ 未配置API密钥"
                                 status_text.color = "#EF5350"
@@ -3182,10 +3213,10 @@ def main(page: ft.Page):
 输出 JSON 数组：[{{"sentence": "英文", "translation": "中文", "category": "开头/转折/结尾/观点/举例/读后续写"}}]
 只返回 JSON。"""
                             try:
-                                resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                                resp = requests.post(api_url,
                                                      headers={"Authorization": f"Bearer {api_key}",
                                                               "Content-Type": "application/json"},
-                                                     json={"model": "glm-4-flash",
+                                                     json={"model": api_model,
                                                            "messages": [{"role": "user", "content": prompt}],
                                                            "temperature": 0.7, "max_tokens": 1500}, timeout=45)
                                 if resp.status_code == 200:
@@ -3440,17 +3471,17 @@ def main(page: ft.Page):
 各科错题数：{json.dumps(subject_errors, ensure_ascii=False)}
 薄弱知识点：{json.dumps(weak_know, ensure_ascii=False)}
 格式：1.总体建议 2.3-5个具体任务（科目+内容+耗时） 3.鼓励语"""
-                    api_key = load_ai_config().get("api_key_free", "").strip()
+                    api_key, api_url, api_model, _v = get_api_endpoint()
                     if not api_key:
                         target.value = "❌ 未配置 API 密钥"
                         target.color = "#EF5350"
                         page.update()
                         return
                     try:
-                        resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                        resp = requests.post(api_url,
                                              headers={"Authorization": f"Bearer {api_key}",
                                                       "Content-Type": "application/json"},
-                                             json={"model": "glm-4-flash",
+                                             json={"model": api_model,
                                                    "messages": [{"role": "user", "content": prompt}],
                                                    "temperature": 0.7, "max_tokens": 800}, timeout=30)
                         if resp.status_code == 200:
@@ -3542,15 +3573,31 @@ def main(page: ft.Page):
             refresh_recycle()
 
             ai_config = load_ai_config()
-            free_key_input = ft.TextField(label="免费模型 API 密钥",
+
+            provider_dropdown = ft.Dropdown(
+                label="AI 提供商",
+                options=[
+                    ft.dropdown.Option("zhipu", "智谱 GLM（免费）"),
+                    ft.dropdown.Option("deepseek", "DeepSeek"),
+                ],
+                value=ai_config.get("provider", "zhipu"),
+                width=280,
+            )
+
+            free_key_input = ft.TextField(label="智谱 GLM API 密钥",
                                           value=ai_config.get("api_key_free", ""),
                                           password=True)
+            deepseek_key_input = ft.TextField(label="DeepSeek API 密钥",
+                                              value=ai_config.get("api_key_deepseek", ""),
+                                              password=True)
 
             def save_keys(e):
-                ai_config = load_ai_config()
-                ai_config["api_key_free"] = free_key_input.value.strip()
-                save_ai_config(ai_config)
-                show_toast("API 密钥已保存", "green")
+                cfg = load_ai_config()
+                cfg["provider"] = provider_dropdown.value
+                cfg["api_key_free"] = free_key_input.value.strip()
+                cfg["api_key_deepseek"] = deepseek_key_input.value.strip()
+                save_ai_config(cfg)
+                show_toast("API 配置已保存", "green")
 
             test_conn_result = ft.Text("", size=14)
 
@@ -3560,7 +3607,7 @@ def main(page: ft.Page):
                 page.update()
 
                 def _test():
-                    api_key = load_ai_config().get("api_key_free", "").strip()
+                    api_key, api_url, api_model, _v = get_api_endpoint()
                     if not api_key:
                         test_conn_result.value = "❌ 未配置API密钥"
                         test_conn_result.color = "#EF5350"
@@ -3569,10 +3616,10 @@ def main(page: ft.Page):
                     try:
                         headers = {"Authorization": f"Bearer {api_key}",
                                    "Content-Type": "application/json"}
-                        payload = {"model": "glm-4-flash",
+                        payload = {"model": api_model,
                                    "messages": [{"role": "user", "content": "仅回复OK"}],
                                    "max_tokens": 5, "temperature": 0}
-                        resp = requests.post("https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                        resp = requests.post(api_url,
                                              headers=headers, json=payload, timeout=10)
                         if resp.status_code == 200:
                             content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -3714,54 +3761,53 @@ def main(page: ft.Page):
             page.overlay.append(restore_picker)
 
             def on_backup_result(e: ft.FilePickerResultEvent):
-                if e.path:
-                    dest_dir = e.path
-                    backup_status.value = "⏳ 正在备份..."
-                    backup_status.color = "#64B5F6"
+                if not e.path:
+                    return
+                dest_dir = e.path
+                backup_status.value = "⏳ 正在打包..."
+                backup_status.color = "#64B5F6"
+                page.update()
+
+                def do_backup():
+                    try:
+                        ts = time.strftime("%Y%m%d_%H%M%S")
+                        zip_path = os.path.join(dest_dir, f"池鱼Study备份_{ts}.zip")
+                        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                            for root, dirs, files in os.walk(DATA_DIR):
+                                for f in files:
+                                    full = os.path.join(root, f)
+                                    arc = os.path.relpath(full, DATA_DIR)
+                                    zf.write(full, arc)
+                        backup_status.value = f"✅ 备份成功：{zip_path}"
+                        backup_status.color = "#81C784"
+                    except Exception as ex:
+                        backup_status.value = f"❌ 备份失败：{str(ex)[:80]}"
+                        backup_status.color = "#EF5350"
                     page.update()
 
-                    def do_backup():
-                        try:
-                            if os.path.exists(DATA_DIR):
-                                backup_folder = os.path.join(dest_dir, "池鱼Study备份")
-                                shutil.copytree(DATA_DIR, backup_folder, dirs_exist_ok=True)
-                                backup_status.value = f"✅ 备份成功！位置：{backup_folder}"
-                                backup_status.color = "#81C784"
-                            else:
-                                backup_status.value = "❌ 数据目录不存在"
-                                backup_status.color = "#EF5350"
-                        except Exception as ex:
-                            backup_status.value = f"❌ 备份失败：{str(ex)[:50]}"
-                            backup_status.color = "#EF5350"
-                        page.update()
-
-                    threading.Thread(target=do_backup, daemon=True).start()
+                threading.Thread(target=do_backup, daemon=True).start()
 
             def on_restore_result(e: ft.FilePickerResultEvent):
-                if e.path:
-                    src_dir = e.path
-                    backup_status.value = "⏳ 正在恢复..."
-                    backup_status.color = "#64B5F6"
+                if not e.files or len(e.files) == 0:
+                    return
+                zip_path = e.files[0].path
+                backup_status.value = "⏳ 正在恢复..."
+                backup_status.color = "#64B5F6"
+                page.update()
+
+                def do_restore():
+                    try:
+                        os.makedirs(DATA_DIR, exist_ok=True)
+                        with zipfile.ZipFile(zip_path, "r") as zf:
+                            zf.extractall(DATA_DIR)
+                        backup_status.value = "✅ 恢复成功！请重启应用"
+                        backup_status.color = "#81C784"
+                    except Exception as ex:
+                        backup_status.value = f"❌ 恢复失败：{str(ex)[:80]}"
+                        backup_status.color = "#EF5350"
                     page.update()
 
-                    def do_restore():
-                        try:
-                            os.makedirs(DATA_DIR, exist_ok=True)
-                            for item in os.listdir(src_dir):
-                                src_item = os.path.join(src_dir, item)
-                                dst_item = os.path.join(DATA_DIR, item)
-                                if os.path.isdir(src_item):
-                                    shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
-                                else:
-                                    shutil.copy2(src_item, dst_item)
-                            backup_status.value = "✅ 恢复成功！请重启应用"
-                            backup_status.color = "#81C784"
-                        except Exception as ex:
-                            backup_status.value = f"❌ 恢复失败：{str(ex)[:50]}"
-                            backup_status.color = "#EF5350"
-                        page.update()
-
-                    threading.Thread(target=do_restore, daemon=True).start()
+                threading.Thread(target=do_restore, daemon=True).start()
 
             def show_vocab_settings_dialog(e):
                 settings_now = load_vocab_settings()
@@ -3824,7 +3870,10 @@ def main(page: ft.Page):
                     empty_recycle(), refresh_recycle(), show_toast("已清空", "green"))),
                 ft.Divider(),
                 ft.Text("🧠 AI 引擎设置", size=20),
-                free_key_input, ft.ElevatedButton("保存密钥", on_click=save_keys),
+                provider_dropdown,
+                free_key_input,
+                deepseek_key_input,
+                ft.ElevatedButton("保存密钥", on_click=save_keys),
                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
                         test_conn_result]),
                 ft.Divider(),
@@ -3835,12 +3884,11 @@ def main(page: ft.Page):
                 ft.Text("所有数据都保存在此文件夹中", size=13, color="#888888"),
                 ft.Row([
                     ft.Text(f"📂 {DATA_DIR}", size=14, expand=True, selectable=True),
-                    ft.Text(f"🔍 {DIAG_TEXT}", size=10, color="#888888", selectable=True),
-                    ft.Text(f"🔍 {DIAG_TEXT}", size=10, color="#888888", selectable=True),
-                    ft.ElevatedButton("📂 切换文件夹",
-                                      on_click=lambda e: sync_folder_picker.get_directory_path(),
-                                      icon=ft.Icons.FOLDER_OPEN),
                 ], spacing=10),
+                ft.Text(f"🔍 {DIAG_TEXT}", size=10, color="#888888", selectable=True),
+                ft.ElevatedButton("📂 切换文件夹",
+                                  on_click=lambda e: sync_folder_picker.get_directory_path(),
+                                  icon=ft.Icons.FOLDER_OPEN),
                 ft.Text("长按路径可复制", size=12, color="#888888"),
                 sync_status_text,
                 ft.Divider(),
@@ -3850,7 +3898,9 @@ def main(page: ft.Page):
                                       on_click=lambda e: backup_picker.get_directory_path(),
                                       icon=ft.Icons.BACKUP),
                     ft.ElevatedButton("📥 恢复数据",
-                                      on_click=lambda e: restore_picker.get_directory_path(),
+                                      on_click=lambda e: restore_picker.pick_files(
+                                          file_type=ft.FilePickerFileType.CUSTOM,
+                                          allowed_extensions=["zip"]),
                                       icon=ft.Icons.RESTORE),
                 ], spacing=10),
                 backup_status,
@@ -3891,4 +3941,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)       
+    ft.app(target=main)
