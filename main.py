@@ -1645,6 +1645,20 @@ def main(page: ft.Page):
                 ball_container.top = ball_state["ball_y"]
                 ball_container.right = None
                 ball_container.bottom = None
+                if contact_panel.visible:
+                    panel_w = 220
+                    panel_h = 420
+                    bx = ball_state["ball_x"]
+                    by = ball_state["ball_y"]
+                    if bx < w / 2:
+                        panel_x = bx + 64
+                    else:
+                        panel_x = bx - panel_w - 8
+                    panel_y = by
+                    panel_x = max(8, min(panel_x, w - panel_w - 8))
+                    panel_y = max(8, min(panel_y, h - panel_h - 8))
+                    contact_panel.left = panel_x
+                    contact_panel.top = panel_y
                 page.update()
 
             def on_ball_pan_end(e):
@@ -1766,6 +1780,14 @@ def main(page: ft.Page):
             def build_chat_window(subject, initial_message=None, auto_send=False):
                 nonlocal stop_flag, generation_active
                 display_name = subject if subject != "总AI" else "总AI"
+                try:
+                    _cfg = load_ai_config()
+                    _provider_key = _cfg.get("provider", "zhipu")
+                    _provider_name = PROVIDERS.get(_provider_key, PROVIDERS["zhipu"])["name"]
+                    _model_name = PROVIDERS.get(_provider_key, PROVIDERS["zhipu"])["model"]
+                except Exception:
+                    _provider_name = "AI"
+                    _model_name = ""
                 history = load_chat_history(subject)
                 context_messages = []
                 for msg in history[-20:]:
@@ -1796,28 +1818,111 @@ def main(page: ft.Page):
                 all_messages = [{"role": "system", "content": system_prompt}]
                 for msg in context_messages[-15:]:
                     all_messages.append(msg)
-                chat_history_display = ft.ListView(spacing=12, expand=True)
-                chat_input = ft.TextField(
-                    label=f"向{display_name}老师提问...",
-                    multiline=True, min_lines=2, max_lines=5)
-                send_btn = ft.ElevatedButton("发送", icon=ft.Icons.SEND)
-                stop_btn = ft.TextButton("停止生成", visible=False)
-                chat_status = ft.Text("", size=14)
-                for msg in history:
-                    is_user = msg["role"] == "user"
-                    chat_history_display.controls.append(
+
+                chat_history_display = ft.ListView(spacing=12, expand=True, auto_scroll=True)
+
+                def make_user_bubble(text):
+                    return ft.Row([
+                        ft.Container(expand=True),
                         ft.Container(
-                            content=ft.Column([
-                                ft.Text("你" if is_user else display_name, size=12,
-                                        weight=ft.FontWeight.BOLD,
-                                        color="#FF8A65" if is_user else "#66BB6A"),
-                                ft.Text(msg["content"], size=14),
-                            ], spacing=4),
-                            padding=10, border_radius=14,
-                            bgcolor="#33FF8A65" if is_user else "#33226622",
-                            blur=8))
-                if initial_message:
-                    chat_input.value = initial_message
+                            content=ft.Text(text, size=14, selectable=True, color="#FFFFFF"),
+                            padding=ft.Padding(left=14, right=14, top=10, bottom=10),
+                            border_radius=ft.BorderRadius(16, 16, 4, 16),
+                            bgcolor="#FF8A65",
+                            shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
+                            max_width=280,
+                        ),
+                    ], alignment=ft.MainAxisAlignment.END)
+
+                def make_ai_bubble(text, can_regenerate=True):
+                    content_col = ft.Column([
+                        ft.Text(text, size=14, selectable=True, color="#EEEEEE"),
+                    ], spacing=4)
+                    action_row = ft.Row([
+                        ft.IconButton(
+                            icon=ft.Icons.COPY_OUTLINED, icon_size=16, tooltip="复制",
+                            icon_color="#888888",
+                            on_click=lambda e, t=text: (page.set_clipboard(t), show_toast("已复制", "green"))),
+                        ft.IconButton(
+                            icon=ft.Icons.REFRESH, icon_size=16, tooltip="重新生成",
+                            icon_color="#888888",
+                            on_click=lambda e: regenerate_last(),
+                        ) if can_regenerate else ft.Container(width=0),
+                    ], spacing=2, tight=True)
+                    bubble = ft.Container(
+                        content=ft.Column([content_col, action_row], spacing=4),
+                        padding=ft.Padding(left=14, right=8, top=10, bottom=6),
+                        border_radius=ft.BorderRadius(16, 16, 16, 4),
+                        bgcolor="#26262E",
+                        border=ft.border.all(1, "#3A3A45"),
+                        shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
+                        max_width=300,
+                    )
+                    return ft.Row([
+                        bubble,
+                        ft.Container(expand=True),
+                    ], alignment=ft.MainAxisAlignment.START), content_col
+
+                for msg in history:
+                    if msg["role"] == "user":
+                        chat_history_display.controls.append(make_user_bubble(msg["content"]))
+                    else:
+                        bubble_row, _ = make_ai_bubble(msg["content"])
+                        chat_history_display.controls.append(bubble_row)
+
+                chat_input = ft.TextField(
+                    hint_text=f"向{display_name}老师提问...",
+                    multiline=True, min_lines=1, max_lines=8,
+                    border_radius=20,
+                    border_color="#3A3A45",
+                    focused_border_color="#FF8A65",
+                    filled=True,
+                    fill_color="#1F1F26",
+                    text_size=14,
+                    content_padding=ft.Padding(left=14, right=14, top=10, bottom=10),
+                    expand=True,
+                )
+                send_btn = ft.Container(
+                    content=ft.Icon(ft.Icons.ARROW_UPWARD, size=20, color="#FFFFFF"),
+                    width=40, height=40, border_radius=20,
+                    bgcolor="#FF8A65",
+                    alignment=ft.alignment.center,
+                    on_click=lambda e: handle_send(),
+                    ink=True,
+                    shadow=ft.BoxShadow(blur_radius=8, color="#44FF8A65"),
+                )
+                stop_btn = ft.TextButton("停止生成", visible=False)
+
+                quick_row = ft.Row([
+                    ft.Container(
+                        content=ft.Text("再讲一遍", size=12, color="#CCCCCC"),
+                        padding=ft.Padding(left=12, right=12, top=6, bottom=6),
+                        border_radius=14, bgcolor="#26262E",
+                        border=ft.border.all(1, "#3A3A45"),
+                        on_click=lambda e: handle_send("请再用更简单的方式讲一遍"),
+                        ink=True),
+                    ft.Container(
+                        content=ft.Text("举个例子", size=12, color="#CCCCCC"),
+                        padding=ft.Padding(left=12, right=12, top=6, bottom=6),
+                        border_radius=14, bgcolor="#26262E",
+                        border=ft.border.all(1, "#3A3A45"),
+                        on_click=lambda e: handle_send("请举一个具体例子"),
+                        ink=True),
+                    ft.Container(
+                        content=ft.Text("出类似的题", size=12, color="#CCCCCC"),
+                        padding=ft.Padding(left=12, right=12, top=6, bottom=6),
+                        border_radius=14, bgcolor="#26262E",
+                        border=ft.border.all(1, "#3A3A45"),
+                        on_click=lambda e: handle_send("出一道类似的题让我练练"),
+                        ink=True),
+                ], spacing=8, scroll=ft.ScrollMode.AUTO)
+
+                last_user_msg = {"text": ""}
+                ai_content_ref = {"col": None}
+
+                def regenerate_last():
+                    if last_user_msg["text"]:
+                        handle_send(last_user_msg["text"])
 
                 def handle_send(msg_text=None):
                     nonlocal generation_active, stop_flag
@@ -1826,25 +1931,30 @@ def main(page: ft.Page):
                         return
                     if not msg_text:
                         chat_input.value = ""
-                    chat_history_display.controls.append(
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Text("你", size=12, weight=ft.FontWeight.BOLD, color="#FF8A65"),
-                                ft.Text(content, size=14),
-                            ], spacing=4),
-                            padding=10, border_radius=14, bgcolor="#33FF8A65", blur=8))
+                    last_user_msg["text"] = content
+                    chat_history_display.controls.append(make_user_bubble(content))
                     send_btn.visible = False
                     stop_btn.visible = True
-                    chat_status.value = "⏳ 生成中..."
                     page.update()
                     save_chat_message(subject, "user", content)
                     current_messages = list(all_messages)
                     current_messages.append({"role": "user", "content": content})
                     ai_response = ""
 
+                    bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False)
+                    ai_content_ref["col"] = content_col
+                    chat_history_display.controls.append(bubble_row)
+                    page.update()
+
                     def on_chunk(text):
                         nonlocal ai_response
                         ai_response = text
+                        try:
+                            if ai_content_ref["col"] and len(ai_content_ref["col"].controls) > 0:
+                                ai_content_ref["col"].controls[0].value = text if text else "▌"
+                                page.update()
+                        except Exception:
+                            pass
 
                     def ai_thread():
                         nonlocal generation_active, stop_flag, ai_response
@@ -1854,20 +1964,13 @@ def main(page: ft.Page):
                             call_ai_stream(current_messages, "auto", on_chunk)
                         finally:
                             generation_active = False
-                        if len(chat_history_display.controls) > 0:
-                            last_child = chat_history_display.controls[-1]
-                            if hasattr(last_child, 'bgcolor') and last_child.bgcolor == "#33226622":
-                                chat_history_display.controls.pop()
-                        chat_history_display.controls.append(
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Text(display_name, size=12, weight=ft.FontWeight.BOLD, color="#66BB6A"),
-                                    ft.Text(ai_response if ai_response else "（无回应）", size=14),
-                                ], spacing=4),
-                                padding=10, border_radius=14, bgcolor="#33226622", blur=8))
+                        try:
+                            if ai_content_ref["col"] and len(ai_content_ref["col"].controls) > 0:
+                                ai_content_ref["col"].controls[0].value = ai_response if ai_response else "（无回应）"
+                        except Exception:
+                            pass
                         send_btn.visible = True
                         stop_btn.visible = False
-                        chat_status.value = ""
                         if ai_response:
                             save_chat_message(subject, "assistant", ai_response)
                             update_chat_memory(subject, content, ai_response)
@@ -1875,8 +1978,6 @@ def main(page: ft.Page):
                         page.update()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
-
-                send_btn.on_click = lambda e: handle_send()
 
                 def stop_generation(e):
                     nonlocal stop_flag
@@ -1891,17 +1992,31 @@ def main(page: ft.Page):
                     show_toast("✅ 对话历史已清除", "green")
 
                 result_col = ft.Column([
-                    ft.Row([
-                        ft.Text(f"💬 {display_name} 对话", size=20, weight=ft.FontWeight.BOLD),
-                        ft.TextButton("🗑️ 清除历史", on_click=clear_history),
-                        ft.IconButton(icon=ft.Icons.CLOSE,
-                                      on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Divider(),
-                    ft.Container(content=chat_history_display, expand=True),
-                    ft.Row([chat_input, send_btn, stop_btn], spacing=10),
-                    chat_status,
-                ], spacing=10, expand=True)
+                    ft.Container(
+                        content=ft.Row([
+                            ft.Column([
+                                ft.Text(f"💬 {display_name}", size=18, weight=ft.FontWeight.BOLD),
+                                ft.Text(f"{_provider_name} · {_model_name}", size=11, color="#888888"),
+                            ], spacing=2, expand=True),
+                            ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_size=20,
+                                          tooltip="清除历史", on_click=clear_history),
+                            ft.IconButton(icon=ft.Icons.CLOSE, icon_size=22,
+                                          on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        padding=ft.Padding(left=4, right=4, top=8, bottom=8),
+                    ),
+                    ft.Divider(height=1, color="#2F2F38"),
+                    ft.Container(content=chat_history_display, expand=True, padding=ft.Padding(left=4, right=4, top=8, bottom=8)),
+                    quick_row,
+                    ft.Container(
+                        content=ft.Row([
+                            chat_input,
+                            send_btn,
+                            stop_btn,
+                        ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.END),
+                        padding=ft.Padding(left=0, right=0, top=6, bottom=4),
+                    ),
+                ], spacing=6, expand=True)
                 if auto_send and initial_message:
                     def trigger():
                         time.sleep(0.4)
