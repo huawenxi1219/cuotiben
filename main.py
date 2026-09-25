@@ -714,38 +714,53 @@ def auto_tag_error(timestamp):
     api_key = _cfg.get(_info["key_field"], "").strip()
     if not api_key:
         return
-    prompt = f"""你是一个专业的高中教师。请分析以下错题，并严格按照JSON格式输出标签信息：
-{{
-  "knowledge_point": "三级知识点",
-  "sub_knowledge": "四级细分题型",
-  "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他",
-  "difficulty": 1-5,
-  "reason": "简短错误分析"
-}}
+    prompt = f"""你是一个专业的高中老师。请给下面这道错题打 5-8 个标签。
+
+标签要覆盖以下角度（不必每个都有，但尽量丰富）：
+- 知识点（如：二次函数、导数应用、电磁感应）
+- 题型（如：求最值、证明题、实验题）
+- 易错点（如：忽略定义域、符号错误、单位漏写）
+- 方法（如：配方法、数形结合、控制变量法）
+- 难度（如：基础、中档、压轴）
+- 陷阱（如：分类讨论遗漏、隐含条件）
+
+要求：
+- 每个标签 2-6 个字，简洁
+- 不要重复
+- 不要出现"数学""题目"这种无意义的词
+
 题目内容：
-{content_text[:500]}
-只输出JSON。"""
+{content_text[:600]}
+
+返回 JSON：
+{{"tags": ["标签1", "标签2", "标签3", "标签4", "标签5"], "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他", "difficulty": 1-5, "reason": "简短错误分析"}}
+只输出 JSON。"""
     try:
         resp = requests.post(_info["url"],
                              headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                              json={"model": _info["model"], "messages": [{"role": "user", "content": prompt}],
-                                   "temperature": 0.3, "max_tokens": 300}, timeout=30)
+                                   "temperature": 0.3, "max_tokens": 500}, timeout=30)
         if resp.status_code == 200:
             content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             try:
                 tag_data = json.loads(content)
             except BaseException:
-                match = re.search(r'\{[^}]+\}', content)
+                match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
                 tag_data = json.loads(match.group()) if match else {}
-            tags = [target.get("subject", "")]
-            if tag_data.get("knowledge_point"):
-                tags.append(tag_data["knowledge_point"])
-            if tag_data.get("sub_knowledge"):
-                tags.append(tag_data["sub_knowledge"])
+            subject = target.get("subject", "")
+            ai_tags = tag_data.get("tags", [])
+            if not isinstance(ai_tags, list):
+                ai_tags = []
+            ai_tags = [str(t).strip() for t in ai_tags if str(t).strip()]
+            tags = [subject]
+            for t in ai_tags:
+                if t and t != subject and t not in tags:
+                    tags.append(t)
             if len(tags) <= 1:
                 fallback_kp = extract_keywords_fallback(content_text)
                 if fallback_kp:
                     tags.append(fallback_kp)
+            tags = tags[:9]
             error_type = tag_data.get("error_type", "")
             difficulty = tag_data.get("difficulty", 0)
             errors = load_jsonl(ERRORS_FILE)
@@ -756,21 +771,21 @@ def auto_tag_error(timestamp):
                     err["difficulty"] = difficulty
                     break
             save_jsonl(ERRORS_FILE, errors)
-            subject = target.get("subject", "")
             if subject:
                 update_weak_subject(subject, 0.1)
-            if tag_data.get("knowledge_point"):
-                update_weak_knowledge(f"{subject}-{tag_data['knowledge_point']}", 0.15)
-                update_knowledge_memory(f"{subject}-{tag_data['knowledge_point']}",
+            kp_main = tags[1] if len(tags) > 1 else ""
+            if kp_main:
+                update_weak_knowledge(f"{subject}-{kp_main}", 0.15)
+                update_knowledge_memory(f"{subject}-{kp_main}",
                                         summary=tag_data.get("reason", ""), error_type=error_type)
-                log_learning_event("error_analyzed", subject, kp=tag_data['knowledge_point'],
+                log_learning_event("error_analyzed", subject, kp=kp_main,
                                    detail=tag_data.get("reason", ""), difficulty=difficulty)
             if error_type:
                 profile = load_user_profile()
                 profile["error_types"][error_type] = profile["error_types"].get(error_type, 0) + 1
                 save_user_profile(profile)
-            if tag_data.get("knowledge_point"):
-                add_recent_focus(f"{subject}-{tag_data['knowledge_point']}")
+            if kp_main:
+                add_recent_focus(f"{subject}-{kp_main}")
     except BaseException:
         pass
 
@@ -913,7 +928,44 @@ def extract_keywords_fallback(text):
         if re.search(pattern, text):
             return kp
     return ""
-
+def weighted_search_errors(items, query):
+    """多关键词加权搜索错题。返回 (按分数降序的items, 分数map)"""
+    if not query or not query.strip():
+        return items, {}
+    keywords = [k.strip().lower() for k in query.split() if k.strip()]
+    if not keywords:
+        return items, {}
+    scored = []
+    for idx, item in enumerate(items):
+        tags = [str(t).lower() for t in item.get("tags", [])]
+        original = str(item.get("original", "") or item.get("question", "")).lower()
+        mistake = str(item.get("mistake", "")).lower()
+        total_score = 0
+        for kw in keywords:
+            kw_score = 0
+            hit_tags = []
+            for tag in tags:
+                if kw == tag:
+                    kw_score += 10
+                    hit_tags.append(tag)
+                elif kw in tag or tag in kw:
+                    kw_score += 6
+                    hit_tags.append(tag)
+            if kw in original:
+                kw_score += 3
+            if kw in mistake:
+                kw_score += 2
+            if kw_score > 0 and len(hit_tags) >= 2:
+                kw_score += 2
+            total_score += kw_score
+        if total_score > 0:
+            scored.append((idx, total_score))
+    if not scored:
+        return [], {}
+    scored.sort(key=lambda x: -x[1])
+    ordered_items = [items[i] for i, _ in scored]
+    score_map = {i: s for i, s in scored}
+    return ordered_items, score_map
 
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
@@ -2728,30 +2780,31 @@ def main(page: ft.Page):
                     return re.sub(r'\s+', ' ', t).strip()
 
                 search_input = ft.TextField(
-                    label="🔍 智能搜索错题",
-                    hint_text="输入知识点或描述，如：我想复习导数",
+                    label="🔍 搜索错题",
+                    hint_text="多个词用空格分隔，如：导数 单调性 易错",
                     expand=True, border_color="#FF8A65", border_width=2)
-                search_btn = ft.ElevatedButton("搜索", on_click=lambda e: perform_search(e),
-                                               icon=ft.Icons.SEARCH, bgcolor="#FF8A65",
-                                               color=ft.Colors.WHITE)
+                local_search_btn = ft.ElevatedButton(
+                    "搜索", on_click=lambda e: do_local_search(), icon=ft.Icons.SEARCH,
+                    bgcolor="#FF8A65", color=ft.Colors.WHITE)
+                ai_search_btn = ft.TextButton(
+                    "🤖 AI 深度搜索", on_click=lambda e: perform_search(e))
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
-                search_row = ft.Row([search_input, search_btn], spacing=10)
+                search_row = ft.Row([search_input, local_search_btn, ai_search_btn], spacing=10)
                 list_view = ft.ListView(spacing=10, expand=True)
 
-                def render_list(items_to_show=None, highlight_set=None):
+                def render_list(display_list=None):
                     list_view.controls.clear()
-                    if items_to_show is None:
-                        items_to_show = subject_items
-                    if highlight_set is None:
-                        highlight_set = set()
-                    if not items_to_show:
+                    if display_list is None:
+                        display_list = [(it, None) for it in subject_items]
+                    if not display_list:
                         list_view.controls.append(ft.Container(
                             content=ft.Text("  暂无错题", size=16, color=ft.Colors.GREY_500),
                             padding=20))
                         page.update()
                         return
-                    for idx, item in enumerate(items_to_show):
+                    for idx, pair in enumerate(display_list):
                         try:
+                            item, score = pair
                             original = item.get("original", "")
                             mistake = item.get("mistake", "")
                             answer = item.get("answer", "")
@@ -2759,8 +2812,11 @@ def main(page: ft.Page):
                             q_media = item.get("question_media", []) or item.get("question_images", [])
                             ts_clean = clean_time_str(item.get("time", ""))
                             tags = item.get("tags", [])
-                            tag_text = "、".join(tags) if tags else "未分类"
-                            is_highlighted = idx in highlight_set
+                            shown_tags = tags[:3]
+                            tag_text = "、".join(shown_tags) if shown_tags else "未分类"
+                            if len(tags) > 3:
+                                tag_text += f" +{len(tags) - 3}"
+                            is_highlighted = score is not None and score > 0
                             bg_color = "#3D3A28" if is_highlighted else "#1F1F26"
                             status = item.get("status", "未看")
                             status_color = {"未看": "#9E9E9E", "已看": "#4CAF50",
@@ -2807,7 +2863,7 @@ def main(page: ft.Page):
                                 padding=ft.Padding(left=6, right=6, top=2, bottom=2),
                                 bgcolor="#2F2F38", border_radius=8)
 
-                            def make_show_detail_card(item_data=item, tags=tags):
+                            def make_show_detail_card(item_data=item):
                                 def show(e):
                                     detail_children = []
                                     detail_children.append(ft.Text("📋 错题详情", size=20,
@@ -2832,10 +2888,19 @@ def main(page: ft.Page):
                                         detail_children.append(
                                             ft.Text(f"💡 理解：{item_data['idea']}",
                                                     size=14, color="#90CAF9", selectable=True))
-                                    if tags:
+                                    tags_now = item_data.get("tags", [])
+                                    if tags_now:
+                                        tag_chips = ft.Row(spacing=6, wrap=True)
+                                        for t in tags_now:
+                                            tag_chips.controls.append(ft.Container(
+                                                content=ft.Text(t, size=12, color="#FFCCBC"),
+                                                bgcolor="#3A2A22", border_radius=10,
+                                                padding=ft.Padding(left=8, right=8, top=3, bottom=3),
+                                                border=ft.border.all(1, "#6B4A3A")))
                                         detail_children.append(
-                                            ft.Text(f"🏷️ 标签：{', '.join(tags)}",
-                                                    size=13, color=ft.Colors.GREY_400))
+                                            ft.Text(f"🏷️ 标签（{len(tags_now)}个）：", size=13,
+                                                    color=ft.Colors.GREY_400))
+                                        detail_children.append(tag_chips)
                                     all_media = []
                                     all_media.extend(item_data.get("question_media", []))
                                     all_media.extend(item_data.get("original_media", []))
@@ -2938,7 +3003,7 @@ def main(page: ft.Page):
                                     tags_input_edit = ft.TextField(
                                         label="标签（逗号分隔）",
                                         value=", ".join(item_data.get("tags", [])),
-                                        multiline=False)
+                                        multiline=True, min_lines=2)
                                     status_dropdown = ft.Dropdown(
                                         label="标记状态",
                                         options=[ft.dropdown.Option("未看"), ft.dropdown.Option("已看"),
@@ -3046,6 +3111,28 @@ def main(page: ft.Page):
                                             color="#EF5350"), padding=20))
                     page.update()
 
+                def do_local_search(e=None):
+                    q = search_input.value.strip()
+                    if not q:
+                        render_list(None)
+                        search_status.value = ""
+                        search_status.color = ft.Colors.GREY_500
+                        page.update()
+                        return
+                    _, score_map = weighted_search_errors(subject_items, q)
+                    if not score_map:
+                        search_status.value = f"❌ 本地没有匹配「{q}」的错题"
+                        search_status.color = "#FFB74D"
+                        render_list([])
+                        page.update()
+                        return
+                    ranked = sorted(score_map.items(), key=lambda x: -x[1])
+                    display_list = [(subject_items[i], s) for i, s in ranked]
+                    render_list(display_list)
+                    search_status.value = f"✅ 本地加权搜索：{len(display_list)} 条（按匹配度排序）"
+                    search_status.color = "#81C784"
+                    page.update()
+
                 def perform_search(e):
                     query = search_input.value.strip()
                     if not query:
@@ -3053,7 +3140,7 @@ def main(page: ft.Page):
                         search_status.color = "#FFB74D"
                         page.update()
                         return
-                    search_status.value = f"⏳ AI正在分析：{query}"
+                    search_status.value = f"⏳ AI 正在分析：{query}"
                     search_status.color = "#FF8A65"
                     page.update()
 
@@ -3089,13 +3176,11 @@ def main(page: ft.Page):
                                 if matches and isinstance(matches, list):
                                     highlight_indices = [m - 1 for m in matches if 1 <= m <= len(subject_items)]
                                     if highlight_indices:
-                                        matched_items = [subject_items[i] for i in highlight_indices]
-                                        other_items = [item for i, item in enumerate(subject_items)
+                                        matched_items = [(subject_items[i], 99) for i in highlight_indices]
+                                        other_items = [(item, None) for i, item in enumerate(subject_items)
                                                        if i not in highlight_indices]
-                                        sorted_items = matched_items + other_items
-                                        highlight_set = set(range(len(matched_items)))
-                                        render_list(sorted_items, highlight_set)
-                                        search_status.value = f"✅ 找到 {len(highlight_indices)} 个匹配的错题（已置顶）"
+                                        render_list(matched_items + other_items)
+                                        search_status.value = f"✅ AI 找到 {len(highlight_indices)} 个匹配（已置顶）"
                                         search_status.color = "#81C784"
                                     else:
                                         search_status.value = "❌ 未找到匹配的错题"
@@ -3113,10 +3198,11 @@ def main(page: ft.Page):
 
                     threading.Thread(target=do_search, daemon=True).start()
 
+                search_input.on_submit = lambda e: do_local_search()
                 render_list()
                 return ft.Column([
                     ft.Text("📋 错题本", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text("🔍 智能搜索：输入知识点或描述，AI自动匹配并置顶", size=13,
+                    ft.Text("🔍 本地加权搜索（多个词空格分隔）｜AI 深度搜索可选", size=13,
                             color="#FF8A65"),
                     search_row,
                     search_status,
