@@ -1159,14 +1159,31 @@ def main(page: ft.Page):
                     start_index = 0
 
                 total = len(valid_paths)
-                state = {"index": start_index, "controls_visible": True}
+                state = {"index": start_index, "zoomed": False}
 
                 image_view = ft.InteractiveViewer(
                     content=ft.Image(src=valid_paths[start_index], fit=ft.ImageFit.CONTAIN),
-                    min_scale=0.5,
+                    min_scale=1.0,
                     max_scale=6.0,
+                    pan_enabled=True,
+                    scale_enabled=True,
                     expand=True,
-                    boundary_margin=ft.Margin(left=0, right=0, top=0, bottom=0),
+                )
+
+                def toggle_zoom(e=None):
+                    try:
+                        state["zoomed"] = not state["zoomed"]
+                        image_view.scale = 2.0 if state["zoomed"] else 1.0
+                        page.update()
+                    except Exception:
+                        pass
+
+                zoom_hint = ft.Container(
+                    content=ft.Text("双击放大 / 双指缩放", size=11, color="#AAFFFFFF"),
+                    bgcolor="#44000000",
+                    blur=8,
+                    border_radius=12,
+                    padding=ft.Padding(left=12, right=12, top=5, bottom=5),
                 )
 
                 counter_text = ft.Text(
@@ -1178,67 +1195,33 @@ def main(page: ft.Page):
 
                 prev_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_BACK_IOS_NEW, size=22, color="#EEFFFFFF"),
-                    width=48,
-                    height=48,
-                    border_radius=24,
-                    bgcolor="#44000000",
-                    blur=10,
+                    width=48, height=48, border_radius=24,
+                    bgcolor="#44000000", blur=10,
                     alignment=ft.alignment.center,
                     on_click=lambda e: go_prev(e),
-                    animate_opacity=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
-                    opacity=1,
                     ink=True,
                 )
 
                 next_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_FORWARD_IOS, size=22, color="#EEFFFFFF"),
-                    width=48,
-                    height=48,
-                    border_radius=24,
-                    bgcolor="#44000000",
-                    blur=10,
+                    width=48, height=48, border_radius=24,
+                    bgcolor="#44000000", blur=10,
                     alignment=ft.alignment.center,
                     on_click=lambda e: go_next(e),
-                    animate_opacity=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
-                    opacity=1,
                     ink=True,
                 )
 
                 counter_container = ft.Container(
                     content=counter_text,
-                    bgcolor="#44000000",
-                    blur=10,
-                    border_radius=14,
+                    bgcolor="#44000000", blur=10, border_radius=14,
                     padding=ft.Padding(left=14, right=14, top=6, bottom=6),
-                    animate_opacity=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
-                    opacity=1,
                 )
-
-                def set_controls_visible(visible):
-                    state["controls_visible"] = visible
-                    target_op = 1 if visible else 0
-                    prev_btn.opacity = target_op
-                    next_btn.opacity = target_op
-                    counter_container.opacity = target_op
-                    try:
-                        page.update()
-                    except BaseException:
-                        pass
-
-                def on_interaction(e):
-                    if not e or not hasattr(e, 'scale'):
-                        return
-                    s = e.scale
-                    if s > 1.05 and state["controls_visible"]:
-                        set_controls_visible(False)
-                    elif s <= 1.05 and not state["controls_visible"]:
-                        set_controls_visible(True)
-
-                image_view.on_interaction_update = on_interaction
 
                 def update_image(idx):
                     if 0 <= idx < total:
                         state["index"] = idx
+                        state["zoomed"] = False
+                        image_view.scale = 1.0
                         image_view.content = ft.Image(src=valid_paths[idx], fit=ft.ImageFit.CONTAIN)
                         counter_text.value = f"{idx+1} / {total}"
                         try:
@@ -1266,60 +1249,50 @@ def main(page: ft.Page):
 
                 close_btn = ft.Container(
                     content=ft.Icon(ft.Icons.CLOSE, size=24, color="#EEFFFFFF"),
-                    width=44,
-                    height=44,
-                    border_radius=22,
-                    bgcolor="#44000000",
-                    blur=10,
+                    width=44, height=44, border_radius=22,
+                    bgcolor="#44000000", blur=10,
                     alignment=ft.alignment.center,
                     on_click=close_gallery,
                     ink=True,
                 )
 
-                left_area = ft.Container(
-                    content=prev_btn,
-                    alignment=ft.alignment.center_left,
-                    padding=ft.Padding(left=12, right=0, top=0, bottom=0),
-                    expand=True,
-                )
-
-                right_area = ft.Container(
-                    content=next_btn,
-                    alignment=ft.alignment.center_right,
-                    padding=ft.Padding(left=0, right=12, top=0, bottom=0),
-                    expand=True,
-                )
-
-                image_stack = ft.Stack([
-                    ft.Container(bgcolor="#000000", expand=True),
-                    ft.Container(
-                        content=image_view,
-                        expand=True,
-                        alignment=ft.alignment.center,
-                        padding=ft.Padding(left=10, right=10, top=50, bottom=50),
-                    ),
-                    ft.Container(
-                        content=ft.Row([left_area, ft.Container(width=1), right_area], expand=True),
-                        alignment=ft.alignment.center,
-                    ),
-                    ft.Container(
-                        content=ft.Row([close_btn], alignment=ft.MainAxisAlignment.END),
-                        top=8,
-                        right=8,
-                    ),
-                    ft.Container(
-                        content=counter_container,
-                        alignment=ft.alignment.bottom_center,
-                        bottom=16,
-                        left=0,
-                        right=0,
-                    ),
-                ], expand=True)
-
                 gallery_overlay = ft.Container(
                     left=0, top=0, right=0, bottom=0,
-                    bgcolor="#EE000000",
-                    content=image_stack,
+                    bgcolor="#000000",
+                    content=ft.GestureDetector(
+                        content=ft.Stack([
+                            ft.Container(
+                                content=image_view,
+                                expand=True,
+                                alignment=ft.alignment.center,
+                                padding=ft.Padding(left=10, right=10, top=60, bottom=60),
+                            ),
+                            ft.Container(
+                                content=ft.Row([close_btn], alignment=ft.MainAxisAlignment.END),
+                                top=8, right=8,
+                            ),
+                            ft.Container(
+                                content=ft.Row([
+                                    ft.Container(prev_btn, margin=ft.margin.only(right=8)),
+                                    ft.Container(next_btn),
+                                ], alignment=ft.MainAxisAlignment.CENTER, spacing=0),
+                                top=None, left=None, right=None, bottom=None,
+                                expand=True,
+                                alignment=ft.alignment.center,
+                            ),
+                            ft.Container(
+                                content=counter_container,
+                                alignment=ft.alignment.bottom_center,
+                                bottom=16, left=0, right=0,
+                            ),
+                            ft.Container(
+                                content=zoom_hint,
+                                alignment=ft.alignment.top_center,
+                                top=60, left=0, right=0,
+                            ),
+                        ], expand=True),
+                        on_double_tap=toggle_zoom,
+                    ),
                     expand=True,
                 )
                 page.overlay.append(gallery_overlay)
@@ -2284,8 +2257,8 @@ def main(page: ft.Page):
                                             or kws in w.get("meaning", "")]
                             else:
                                 filtered = [w for w in all_words
-                                            if w.get("word", "").lower().startswith(kws)
-                                            or kws in w.get("meaning", "").lower()]
+                                            if w.get("word", "").lower().startswith(kws)]
+                        
                         BATCH = 100
                         total = len(filtered)
                         shown = min(BATCH, total)
