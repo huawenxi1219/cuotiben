@@ -558,13 +558,15 @@ PROVIDERS = {
         "model": "glm-4-flash",
         "vision_model": "glm-4v-flash",
         "key_field": "api_key_free",
+        "supports_vision": True,
     },
     "deepseek": {
         "name": "DeepSeek",
         "url": "https://api.deepseek.com/v1/chat/completions",
         "model": "deepseek-chat",
-        "vision_model": "deepseek-chat",
+        "vision_model": "",
         "key_field": "api_key_deepseek",
+        "supports_vision": False,
     },
 }
 
@@ -575,6 +577,12 @@ def get_api_endpoint():
     info = PROVIDERS.get(provider, PROVIDERS["zhipu"])
     key = cfg.get(info["key_field"], "").strip()
     return key, info["url"], info["model"], info["vision_model"]
+
+
+def provider_supports_vision():
+    cfg = load_ai_config()
+    provider = cfg.get("provider", "zhipu")
+    return PROVIDERS.get(provider, PROVIDERS["zhipu"]).get("supports_vision", False)
 
 
 def get_chat_history_file(subject):
@@ -1151,14 +1159,16 @@ def main(page: ft.Page):
                     start_index = 0
 
                 total = len(valid_paths)
-                state = {"index": start_index, "scale": 1.0, "controls_visible": True}
+                state = {"index": start_index, "controls_visible": True}
 
                 image_view = ft.InteractiveViewer(
                     content=ft.Image(src=valid_paths[start_index], fit=ft.ImageFit.CONTAIN),
                     min_scale=0.5,
                     max_scale=6.0,
                     expand=True,
+                    boundary_margin=ft.Margin(left=0, right=0, top=0, bottom=0),
                 )
+
                 counter_text = ft.Text(
                     f"{start_index+1} / {total}",
                     size=12,
@@ -1210,13 +1220,15 @@ def main(page: ft.Page):
                     prev_btn.opacity = target_op
                     next_btn.opacity = target_op
                     counter_container.opacity = target_op
-                    page.update()
+                    try:
+                        page.update()
+                    except BaseException:
+                        pass
 
                 def on_interaction(e):
                     if not e or not hasattr(e, 'scale'):
                         return
                     s = e.scale
-                    state["scale"] = s
                     if s > 1.05 and state["controls_visible"]:
                         set_controls_visible(False)
                     elif s <= 1.05 and not state["controls_visible"]:
@@ -1229,7 +1241,10 @@ def main(page: ft.Page):
                         state["index"] = idx
                         image_view.content = ft.Image(src=valid_paths[idx], fit=ft.ImageFit.CONTAIN)
                         counter_text.value = f"{idx+1} / {total}"
-                        page.update()
+                        try:
+                            page.update()
+                        except BaseException:
+                            pass
 
                 def go_prev(e):
                     if state["index"] > 0:
@@ -1239,6 +1254,16 @@ def main(page: ft.Page):
                     if state["index"] < total - 1:
                         update_image(state["index"] + 1)
 
+                def close_gallery(e=None):
+                    try:
+                        page.overlay.remove(gallery_overlay)
+                    except BaseException:
+                        pass
+                    try:
+                        page.update()
+                    except BaseException:
+                        pass
+
                 close_btn = ft.Container(
                     content=ft.Icon(ft.Icons.CLOSE, size=24, color="#EEFFFFFF"),
                     width=44,
@@ -1247,7 +1272,7 @@ def main(page: ft.Page):
                     bgcolor="#44000000",
                     blur=10,
                     alignment=ft.alignment.center,
-                    on_click=lambda e: page.close(gallery_dlg),
+                    on_click=close_gallery,
                     ink=True,
                 )
 
@@ -1270,9 +1295,13 @@ def main(page: ft.Page):
                     ft.Container(
                         content=image_view,
                         expand=True,
-                        padding=ft.Padding(left=60, right=60, top=60, bottom=60),
+                        alignment=ft.alignment.center,
+                        padding=ft.Padding(left=10, right=10, top=50, bottom=50),
                     ),
-                    ft.Row([left_area, ft.Container(width=1), right_area], expand=True),
+                    ft.Container(
+                        content=ft.Row([left_area, ft.Container(width=1), right_area], expand=True),
+                        alignment=ft.alignment.center,
+                    ),
                     ft.Container(
                         content=ft.Row([close_btn], alignment=ft.MainAxisAlignment.END),
                         top=8,
@@ -1287,18 +1316,13 @@ def main(page: ft.Page):
                     ),
                 ], expand=True)
 
-                gallery_dlg = ft.AlertDialog(
-                    content=ft.Container(
-                        content=image_stack,
-                        expand=True,
-                        padding=0,
-                        margin=0,
-                    ),
-                    content_padding=0,
-                    inset_padding=ft.Padding(0, 0, 0, 0),
-                    actions=[],
+                gallery_overlay = ft.Container(
+                    left=0, top=0, right=0, bottom=0,
+                    bgcolor="#EE000000",
+                    content=image_stack,
+                    expand=True,
                 )
-                page.open(gallery_dlg)
+                page.overlay.append(gallery_overlay)
                 page.update()
 
             sync_status_text = ft.Text("", size=14)
@@ -1457,6 +1481,9 @@ def main(page: ft.Page):
 
             @retry_request(max_retries=2, base_delay=2)
             def analyze_single_image(image_path):
+                if not provider_supports_vision():
+                    show_toast("当前 API 不支持图像识别，请切换到智谱 GLM", "red")
+                    return None
                 api_key, api_url, _m, vision_model = get_api_endpoint()
                 if not api_key:
                     return None
@@ -1830,19 +1857,31 @@ def main(page: ft.Page):
                             border_radius=ft.BorderRadius(16, 16, 4, 16),
                             bgcolor="#FF8A65",
                             shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
-                            max_width=280,
+                            width=280,
                         ),
                     ], alignment=ft.MainAxisAlignment.END)
 
-                def make_ai_bubble(text, can_regenerate=True):
+                def make_ai_bubble(text, can_regenerate=True, content_ref=None):
+                    if content_ref is None:
+                        content_ref = {"col": None}
                     content_col = ft.Column([
                         ft.Text(text, size=14, selectable=True, color="#EEEEEE"),
                     ], spacing=4)
+                    content_ref["col"] = content_col
+
+                    def _do_copy(e):
+                        try:
+                            current = content_col.controls[0].value or ""
+                            page.set_clipboard(current)
+                            show_toast("已复制", "green")
+                        except Exception:
+                            show_toast("复制失败", "red")
+
                     action_row = ft.Row([
                         ft.IconButton(
                             icon=ft.Icons.COPY_OUTLINED, icon_size=16, tooltip="复制",
                             icon_color="#888888",
-                            on_click=lambda e, t=text: (page.set_clipboard(t), show_toast("已复制", "green"))),
+                            on_click=_do_copy),
                         ft.IconButton(
                             icon=ft.Icons.REFRESH, icon_size=16, tooltip="重新生成",
                             icon_color="#888888",
@@ -1856,7 +1895,7 @@ def main(page: ft.Page):
                         bgcolor="#26262E",
                         border=ft.border.all(1, "#3A3A45"),
                         shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
-                        max_width=300,
+                        width=300,
                     )
                     return ft.Row([
                         bubble,
@@ -1918,46 +1957,57 @@ def main(page: ft.Page):
                 ], spacing=8, scroll=ft.ScrollMode.AUTO)
 
                 last_user_msg = {"text": ""}
-                ai_content_ref = {"col": None}
+                last_ai_content_ref = {"col": None}
 
                 def regenerate_last():
-                    if last_user_msg["text"]:
-                        handle_send(last_user_msg["text"])
+                    if not last_user_msg["text"]:
+                        return
+                    if last_ai_content_ref["col"]:
+                        try:
+                            chat_history_display.controls.pop()
+                        except Exception:
+                            pass
+                    _send_internal(last_user_msg["text"], insert_user_bubble=False)
 
                 def handle_send(msg_text=None):
-                    nonlocal generation_active, stop_flag
-                    content = msg_text if msg_text else chat_input.value.strip()
+                    content = msg_text if msg_text else (chat_input.value or "").strip()
                     if not content:
                         return
                     if not msg_text:
                         chat_input.value = ""
                     last_user_msg["text"] = content
-                    chat_history_display.controls.append(make_user_bubble(content))
+                    _send_internal(content, insert_user_bubble=True)
+
+                def _send_internal(content, insert_user_bubble=True):
+                    nonlocal generation_active, stop_flag
+                    if insert_user_bubble:
+                        chat_history_display.controls.append(make_user_bubble(content))
                     send_btn.visible = False
                     stop_btn.visible = True
                     page.update()
-                    save_chat_message(subject, "user", content)
+                    if insert_user_bubble:
+                        save_chat_message(subject, "user", content)
                     current_messages = list(all_messages)
                     current_messages.append({"role": "user", "content": content})
-                    ai_response = ""
+                    ai_response = {"text": ""}
 
-                    bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False)
-                    ai_content_ref["col"] = content_col
+                    content_ref = {"col": None}
+                    bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref)
+                    last_ai_content_ref["col"] = content_col
                     chat_history_display.controls.append(bubble_row)
                     page.update()
 
                     def on_chunk(text):
-                        nonlocal ai_response
-                        ai_response = text
+                        ai_response["text"] = text
                         try:
-                            if ai_content_ref["col"] and len(ai_content_ref["col"].controls) > 0:
-                                ai_content_ref["col"].controls[0].value = text if text else "▌"
+                            if content_ref["col"] and len(content_ref["col"].controls) > 0:
+                                content_ref["col"].controls[0].value = text if text else "▌"
                                 page.update()
                         except Exception:
                             pass
 
                     def ai_thread():
-                        nonlocal generation_active, stop_flag, ai_response
+                        nonlocal generation_active, stop_flag
                         generation_active = True
                         stop_flag = False
                         try:
@@ -1965,15 +2015,15 @@ def main(page: ft.Page):
                         finally:
                             generation_active = False
                         try:
-                            if ai_content_ref["col"] and len(ai_content_ref["col"].controls) > 0:
-                                ai_content_ref["col"].controls[0].value = ai_response if ai_response else "（无回应）"
+                            if content_ref["col"] and len(content_ref["col"].controls) > 0:
+                                content_ref["col"].controls[0].value = ai_response["text"] if ai_response["text"] else "（无回应）"
                         except Exception:
                             pass
                         send_btn.visible = True
                         stop_btn.visible = False
-                        if ai_response:
-                            save_chat_message(subject, "assistant", ai_response)
-                            update_chat_memory(subject, content, ai_response)
+                        if ai_response["text"]:
+                            save_chat_message(subject, "assistant", ai_response["text"])
+                            update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
                         page.update()
 
@@ -2017,9 +2067,12 @@ def main(page: ft.Page):
                         padding=ft.Padding(left=0, right=0, top=6, bottom=4),
                     ),
                 ], spacing=6, expand=True)
+
+                if initial_message:
+                    chat_input.value = initial_message
                 if auto_send and initial_message:
                     def trigger():
-                        time.sleep(0.4)
+                        time.sleep(0.6)
                         handle_send()
                     threading.Thread(target=trigger, daemon=True).start()
                 return result_col
@@ -2215,15 +2268,24 @@ def main(page: ft.Page):
                     all_vocab = load_jsonl(VOCAB_FILE)
                     all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
                     vocab_list_view = ft.ListView(spacing=2, expand=True)
-                    search_field = ft.TextField(label="🔍 搜索单词", hint_text="输入英文或中文", expand=True)
+                    search_field = ft.TextField(label="🔍 搜索单词", hint_text="英文前缀或中文关键词", expand=True)
                     count_text = ft.Text(f"共 {len(all_words)} 词", size=13, color=ft.Colors.GREY_500)
 
                     def _render_list(keyword=""):
                         vocab_list_view.controls.clear()
-                        kw = keyword.strip().lower()
+                        kw = keyword.strip()
+                        kws = kw.lower()
                         filtered = all_words
-                        if kw:
-                            filtered = [w for w in all_words if kw in w.get("word", "").lower() or kw in w.get("meaning", "").lower()]
+                        if kws:
+                            has_chinese = bool(re.search(r'[\u4e00-\u9fff]', kws))
+                            if has_chinese:
+                                filtered = [w for w in all_words
+                                            if kws in w.get("word", "").lower()
+                                            or kws in w.get("meaning", "")]
+                            else:
+                                filtered = [w for w in all_words
+                                            if w.get("word", "").lower().startswith(kws)
+                                            or kws in w.get("meaning", "").lower()]
                         BATCH = 100
                         total = len(filtered)
                         shown = min(BATCH, total)
@@ -2285,8 +2347,23 @@ def main(page: ft.Page):
                                 show_toast("请选择 .jsonl 文件", "red")
                                 return
                             try:
-                                shutil.copy(file_path, VOCAB_FILE)
-                                show_toast("✅ 词汇导入成功！", "green")
+                                imported = load_jsonl(file_path)
+                                if not imported:
+                                    show_toast("文件内容为空", "red")
+                                    return
+                                existing = load_jsonl(VOCAB_FILE)
+                                existing_words = {w.get("word", "").lower() for w in existing}
+                                added = 0
+                                for w in imported:
+                                    wd = w.get("word", "").lower()
+                                    if not wd or wd in existing_words:
+                                        continue
+                                    ensure_learning_field(w)
+                                    existing.append(w)
+                                    existing_words.add(wd)
+                                    added += 1
+                                save_jsonl(VOCAB_FILE, existing)
+                                show_toast(f"✅ 已追加 {added} 个词", "green")
                                 nonlocal all_vocab, all_words
                                 all_vocab = load_jsonl(VOCAB_FILE)
                                 all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
@@ -3106,7 +3183,6 @@ def main(page: ft.Page):
                             content = item.get("content", "")
                             images = item.get("images", []) or item.get("media", [])
                             ts = item.get("time", "")
-                            ts_int = item.get("timestamp", 0)
                             thumb_container = None
                             if images and len(images) > 0:
                                 first_img = images[0]
@@ -3181,6 +3257,7 @@ def main(page: ft.Page):
 
                             def make_edit_note(item_data=item):
                                 def show(e):
+                                    current_ts = item_data.get("timestamp", 0)
                                     content_input = ft.TextField(label="笔记内容",
                                                                  value=item_data.get("content", ""),
                                                                  multiline=True, min_lines=4)
@@ -3188,7 +3265,7 @@ def main(page: ft.Page):
                                     def save_edit(e):
                                         all_items = load_jsonl(NOTES_FILE)
                                         for d in all_items:
-                                            if d.get("timestamp") == ts_int:
+                                            if d.get("timestamp") == current_ts:
                                                 d["content"] = content_input.value
                                                 break
                                         save_jsonl(NOTES_FILE, all_items)
@@ -3199,7 +3276,7 @@ def main(page: ft.Page):
 
                                     def delete_item(e):
                                         all_items = load_jsonl(NOTES_FILE)
-                                        filtered = [d for d in all_items if d.get("timestamp") != ts_int]
+                                        filtered = [d for d in all_items if d.get("timestamp") != current_ts]
                                         save_jsonl(NOTES_FILE, filtered)
                                         page.close(edit_dlg)
                                         show_toast("🗑️ 已删除", "green")
@@ -4056,4 +4133,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)     
+    ft.app(target=main)
