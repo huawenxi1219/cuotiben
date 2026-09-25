@@ -1159,70 +1159,36 @@ def main(page: ft.Page):
                     start_index = 0
 
                 total = len(valid_paths)
-                state = {"index": start_index, "zoomed": False}
+                state = {"index": start_index}
 
+                img_ctrl = ft.Image(src=valid_paths[start_index], fit=ft.ImageFit.CONTAIN)
                 image_view = ft.InteractiveViewer(
-                    content=ft.Image(src=valid_paths[start_index], fit=ft.ImageFit.CONTAIN),
+                    content=img_ctrl,
                     min_scale=1.0,
                     max_scale=6.0,
                     pan_enabled=True,
                     scale_enabled=True,
+                    constrained=False,
                     expand=True,
-                )
-
-                def toggle_zoom(e=None):
-                    try:
-                        state["zoomed"] = not state["zoomed"]
-                        image_view.scale = 2.0 if state["zoomed"] else 1.0
-                        page.update()
-                    except Exception:
-                        pass
-
-                zoom_hint = ft.Container(
-                    content=ft.Text("双击放大 / 双指缩放", size=11, color="#AAFFFFFF"),
-                    bgcolor="#44000000",
-                    blur=8,
-                    border_radius=12,
-                    padding=ft.Padding(left=12, right=12, top=5, bottom=5),
                 )
 
                 counter_text = ft.Text(
                     f"{start_index+1} / {total}",
                     size=12,
-                    color="#CCFFFFFF",
+                    color="#FFFFFF",
                     weight=ft.FontWeight.W_500,
                 )
 
-                prev_btn = ft.Container(
-                    content=ft.Icon(ft.Icons.ARROW_BACK_IOS_NEW, size=22, color="#EEFFFFFF"),
-                    width=48, height=48, border_radius=24,
-                    bgcolor="#44000000", blur=10,
-                    alignment=ft.alignment.center,
-                    on_click=lambda e: go_prev(e),
-                    ink=True,
-                )
-
-                next_btn = ft.Container(
-                    content=ft.Icon(ft.Icons.ARROW_FORWARD_IOS, size=22, color="#EEFFFFFF"),
-                    width=48, height=48, border_radius=24,
-                    bgcolor="#44000000", blur=10,
-                    alignment=ft.alignment.center,
-                    on_click=lambda e: go_next(e),
-                    ink=True,
-                )
-
-                counter_container = ft.Container(
-                    content=counter_text,
-                    bgcolor="#44000000", blur=10, border_radius=14,
-                    padding=ft.Padding(left=14, right=14, top=6, bottom=6),
-                )
+                def close_gallery(e=None):
+                    try:
+                        page.close(gallery_dlg)
+                    except BaseException:
+                        pass
 
                 def update_image(idx):
                     if 0 <= idx < total:
                         state["index"] = idx
-                        state["zoomed"] = False
-                        image_view.scale = 1.0
-                        image_view.content = ft.Image(src=valid_paths[idx], fit=ft.ImageFit.CONTAIN)
+                        img_ctrl.src = valid_paths[idx]
                         counter_text.value = f"{idx+1} / {total}"
                         try:
                             page.update()
@@ -1237,65 +1203,82 @@ def main(page: ft.Page):
                     if state["index"] < total - 1:
                         update_image(state["index"] + 1)
 
-                def close_gallery(e=None):
-                    try:
-                        page.overlay.remove(gallery_overlay)
-                    except BaseException:
-                        pass
-                    try:
-                        page.update()
-                    except BaseException:
-                        pass
-
                 close_btn = ft.Container(
-                    content=ft.Icon(ft.Icons.CLOSE, size=24, color="#EEFFFFFF"),
-                    width=44, height=44, border_radius=22,
-                    bgcolor="#44000000", blur=10,
+                    content=ft.Icon(ft.Icons.CLOSE, size=26, color="#FFFFFF"),
+                    width=48, height=48, border_radius=24,
+                    bgcolor="#88000000",
                     alignment=ft.alignment.center,
                     on_click=close_gallery,
                     ink=True,
                 )
 
-                gallery_overlay = ft.Container(
-                    left=0, top=0, right=0, bottom=0,
-                    bgcolor="#000000",
-                    content=ft.GestureDetector(
+                counter_container = ft.Container(
+                    content=counter_text,
+                    bgcolor="#88000000", blur=10, border_radius=14,
+                    padding=ft.Padding(left=14, right=14, top=6, bottom=6),
+                )
+
+                left_edge = ft.Container(
+                    content=ft.Icon(ft.Icons.ARROW_BACK_IOS_NEW, size=26, color="#FFFFFF"),
+                    width=56,
+                    bgcolor="#55000000",
+                    alignment=ft.alignment.center,
+                    on_click=go_prev,
+                    ink=True,
+                    expand=True,
+                )
+
+                right_edge = ft.Container(
+                    content=ft.Icon(ft.Icons.ARROW_FORWARD_IOS, size=26, color="#FFFFFF"),
+                    width=56,
+                    bgcolor="#55000000",
+                    alignment=ft.alignment.center,
+                    on_click=go_next,
+                    ink=True,
+                    expand=True,
+                )
+
+                gallery_dlg = ft.AlertDialog(
+                    content=ft.Container(
                         content=ft.Stack([
                             ft.Container(
                                 content=image_view,
+                                left=0, top=0, right=0, bottom=0,
                                 expand=True,
-                                alignment=ft.alignment.center,
-                                padding=ft.Padding(left=10, right=10, top=60, bottom=60),
                             ),
                             ft.Container(
-                                content=ft.Row([close_btn], alignment=ft.MainAxisAlignment.END),
-                                top=8, right=8,
+                                content=left_edge,
+                                left=0,
+                                top=0, bottom=0,
+                                width=56,
+                                expand=False,
                             ),
                             ft.Container(
-                                content=ft.Row([
-                                    ft.Container(prev_btn, margin=ft.margin.only(right=8)),
-                                    ft.Container(next_btn),
-                                ], alignment=ft.MainAxisAlignment.CENTER, spacing=0),
-                                top=None, left=None, right=None, bottom=None,
-                                expand=True,
-                                alignment=ft.alignment.center,
+                                content=right_edge,
+                                right=0,
+                                top=0, bottom=0,
+                                width=56,
+                                expand=False,
+                            ),
+                            ft.Container(
+                                content=close_btn,
+                                top=12, right=12,
                             ),
                             ft.Container(
                                 content=counter_container,
                                 alignment=ft.alignment.bottom_center,
-                                bottom=16, left=0, right=0,
-                            ),
-                            ft.Container(
-                                content=zoom_hint,
-                                alignment=ft.alignment.top_center,
-                                top=60, left=0, right=0,
+                                bottom=20, left=0, right=0,
                             ),
                         ], expand=True),
-                        on_double_tap=toggle_zoom,
+                        bgcolor="#EE000000",
+                        expand=True,
                     ),
-                    expand=True,
+                    content_padding=0,
+                    inset_padding=ft.Padding(0, 0, 0, 0),
+                    actions=[],
                 )
-                page.overlay.append(gallery_overlay)
+
+                page.open(gallery_dlg)
                 page.update()
 
             sync_status_text = ft.Text("", size=14)
