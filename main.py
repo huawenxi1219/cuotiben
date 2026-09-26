@@ -2947,7 +2947,7 @@ def main(page: ft.Page):
                                                         content=ft.Image(src=full_path, width=100, height=100,
                                                                          fit=ft.ImageFit.COVER, border_radius=8),
                                                         on_click=lambda e, paths=unique_media,
-                                                                       idx=unique_media.index(img_path): show_image_gallery(paths, idx, on_close=lambda: show(None)),
+                                                                       idx=unique_media.index(img_path): show_image_gallery(paths, idx),
                                                         ink=True, border_radius=8)
                                                     img_row.controls.append(img)
                                                 except BaseException:
