@@ -1193,7 +1193,7 @@ def main(page: ft.Page):
                     daemon=True
                 ).start()
 
-            def show_image_gallery(image_paths, start_index=0):
+            def show_image_gallery(image_paths, start_index=0, on_close=None):
                 if not image_paths:
                     return
 
@@ -1235,6 +1235,17 @@ def main(page: ft.Page):
                         page.close(gallery_dlg)
                     except BaseException:
                         pass
+                    if on_close:
+                        try:
+                            def _delayed():
+                                time.sleep(0.15)
+                                try:
+                                    on_close()
+                                except BaseException:
+                                    pass
+                            threading.Thread(target=_delayed, daemon=True).start()
+                        except BaseException:
+                            pass
 
                 def update_image(idx):
                     if 0 <= idx < total:
@@ -2936,7 +2947,7 @@ def main(page: ft.Page):
                                                         content=ft.Image(src=full_path, width=100, height=100,
                                                                          fit=ft.ImageFit.COVER, border_radius=8),
                                                         on_click=lambda e, paths=unique_media,
-                                                                       idx=unique_media.index(img_path): show_image_gallery(paths, idx),
+                                                                       idx=unique_media.index(img_path): show_image_gallery(paths, idx, on_close=lambda: show(None)),
                                                         ink=True, border_radius=8)
                                                     img_row.controls.append(img)
                                                 except BaseException:
@@ -3280,7 +3291,7 @@ def main(page: ft.Page):
                                                         content=ft.Image(src=full_path, width=100, height=100,
                                                                          fit=ft.ImageFit.COVER, border_radius=8),
                                                         on_click=lambda e, paths=note_images,
-                                                                       idx=note_images.index(img_path): show_image_gallery(paths, idx),
+                                                                       idx=note_images.index(img_path): show_image_gallery(paths, idx, on_close=lambda: show(None)),
                                                         ink=True, border_radius=8)
                                                     img_row.controls.append(img)
                                                 except BaseException:
