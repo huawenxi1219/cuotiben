@@ -202,6 +202,7 @@ def auto_tag_error(timestamp):
                     err["tags"] = tags
                     err["error_type"] = error_type
                     err["difficulty"] = difficulty
+                    err["tags_done"] = True
                     break
             save_jsonl(ERRORS_FILE, errors)
             subject = target.get("subject", "")

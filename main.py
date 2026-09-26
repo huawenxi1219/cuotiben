@@ -676,7 +676,8 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
         "idea_media": idea_media, "question": original, "question_media": question_media,
         "tags": [subject] + user_tags if user_tags else [subject],
         "error_type": "", "difficulty": 0, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "timestamp": int(time.time()), "deep_analysis": "", "status": "未看"
+        "timestamp": int(time.time()), "deep_analysis": "", "status": "未看",
+        "tags_done": bool(user_tags)
     }
     data.append(entry)
     save_jsonl(ERRORS_FILE, data)
@@ -769,6 +770,7 @@ def auto_tag_error(timestamp):
                     err["tags"] = tags
                     err["error_type"] = error_type
                     err["difficulty"] = difficulty
+                    err["tags_done"] = True
                     break
             save_jsonl(ERRORS_FILE, errors)
             if subject:
@@ -3063,6 +3065,7 @@ def main(page: ft.Page):
                                                 d["answer"] = ans_input.value
                                                 d["idea"] = idea_input.value
                                                 d["tags"] = new_tags
+                                                d["tags_done"] = True
                                                 d["status"] = status_dropdown.value
                                                 d["update_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
                                                 break
@@ -3903,6 +3906,58 @@ def main(page: ft.Page):
             def save_skill(e):
                 save_custom_skill(skill_input.value)
                 show_toast("Skill 已保存", "green")
+            retag_status = ft.Text("", size=13, color="#888888")
+
+            retag_status = ft.Text("", size=13, color="#888888")
+            retag_state = {"running": False}
+
+            def batch_retag(e):
+                if retag_state["running"]:
+                    show_toast("⏳ 正在跑，别点两次", "info")
+                    return
+                all_errors = load_jsonl(ERRORS_FILE)
+                todo = [err for err in all_errors if not err.get("tags_done")]
+                if not todo:
+                    show_toast("✅ 所有错题标签都已打好", "green")
+                    retag_status.value = "✅ 无需重打"
+                    retag_status.color = "#81C784"
+                    page.update()
+                    return
+                total = len(todo)
+                retag_state["running"] = True
+                retag_status.value = f"⏳ 排队中：共 {total} 条待重打"
+                retag_status.color = "#FF8A65"
+                page.update()
+
+                def do_retag():
+                    done = 0
+                    fail = 0
+                    try:
+                        for err in todo:
+                            ts = err.get("timestamp")
+                            if not ts:
+                                continue
+                            try:
+                                auto_tag_error(ts)
+                                check = load_jsonl(ERRORS_FILE)
+                                ok = any(x.get("timestamp") == ts and x.get("tags_done") for x in check)
+                                if ok:
+                                    done += 1
+                                else:
+                                    fail += 1
+                            except BaseException:
+                                fail += 1
+                            retag_status.value = f"⏳ 重打标签 {done+fail}/{total}（成功 {done}，失败 {fail}）"
+                            page.update()
+                            time.sleep(0.8)
+                    finally:
+                        retag_state["running"] = False
+                    retag_status.value = f"✅ 完成：成功 {done} 条，失败 {fail} 条"
+                    retag_status.color = "#81C784"
+                    page.update()
+                    show_toast(f"批量重打完成：成功 {done}，失败 {fail}", "green")
+
+                threading.Thread(target=do_retag, daemon=True).start()
 
             def show_learning_profile(e):
                 profile = load_user_profile()
@@ -4110,8 +4165,9 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
                                   icon=ft.Icons.PERSON_OUTLINE),
-                ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
-                                  icon=ft.Icons.BAR_CHART),
+                ft.ElevatedButton("🏷️ 批量重打标签", on_click=lambda e: batch_retag(e),
+                                  icon=ft.Icons.LABEL),
+                retag_status,
                 ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
                                   icon=ft.Icons.SETTINGS),
                 mine_msg,
