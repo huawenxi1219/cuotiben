@@ -1220,7 +1220,6 @@ def main(page: ft.Page):
                     max_scale=6.0,
                     pan_enabled=True,
                     scale_enabled=True,
-                    constrained=False,
                     expand=True,
                 )
 
@@ -1242,25 +1241,33 @@ def main(page: ft.Page):
                         state["index"] = idx
                         img_ctrl.src = valid_paths[idx]
                         counter_text.value = f"{idx+1} / {total}"
+                        refresh_thumbs()
                         try:
                             page.update()
                         except BaseException:
                             pass
 
-                def go_prev(e):
-                    if state["index"] > 0:
-                        update_image(state["index"] - 1)
-
-                def go_next(e):
-                    if state["index"] < total - 1:
-                        update_image(state["index"] + 1)
+                def open_in_system(e):
+                    try:
+                        idx = state["index"]
+                        p = valid_paths[idx]
+                        page.launch_url(f"file://{p}")
+                    except Exception as ex:
+                        show_toast(f"打开失败：{str(ex)[:40]}", "red")
 
                 close_btn = ft.Container(
-                    content=ft.Icon(ft.Icons.CLOSE, size=26, color="#FFFFFF"),
-                    width=48, height=48, border_radius=24,
-                    bgcolor="#88000000",
+                    content=ft.Icon(ft.Icons.CLOSE, size=22, color="#FFFFFF"),
+                    width=36, height=36, border_radius=18,
                     alignment=ft.alignment.center,
                     on_click=close_gallery,
+                    ink=True,
+                )
+
+                open_btn = ft.Container(
+                    content=ft.Icon(ft.Icons.OPEN_IN_NEW, size=20, color="#FFFFFF"),
+                    width=36, height=36, border_radius=18,
+                    alignment=ft.alignment.center,
+                    on_click=open_in_system,
                     ink=True,
                 )
 
@@ -1270,25 +1277,23 @@ def main(page: ft.Page):
                     padding=ft.Padding(left=14, right=14, top=6, bottom=6),
                 )
 
-                left_edge = ft.Container(
-                    content=ft.Icon(ft.Icons.ARROW_BACK_IOS_NEW, size=26, color="#FFFFFF"),
-                    width=56,
-                    bgcolor="#55000000",
-                    alignment=ft.alignment.center,
-                    on_click=go_prev,
-                    ink=True,
-                    expand=True,
-                )
+                thumbs_row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
 
-                right_edge = ft.Container(
-                    content=ft.Icon(ft.Icons.ARROW_FORWARD_IOS, size=26, color="#FFFFFF"),
-                    width=56,
-                    bgcolor="#55000000",
-                    alignment=ft.alignment.center,
-                    on_click=go_next,
-                    ink=True,
-                    expand=True,
-                )
+                def refresh_thumbs():
+                    thumbs_row.controls.clear()
+                    for i, p in enumerate(valid_paths):
+                        is_active = (i == state["index"])
+                        thumb = ft.Container(
+                            content=ft.Image(src=p, width=48, height=48, fit=ft.ImageFit.COVER),
+                            width=52, height=52,
+                            border_radius=8,
+                            border=ft.border.all(2, "#FF8A65" if is_active else "#666666"),
+                            on_click=lambda e, idx=i: update_image(idx),
+                            ink=True,
+                        )
+                        thumbs_row.controls.append(thumb)
+
+                refresh_thumbs()
 
                 gallery_dlg = ft.AlertDialog(
                     content=ft.Container(
@@ -1299,27 +1304,28 @@ def main(page: ft.Page):
                                 expand=True,
                             ),
                             ft.Container(
-                                content=left_edge,
-                                left=0,
-                                top=0, bottom=0,
-                                width=56,
-                                expand=False,
-                            ),
-                            ft.Container(
-                                content=right_edge,
-                                right=0,
-                                top=0, bottom=0,
-                                width=56,
-                                expand=False,
-                            ),
-                            ft.Container(
                                 content=close_btn,
-                                top=12, right=12,
+                                top=8, left=8,
+                            ),
+                            ft.Container(
+                                content=open_btn,
+                                top=8, right=8,
                             ),
                             ft.Container(
                                 content=counter_container,
+                                alignment=ft.alignment.top_center,
+                                top=12, left=0, right=0,
+                            ),
+                            ft.Container(
+                                content=ft.Container(
+                                    content=thumbs_row,
+                                    bgcolor="#66000000",
+                                    blur=10,
+                                    border_radius=14,
+                                    padding=ft.Padding(left=10, right=10, top=8, bottom=8),
+                                ),
                                 alignment=ft.alignment.bottom_center,
-                                bottom=20, left=0, right=0,
+                                bottom=16, left=16, right=16,
                             ),
                         ], expand=True),
                         bgcolor="#EE000000",
