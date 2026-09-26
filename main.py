@@ -1257,7 +1257,8 @@ def main(page: ft.Page):
 
                 close_btn = ft.Container(
                     content=ft.Icon(ft.Icons.CLOSE, size=22, color="#FFFFFF"),
-                    width=36, height=36, border_radius=18,
+                    width=44, height=44, border_radius=22,
+                    bgcolor="#88000000",
                     alignment=ft.alignment.center,
                     on_click=close_gallery,
                     ink=True,
@@ -1265,16 +1266,11 @@ def main(page: ft.Page):
 
                 open_btn = ft.Container(
                     content=ft.Icon(ft.Icons.OPEN_IN_NEW, size=20, color="#FFFFFF"),
-                    width=36, height=36, border_radius=18,
+                    width=44, height=44, border_radius=22,
+                    bgcolor="#88000000",
                     alignment=ft.alignment.center,
                     on_click=open_in_system,
                     ink=True,
-                )
-
-                counter_container = ft.Container(
-                    content=counter_text,
-                    bgcolor="#88000000", blur=10, border_radius=14,
-                    padding=ft.Padding(left=14, right=14, top=6, bottom=6),
                 )
 
                 thumbs_row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
@@ -1284,10 +1280,10 @@ def main(page: ft.Page):
                     for i, p in enumerate(valid_paths):
                         is_active = (i == state["index"])
                         thumb = ft.Container(
-                            content=ft.Image(src=p, width=48, height=48, fit=ft.ImageFit.COVER),
-                            width=52, height=52,
+                            content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER),
+                            width=48, height=48,
                             border_radius=8,
-                            border=ft.border.all(2, "#FF8A65" if is_active else "#666666"),
+                            border=ft.border.all(2, "#FF8A65" if is_active else "#555555"),
                             on_click=lambda e, idx=i: update_image(idx),
                             ink=True,
                         )
@@ -1295,45 +1291,53 @@ def main(page: ft.Page):
 
                 refresh_thumbs()
 
+                bottom_bar = ft.Container(
+                    content=ft.Row([
+                        counter_text,
+                        ft.Container(width=10),
+                        ft.Container(content=thumbs_row, expand=True),
+                    ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    bgcolor="#66000000",
+                    blur=10,
+                    border_radius=14,
+                    padding=ft.Padding(left=14, right=14, top=8, bottom=8),
+                )
+
+                try:
+                    w = page.width or (page.window.width if page.window else None) or 400
+                    h = page.height or (page.window.height if page.window else None) or 800
+                except Exception:
+                    w, h = 400, 800
+
                 gallery_dlg = ft.AlertDialog(
                     content=ft.Container(
                         content=ft.Stack([
                             ft.Container(
                                 content=image_view,
                                 left=0, top=0, right=0, bottom=0,
-                                expand=True,
                             ),
                             ft.Container(
                                 content=close_btn,
-                                top=8, left=8,
+                                left=14, top=14,
                             ),
                             ft.Container(
                                 content=open_btn,
-                                top=8, right=8,
+                                right=14, top=14,
                             ),
                             ft.Container(
-                                content=counter_container,
-                                alignment=ft.alignment.top_center,
-                                top=12, left=0, right=0,
-                            ),
-                            ft.Container(
-                                content=ft.Container(
-                                    content=thumbs_row,
-                                    bgcolor="#66000000",
-                                    blur=10,
-                                    border_radius=14,
-                                    padding=ft.Padding(left=10, right=10, top=8, bottom=8),
-                                ),
-                                alignment=ft.alignment.bottom_center,
-                                bottom=16, left=16, right=16,
+                                content=bottom_bar,
+                                left=14, right=14, bottom=20,
                             ),
                         ], expand=True),
                         bgcolor="#EE000000",
-                        expand=True,
+                        width=w,
+                        height=h,
                     ),
-                    content_padding=0,
                     inset_padding=ft.Padding(0, 0, 0, 0),
+                    content_padding=0,
+                    title_padding=0,
                     actions=[],
+                    actions_padding=0,
                 )
 
                 page.open(gallery_dlg)
