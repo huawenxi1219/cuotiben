@@ -67,6 +67,31 @@ SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 LEARNING_EVENTS_FILE = os.path.join(DATA_DIR, "learning_events.jsonl")
 VOCAB_SETTINGS_FILE = os.path.join(DATA_DIR, "vocab_settings.json")
 _jsonl_lock = threading.Lock()
+def now_ms():
+    """统一的毫秒级时间戳，以后所有事件时间线都用这个"""
+    return int(time.time() * 1000)
+
+
+def gen_uid():
+    """生成短唯一 ID"""
+    return uuid.uuid4().hex[:16]
+
+
+def dedup_keys(item, extra_fields):
+    """返回一条记录的去重键集合。任意一个键撞上就算重复"""
+    keys = set()
+    eid = item.get("event_id")
+    if eid:
+        keys.add(f"eid:{eid}")
+    parts = []
+    for f in extra_fields:
+        v = item.get(f, "")
+        if isinstance(v, str):
+            v = v[:80].strip()
+        parts.append(str(v))
+    if any(parts):
+        keys.add("c:" + "|".join(parts))
+    return keys
 
 DEFAULT_VOCAB_SETTINGS = {
     "daily_new": 20,
@@ -216,7 +241,218 @@ def update_data_dir(new_path: str):
     for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_LIB_DIR]:
         os.makedirs(d, exist_ok=True)
 
+def merge_restore_from_zip(zip_path):
+    """合并恢复：zip 数据合进当前数据，两边都保留，不覆盖"""
+    stats = {"errors": 0, "notes": 0, "vocab": 0, "sentences": 0, "events": 0, "images": 0}
+    tmp_dir = os.path.join(DATA_DIR, "_restore_tmp")
+    try:
+        if os.path.exists(tmp_dir):
+            shutil.rmtree(tmp_dir)
+        os.makedirs(tmp_dir, exist_ok=True)
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(tmp_dir)
 
+        def _normalize(it):
+            if not it.get("event_id"):
+                it["event_id"] = gen_uid()
+            ts = it.get("timestamp", 0)
+            if isinstance(ts, (int, float)) and ts and ts < 10000000000:
+                it["timestamp"] = int(ts) * 1000
+
+        rules = [
+            ("errors.jsonl", ["subject", "original", "mistake"], ERRORS_FILE, "errors"),
+            ("notes.jsonl", ["subject", "content"], NOTES_FILE, "notes"),
+            ("learning_events.jsonl", ["type", "subject", "kp", "detail"], LEARNING_EVENTS_FILE, "events"),
+        ]
+        for fname, fields, dst_path, stat_key in rules:
+            src = os.path.join(tmp_dir, fname)
+            if not os.path.exists(src):
+                continue
+            incoming = load_jsonl(src)
+            existing = load_jsonl(dst_path)
+            seen = set()
+            for it in existing:
+                seen |= dedup_keys(it, fields)
+            added = 0
+            for it in incoming:
+                _normalize(it)
+                keys = dedup_keys(it, fields)
+                if keys & seen:
+                    continue
+                existing.append(it)
+                seen |= keys
+                added += 1
+            save_jsonl(dst_path, existing)
+            stats[stat_key] = added
+
+        src_v = os.path.join(tmp_dir, "vocabulary.jsonl")
+        if os.path.exists(src_v):
+            incoming = load_jsonl(src_v)
+            existing = load_jsonl(VOCAB_FILE)
+            seen = set(str(w.get("word", "")).lower() for w in existing if w.get("word"))
+            added = 0
+            for w in incoming:
+                word = str(w.get("word", "")).lower()
+                if not word or word in seen:
+                    continue
+                if not w.get("event_id"):
+                    w["event_id"] = gen_uid()
+                existing.append(w)
+                seen.add(word)
+                added += 1
+            save_jsonl(VOCAB_FILE, existing)
+            stats["vocab"] = added
+
+        src_s = os.path.join(tmp_dir, "sentences.jsonl")
+        if os.path.exists(src_s):
+            incoming = load_jsonl(src_s)
+            existing = load_jsonl(SENTENCES_FILE)
+            seen_text = set(s.get("sentence", "") for s in existing)
+            max_id = max([s.get("id", 0) for s in existing], default=0)
+            added = 0
+            for s in incoming:
+                t = s.get("sentence", "")
+                if not t or t in seen_text:
+                    continue
+                max_id += 1
+                s["id"] = max_id
+                if not s.get("event_id"):
+                    s["event_id"] = gen_uid()
+                if not s.get("timestamp"):
+                    s["timestamp"] = now_ms()
+                existing.append(s)
+                seen_text.add(t)
+                added += 1
+            save_jsonl(SENTENCES_FILE, existing)
+            stats["sentences"] = added
+
+        src_t = os.path.join(tmp_dir, "tasks.jsonl")
+        if os.path.exists(src_t):
+            incoming = load_jsonl(src_t)
+            existing = load_jsonl(TASKS_FILE)
+            seen_t = set(t.get("created", "") for t in existing)
+            for t in incoming:
+                c = t.get("created", "")
+                if c and c not in seen_t:
+                    if not t.get("event_id"):
+                        t["event_id"] = gen_uid()
+                    existing.append(t)
+                    seen_t.add(c)
+            save_jsonl(TASKS_FILE, existing)
+
+        src_chat = os.path.join(tmp_dir, "chat_history")
+        if os.path.exists(src_chat):
+            os.makedirs(CHAT_HISTORY_DIR, exist_ok=True)
+            for fname in os.listdir(src_chat):
+                if not fname.endswith(".jsonl"):
+                    continue
+                incoming = load_jsonl(os.path.join(src_chat, fname))
+                dst_f = os.path.join(CHAT_HISTORY_DIR, fname)
+                existing = load_jsonl(dst_f)
+                seen = set(m.get("event_id", "") for m in existing if m.get("event_id"))
+                for m in incoming:
+                    if not m.get("event_id"):
+                        m["event_id"] = gen_uid()
+                    if m["event_id"] in seen:
+                        continue
+                    existing.append(m)
+                    seen.add(m["event_id"])
+                save_jsonl(dst_f, existing)
+
+        for sub in ["images", "videos", "documents"]:
+            src_d = os.path.join(tmp_dir, sub)
+            if not os.path.exists(src_d):
+                continue
+            dst_d = os.path.join(DATA_DIR, sub)
+            os.makedirs(dst_d, exist_ok=True)
+            for fname in os.listdir(src_d):
+                src_f = os.path.join(src_d, fname)
+                dst_f = os.path.join(dst_d, fname)
+                if os.path.isfile(src_f) and not os.path.exists(dst_f):
+                    try:
+                        shutil.copy2(src_f, dst_f)
+                        if sub == "images":
+                            stats["images"] += 1
+                    except BaseException:
+                        pass
+
+        for sub in ["content_lib"]:
+            src_d = os.path.join(tmp_dir, sub)
+            if not os.path.exists(src_d):
+                continue
+            dst_d = os.path.join(DATA_DIR, sub)
+            os.makedirs(dst_d, exist_ok=True)
+            for fname in os.listdir(src_d):
+                src_f = os.path.join(src_d, fname)
+                dst_f = os.path.join(dst_d, fname)
+                if os.path.isfile(src_f) and not os.path.exists(dst_f):
+                    shutil.copy2(src_f, dst_f)
+
+        for fname in ["ai_config.json", "custom_skill.txt", "vocab_settings.json"]:
+            src_f = os.path.join(tmp_dir, fname)
+            dst_f = os.path.join(DATA_DIR, fname)
+            if os.path.exists(src_f) and not os.path.exists(dst_f):
+                shutil.copy2(src_f, dst_f)
+
+        src_p = os.path.join(tmp_dir, "user_profile.json")
+        dst_p = os.path.join(DATA_DIR, "user_profile.json")
+        if os.path.exists(src_p):
+            try:
+                with open(src_p, "r", encoding="utf-8") as f:
+                    sp = json.load(f)
+                if os.path.exists(dst_p):
+                    with open(dst_p, "r", encoding="utf-8") as f:
+                        dp = json.load(f)
+                else:
+                    dp = {}
+                for k in ["weak_subjects", "weak_knowledge", "error_types"]:
+                    sd = sp.get(k, {}) or {}
+                    dd = dp.get(k, {}) or {}
+                    for kk, vv in sd.items():
+                        if isinstance(vv, (int, float)):
+                            dd[kk] = max(dd.get(kk, 0), vv)
+                    dp[k] = dd
+                skm = sp.get("knowledge_memory", {}) or {}
+                dkm = dp.get("knowledge_memory", {}) or {}
+                for kk, vv in skm.items():
+                    if kk not in dkm:
+                        dkm[kk] = vv
+                    elif (vv.get("events", 0) or 0) > (dkm[kk].get("events", 0) or 0):
+                        dkm[kk] = vv
+                dp["knowledge_memory"] = dkm
+                sem = sp.get("error_memory", []) or []
+                dem = dp.get("error_memory", []) or []
+                seen_em = set(e.get("timestamp") for e in dem if e.get("timestamp"))
+                for e in sem:
+                    ts = e.get("timestamp")
+                    if ts and ts not in seen_em:
+                        dem.append(e)
+                        seen_em.add(ts)
+                dp["error_memory"] = dem[-50:]
+                dp["total_errors"] = max(dp.get("total_errors", 0), sp.get("total_errors", 0))
+                dp["total_chats"] = max(dp.get("total_chats", 0), sp.get("total_chats", 0))
+                with open(dst_p, "w", encoding="utf-8") as f:
+                    json.dump(dp, f, ensure_ascii=False, indent=2)
+            except BaseException:
+                pass
+
+        evs = load_jsonl(LEARNING_EVENTS_FILE)
+        if len(evs) > 1000:
+            archive_file = os.path.join(DATA_DIR, "learning_events_archive.jsonl")
+            archive = load_jsonl(archive_file)
+            archive.extend(evs[:-1000])
+            save_jsonl(archive_file, archive)
+            save_jsonl(LEARNING_EVENTS_FILE, evs[-1000:])
+
+        return stats, None
+    except Exception as e:
+        return None, str(e)
+    finally:
+        try:
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir)
+        except BaseException:
+            pass
 def retry_request(max_retries=3, base_delay=2, backoff=2,
                   exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
     def decorator(func):
@@ -266,7 +502,84 @@ def save_jsonl(filepath, data_list):
             for item in data_list:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
+def migrate_timestamps():
+    """一次性迁移：给所有历史数据补 event_id 和毫秒级 timestamp"""
+    marker = os.path.join(DATA_DIR, ".migrated_v2")
+    if os.path.exists(marker):
+        return
+    try:
+        def _ensure(e):
+            changed = False
+            if not e.get("event_id"):
+                e["event_id"] = gen_uid()
+                changed = True
+            ts = e.get("timestamp", 0)
+            if isinstance(ts, (int, float)) and ts and ts < 10000000000:
+                e["timestamp"] = int(ts) * 1000
+                changed = True
+            return changed
 
+        targets = [
+            ERRORS_FILE, NOTES_FILE, LEARNING_EVENTS_FILE, SENTENCES_FILE, TASKS_FILE,
+            os.path.join(DATA_DIR, "learning_events_archive.jsonl"),
+        ]
+        for path in targets:
+            if not os.path.exists(path):
+                continue
+            items = load_jsonl(path)
+            changed = False
+            for it in items:
+                if _ensure(it):
+                    changed = True
+            if changed:
+                save_jsonl(path, items)
+
+        if os.path.exists(CHAT_HISTORY_DIR):
+            for fname in os.listdir(CHAT_HISTORY_DIR):
+                if not fname.endswith(".jsonl"):
+                    continue
+                fp = os.path.join(CHAT_HISTORY_DIR, fname)
+                items = load_jsonl(fp)
+                changed = False
+                for it in items:
+                    if not it.get("event_id"):
+                        it["event_id"] = gen_uid()
+                        changed = True
+                    ts = it.get("timestamp", 0)
+                    if isinstance(ts, (int, float)) and ts and ts < 10000000000:
+                        it["timestamp"] = int(ts) * 1000
+                        changed = True
+                    elif not ts:
+                        try:
+                            dt = datetime.strptime(it.get("time", ""), "%Y-%m-%d %H:%M:%S")
+                            it["timestamp"] = int(dt.timestamp() * 1000)
+                            changed = True
+                        except BaseException:
+                            it["timestamp"] = now_ms()
+                            changed = True
+                if changed:
+                    save_jsonl(fp, items)
+
+        recycle = load_jsonl(RECYCLE_FILE)
+        changed = False
+        for r in recycle:
+            ts = r.get("delete_ts", 0)
+            if isinstance(ts, (int, float)) and ts and ts < 10000000000:
+                r["delete_ts"] = int(ts) * 1000
+                changed = True
+            if not r.get("event_id"):
+                r["event_id"] = gen_uid()
+                changed = True
+            d = r.get("data", {})
+            if d and _ensure(d):
+                changed = True
+        if changed:
+            save_jsonl(RECYCLE_FILE, recycle)
+
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
+    except BaseException as e:
+        print(f"迁移失败：{e}")
 def load_custom_skill():
     if os.path.exists(CUSTOM_SKILL_FILE):
         with open(CUSTOM_SKILL_FILE, "r", encoding="utf-8") as f:
@@ -282,7 +595,8 @@ def save_custom_skill(text):
 def log_learning_event(event_type, subject, kp="", detail="", correct=None, difficulty=None):
     event = {
         "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "timestamp": int(time.time()),
+        "timestamp": now_ms(),
+        "event_id": gen_uid(),
         "type": event_type,
         "subject": subject,
         "kp": kp,
@@ -320,7 +634,8 @@ def add_error_memory(subject, summary, knowledge_point="", discussed=False):
     profile = load_user_profile()
     em = profile.get("error_memory", [])
     em.append({
-        "timestamp": int(time.time()),
+        "timestamp": now_ms(),
+        "event_id": gen_uid(),
         "subject": subject,
         "summary": summary[:200],
         "knowledge_point": knowledge_point,
@@ -597,7 +912,9 @@ def load_chat_history(subject):
 def save_chat_message(subject, role, content):
     fp = get_chat_history_file(subject)
     data = load_jsonl(fp)
-    data.append({"role": role, "content": content, "time": time.strftime("%Y-%m-%d %H:%M:%S")})
+    data.append({"role": role, "content": content,
+                 "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                 "timestamp": now_ms(), "event_id": gen_uid()})
     save_jsonl(fp, data)
 
 
@@ -606,7 +923,7 @@ def move_to_recycle(item):
     recycle.append({
         "original_type": item.get("type"), "data": item,
         "delete_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "delete_ts": int(time.time()),
+        "delete_ts": now_ms(), "event_id": gen_uid(),
     })
     save_jsonl(RECYCLE_FILE, recycle)
 
@@ -676,7 +993,8 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
         "idea_media": idea_media, "question": original, "question_media": question_media,
         "tags": [subject] + user_tags if user_tags else [subject],
         "error_type": "", "difficulty": 0, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "timestamp": int(time.time()), "deep_analysis": "", "status": "未看",
+        "timestamp": now_ms(), "event_id": gen_uid(),
+        "deep_analysis": "", "status": "未看",
         "tags_done": bool(user_tags)
     }
     data.append(entry)
@@ -858,7 +1176,8 @@ def add_sentence(category, sentence, translation="", favorite=False):
     now = time.strftime("%Y-%m-%d %H:%M:%S")
     sentences.append({"id": new_id, "category": category, "sentence": sentence,
                       "translation": translation, "favorite": favorite,
-                      "created": now, "updated": now})
+                      "created": now, "updated": now,
+                      "timestamp": now_ms(), "event_id": gen_uid()})
     save_sentences(sentences)
     return new_id
 
@@ -1074,11 +1393,13 @@ def main(page: ft.Page):
 
         init_vocabulary()
         init_content_lib()
+        migrate_timestamps()
 
         def load_ui():
             page.controls.clear()
             page.update()
             print("=== load_ui 开始 ===")
+            app_state = {"busy": None}
 
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
             if not is_mobile:
@@ -3777,7 +4098,8 @@ def main(page: ft.Page):
                 if text:
                     tasks = load_jsonl(TASKS_FILE)
                     tasks.append({"text": text, "done": False,
-                                  "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+                                  "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                  "timestamp": now_ms(), "event_id": gen_uid()})
                     save_jsonl(TASKS_FILE, tasks)
                     new_task_input.value = ""
                     refresh_tasks()
@@ -3906,8 +4228,6 @@ def main(page: ft.Page):
             def save_skill(e):
                 save_custom_skill(skill_input.value)
                 show_toast("Skill 已保存", "green")
-            retag_status = ft.Text("", size=13, color="#888888")
-
             retag_status = ft.Text("", size=13, color="#888888")
             retag_state = {"running": False}
 
@@ -4067,8 +4387,10 @@ def main(page: ft.Page):
             backup_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
             backup_picker = ft.FilePicker(on_result=lambda e: on_backup_result(e))
             restore_picker = ft.FilePicker(on_result=lambda e: on_restore_result(e))
+            merge_picker = ft.FilePicker(on_result=lambda e: on_merge_result(e))
             page.overlay.append(backup_picker)
             page.overlay.append(restore_picker)
+            page.overlay.append(merge_picker)
 
             def on_backup_result(e: ft.FilePickerResultEvent):
                 if not e.path:
@@ -4084,7 +4406,11 @@ def main(page: ft.Page):
                         zip_path = os.path.join(dest_dir, f"池鱼Study备份_{ts}.zip")
                         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                             for root, dirs, files in os.walk(DATA_DIR):
+                                if "_restore_tmp" in root.split(os.sep):
+                                    continue
                                 for f in files:
+                                    if f.startswith("."):
+                                        continue
                                     full = os.path.join(root, f)
                                     arc = os.path.relpath(full, DATA_DIR)
                                     zf.write(full, arc)
@@ -4118,6 +4444,40 @@ def main(page: ft.Page):
                     page.update()
 
                 threading.Thread(target=do_restore, daemon=True).start()
+
+            def on_merge_result(e: ft.FilePickerResultEvent):
+                if not e.files or len(e.files) == 0:
+                    return
+                if app_state["busy"]:
+                    backup_status.value = f"⏳ 正在「{app_state['busy']}」，先等它跑完"
+                    backup_status.color = "#FFB74D"
+                    page.update()
+                    return
+                zip_path = e.files[0].path
+                app_state["busy"] = "合并恢复"
+                backup_status.value = "⏳ 正在合并恢复..."
+                backup_status.color = "#64B5F6"
+                page.update()
+
+                def do_merge():
+                    try:
+                        stats, err = merge_restore_from_zip(zip_path)
+                        if err:
+                            backup_status.value = f"❌ 合并失败：{err[:80]}"
+                            backup_status.color = "#EF5350"
+                        else:
+                            backup_status.value = (
+                                f"✅ 合并完成！新增 错题 {stats['errors']} · 笔记 {stats['notes']} · "
+                                f"单词 {stats['vocab']} · 金句 {stats['sentences']} · "
+                                f"事件 {stats['events']} · 图片 {stats['images']}"
+                                f"（请重新进入错题本查看）"
+                            )
+                            backup_status.color = "#81C784"
+                    finally:
+                        app_state["busy"] = None
+                    page.update()
+
+                threading.Thread(target=do_merge, daemon=True).start()
 
             def show_vocab_settings_dialog(e):
                 settings_now = load_vocab_settings()
@@ -4208,11 +4568,16 @@ def main(page: ft.Page):
                     ft.ElevatedButton("📤 备份数据",
                                       on_click=lambda e: backup_picker.get_directory_path(),
                                       icon=ft.Icons.BACKUP),
-                    ft.ElevatedButton("📥 恢复数据",
+                    ft.ElevatedButton("📥 覆盖恢复",
                                       on_click=lambda e: restore_picker.pick_files(
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
                                       icon=ft.Icons.RESTORE),
+                    ft.ElevatedButton("🔀 合并恢复",
+                                      on_click=lambda e: merge_picker.pick_files(
+                                          file_type=ft.FilePickerFileType.CUSTOM,
+                                          allowed_extensions=["zip"]),
+                                      icon=ft.Icons.MERGE_TYPE),
                 ], spacing=10),
                 backup_status,
                 ft.Container(height=20),

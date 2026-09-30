@@ -133,7 +133,8 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
         "idea_media": idea_media, "question": original, "question_media": question_media,
         "tags": [subject] + user_tags if user_tags else [subject],
         "error_type": "", "difficulty": 0, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "timestamp": int(time.time()), "deep_analysis": ""
+        "timestamp": now_ms(),
+        "event_id": gen_uid(), "deep_analysis": ""
     }
     data.append(entry)
     save_jsonl(ERRORS_FILE, data)
@@ -669,7 +670,9 @@ def load_chat_history(subject):
 def save_chat_message(subject, role, content):
     fp = get_chat_history_file(subject)
     data = load_jsonl(fp)
-    data.append({"role": role, "content": content, "time": time.strftime("%Y-%m-%d %H:%M:%S")})
+    data.append({"role": role, "content": content,
+                 "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                 "timestamp": now_ms(), "event_id": gen_uid()})
     save_jsonl(fp, data)
 
 def load_user_profile():
@@ -1209,6 +1212,7 @@ def main(page: ft.Page):
     try:
         init_vocabulary()
         init_content_lib()
+        migrate_timestamps()
 
         is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
         if not is_mobile:
