@@ -1287,7 +1287,35 @@ def weighted_search_errors(items, query):
     ordered_items = [items[i] for i, _ in scored]
     score_map = {i: s for i, s in scored}
     return ordered_items, score_map
-
+def extract_chart_block(text):
+    """从 AI 回复中提取图表代码块。返回 (去块后的文本, 图表HTML或None)"""
+    if not text:
+        return text, None
+    m = re.search(r'```(svg|html|echarts)\s*\n(.*?)```', text, re.DOTALL)
+    if not m:
+        return text, None
+    kind = m.group(1)
+    code = m.group(2).strip()
+    clean = (text[:m.start()] + text[m.end():]).strip()
+    if kind == "svg":
+        if "<svg" not in code.lower():
+            return text, None
+        return clean, code
+    if kind == "html":
+        return clean, code
+    if kind == "echarts":
+        wrapped = (
+            "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<script src=\"https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js\"></script>"
+            "<style>body{margin:0;background:#1C1C22}#c{width:100vw;height:100vh}</style>"
+            "</head><body><div id=\"c\"></div><script>"
+            "var chart=echarts.init(document.getElementById('c'),'dark');"
+            + code +
+            "</script></body></html>"
+        )
+        return clean, wrapped
+    return text, None
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
                        '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
@@ -1676,6 +1704,34 @@ def main(page: ft.Page):
 
                 page.open(gallery_dlg)
                 page.update()
+            def show_chart_overlay(html_content):
+                try:
+                    charts_dir = os.path.join(DATA_DIR, "charts")
+                    os.makedirs(charts_dir, exist_ok=True)
+                    fname = f"chart_{int(time.time()*1000)}.html"
+                    fpath = os.path.join(charts_dir, fname)
+                    content = html_content
+                    if "<html" not in content.lower():
+                        content = (
+                            "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+                            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                            "<style>body{margin:0;background:#1C1C22;color:#EEE;font-family:sans-serif;"
+                            "display:flex;align-items:center;justify-content:center;min-height:100vh;"
+                            "padding:10px;box-sizing:border-box}svg{max-width:100%;height:auto}</style>"
+                            "</head><body>" + content + "</body></html>"
+                        )
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    wv = ft.WebView(url=f"file://{fpath}", expand=True)
+                    dlg = ft.AlertDialog(
+                        title=ft.Text("📊 图表"),
+                        content=ft.Container(content=wv, width=420, height=620),
+                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
+                    )
+                    page.open(dlg)
+                    page.update()
+                except Exception as ex:
+                    show_toast(f"渲染失败：{str(ex)[:40]}", "red")
 
             sync_status_text = ft.Text("", size=14)
             sync_folder_picker = ft.FilePicker(on_result=lambda e: on_sync_folder_selected(e))
@@ -2180,6 +2236,16 @@ def main(page: ft.Page):
 - 对于作文类问题，请提供框架和例句。
 - 回答要简洁、准确、有条理。
 - 请主动引用你对这个学生的记忆，让学生感到你了解他。"""
+                system_prompt += """
+
+【可视化规则】
+当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，优先用图形表达：
+- 首选 ```svg 代码块（纯 SVG，含 <svg> 标签，不用 JS，内联样式，用 viewBox 自适应）
+- 需要交互时用 ```echarts 代码块（JS 代码，最后调用 chart.setOption({...})）
+- 不适合图形时用纯文字
+- 一条回复里最多 1 个图形代码块，代码块要独立完整
+- 不支持地图、海报、写实图片、艺术插画
+"""
                 custom_skill = load_custom_skill()
                 if custom_skill:
                     system_prompt += f"\n\n额外的教学指导：{custom_skill}"
@@ -2258,7 +2324,26 @@ def main(page: ft.Page):
                     if msg["role"] == "user":
                         chat_history_display.controls.append(make_user_bubble(msg["content"]))
                     else:
-                        bubble_row, _ = make_ai_bubble(msg["content"])
+                        clean_text, chart_html = extract_chart_block(msg["content"])
+                        bubble_row, content_col = make_ai_bubble(clean_text if clean_text else msg["content"])
+                        if chart_html and content_col:
+                            def make_view(h=chart_html):
+                                def view(e):
+                                    show_chart_overlay(h)
+                                return view
+                            chart_btn = ft.Container(
+                                content=ft.Row([
+                                    ft.Text("📊", size=16),
+                                    ft.Text("查看图表", size=13, color="#FFCCCC"),
+                                ], spacing=4, tight=True),
+                                bgcolor="#3A2A22",
+                                border_radius=12,
+                                padding=ft.Padding(left=12, right=12, top=6, bottom=6),
+                                border=ft.border.all(1, "#6B4A3A"),
+                                on_click=make_view(),
+                                ink=True,
+                            )
+                            content_col.controls.append(chart_btn)
                         chat_history_display.controls.append(bubble_row)
 
                 chat_input = ft.TextField(
@@ -2367,8 +2452,28 @@ def main(page: ft.Page):
                         finally:
                             generation_active = False
                         try:
+                            final_text = ai_response["text"] if ai_response["text"] else "（无回应）"
+                            clean_text, chart_html = extract_chart_block(final_text)
                             if content_ref["col"] and len(content_ref["col"].controls) > 0:
-                                content_ref["col"].controls[0].value = ai_response["text"] if ai_response["text"] else "（无回应）"
+                                content_ref["col"].controls[0].value = clean_text if clean_text else "（无回应）"
+                            if chart_html and content_ref["col"]:
+                                def make_view(h=chart_html):
+                                    def view(e):
+                                        show_chart_overlay(h)
+                                    return view
+                                chart_btn = ft.Container(
+                                    content=ft.Row([
+                                        ft.Text("📊", size=16),
+                                        ft.Text("查看图表", size=13, color="#FFCCCC"),
+                                    ], spacing=4, tight=True),
+                                    bgcolor="#3A2A22",
+                                    border_radius=12,
+                                    padding=ft.Padding(left=12, right=12, top=6, bottom=6),
+                                    border=ft.border.all(1, "#6B4A3A"),
+                                    on_click=make_view(),
+                                    ink=True,
+                                )
+                                content_ref["col"].controls.append(chart_btn)
                         except Exception:
                             pass
                         send_btn.visible = True
@@ -2378,6 +2483,8 @@ def main(page: ft.Page):
                             update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
                         page.update()
+
+                    threading.Thread(target=ai_thread, daemon=True).start()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
 
