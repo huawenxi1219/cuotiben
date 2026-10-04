@@ -1291,30 +1291,27 @@ def extract_chart_block(text):
     """从 AI 回复中提取图表代码块。返回 (去块后的文本, 图表HTML或None)"""
     if not text:
         return text, None
-    m = re.search(r'```(svg|html|echarts)\s*\n(.*?)```', text, re.DOTALL)
-    if not m:
-        return text, None
-    kind = m.group(1)
-    code = m.group(2).strip()
-    clean = (text[:m.start()] + text[m.end():]).strip()
-    if kind == "svg":
-        if "<svg" not in code.lower():
-            return text, None
-        return clean, code
-    if kind == "html":
-        return clean, code
-    if kind == "echarts":
-        wrapped = (
-            "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            "<script src=\"https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js\"></script>"
-            "<style>body{margin:0;background:#1C1C22}#c{width:100vw;height:100vh}</style>"
-            "</head><body><div id=\"c\"></div><script>"
-            "var chart=echarts.init(document.getElementById('c'),'dark');"
-            + code +
-            "</script></body></html>"
-        )
-        return clean, wrapped
+
+    m = re.search(r'```(svg|xml|html|echarts)\s*\n(.*?)```',
+                  text, re.DOTALL | re.IGNORECASE)
+    if m:
+        kind = m.group(1).lower()
+        code = m.group(2).strip()
+        clean = (text[:m.start()] + text[m.end():]).strip()
+        if kind in ("svg", "xml"):
+            if "<svg" in code.lower():
+                return clean, code
+        elif kind == "html":
+            return clean, code
+        elif kind == "echarts":
+            return clean, "ECHARTS_UNSUPPORTED"
+
+    m2 = re.search(r'(<svg[\s\S]*?</svg>)', text, re.IGNORECASE)
+    if m2:
+        svg = m2.group(1).strip()
+        clean = (text[:m2.start()] + text[m2.end():]).strip()
+        return clean, svg
+
     return text, None
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
@@ -1704,28 +1701,27 @@ def main(page: ft.Page):
 
                 page.open(gallery_dlg)
                 page.update()
-            def show_chart_overlay(html_content):
+            def show_chart_overlay(svg_or_html):
                 try:
-                    charts_dir = os.path.join(DATA_DIR, "charts")
-                    os.makedirs(charts_dir, exist_ok=True)
-                    fname = f"chart_{int(time.time()*1000)}.html"
-                    fpath = os.path.join(charts_dir, fname)
-                    content = html_content
-                    if "<html" not in content.lower():
-                        content = (
-                            "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-                            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-                            "<style>body{margin:0;background:#1C1C22;color:#EEE;font-family:sans-serif;"
-                            "display:flex;align-items:center;justify-content:center;min-height:100vh;"
-                            "padding:10px;box-sizing:border-box}svg{max-width:100%;height:auto}</style>"
-                            "</head><body>" + content + "</body></html>"
-                        )
-                    with open(fpath, "w", encoding="utf-8") as f:
-                        f.write(content)
-                    wv = ft.WebView(url=f"file://{fpath}", expand=True)
+                    content = svg_or_html.strip()
+                    if content == "ECHARTS_UNSUPPORTED" or "<html" in content.lower() or "<script" in content.lower():
+                        show_toast("Android 版暂不支持 ECharts，请让 AI 输出 SVG", "red")
+                        return
+                    if "<svg" not in content.lower():
+                        show_toast("不是有效的 SVG", "red")
+                        return
+                    b64 = base64.b64encode(content.encode("utf-8")).decode()
+                    src = f"data:image/svg+xml;base64,{b64}"
                     dlg = ft.AlertDialog(
                         title=ft.Text("📊 图表"),
-                        content=ft.Container(content=wv, width=420, height=620),
+                        content=ft.Container(
+                            content=ft.InteractiveViewer(
+                                content=ft.Image(src=src, fit=ft.ImageFit.CONTAIN),
+                                min_scale=1.0, max_scale=6.0,
+                                pan_enabled=True, scale_enabled=True, expand=True,
+                            ),
+                            width=420, height=620, bgcolor="#1C1C22",
+                        ),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
                     )
                     page.open(dlg)
@@ -2239,15 +2235,18 @@ def main(page: ft.Page):
 
 【继续生成规则】
 - 如果历史对话里最后一条 assistant 消息明显没说完（用户随后说"继续""接着说"等），请直接接着上一条继续写，不要重新开始、不要重复已写内容。
-- 不要输出"[已停止]"之类的元信息。
 
-【可视化规则】
-当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，优先用图形表达：
-- 首选 ```svg 代码块（纯 SVG，含 <svg> 标签，不用 JS，内联样式，用 viewBox 自适应）
-- 需要交互时用 ```echarts 代码块（JS 代码，最后调用 chart.setOption({...})）
+【可视化规则 - 必须遵守】
+- 当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，必须用 ```svg 代码块输出纯 SVG 图。
+- 只能用 SVG，不要用 ECharts、不要用 HTML+JS（Android 端不支持）。
+- SVG 要求：
+  · 必须以 <svg ...> 开头、</svg> 结尾
+  · 必须写 viewBox（如 viewBox="0 0 600 400"），不要写固定 width/height
+  · 用 fill / stroke / 内联 style，不要引用外部资源
+  · 中文字体写 font-family="sans-serif"
+  · 颜色用深色主题配色（背景深、文字浅、重点色 #FF8A65 / #FFB74D / #81C784）
+- 一条回复最多 1 个 SVG 代码块
 - 不适合图形时用纯文字
-- 一条回复里最多 1 个图形代码块，代码块要独立完整
-- 不支持地图、海报、写实图片、艺术插画
 """
                 custom_skill = load_custom_skill()
                 if custom_skill:
@@ -2284,7 +2283,7 @@ def main(page: ft.Page):
 
                 def make_ai_bubble(text, can_regenerate=True, content_ref=None):
                     if content_ref is None:
-                        content_ref = {"col": None, "md": None, "row": None}
+                        content_ref = {"col": None, "md": None, "row": None, "actions": None}
                     md = ft.Markdown(
                         value=text,
                         selectable=True,
@@ -2298,8 +2297,7 @@ def main(page: ft.Page):
 
                     def _do_copy(e):
                         try:
-                            current = md.value or ""
-                            page.set_clipboard(current)
+                            page.set_clipboard(md.value or "")
                             show_toast("已复制", "green")
                         except Exception:
                             show_toast("复制失败", "red")
@@ -2314,21 +2312,22 @@ def main(page: ft.Page):
                         except Exception as ex:
                             show_toast(f"删除失败：{str(ex)[:30]}", "red")
 
-                    action_row = ft.Row([
-                        ft.IconButton(
-                            icon=ft.Icons.COPY_OUTLINED, icon_size=16, tooltip="复制",
-                            icon_color="#888888",
-                            on_click=_do_copy),
-                        ft.IconButton(
-                            icon=ft.Icons.REFRESH, icon_size=16, tooltip="重新生成",
-                            icon_color="#888888",
-                            on_click=lambda e: regenerate_last(),
-                        ) if can_regenerate else ft.Container(width=0),
-                        ft.IconButton(
-                            icon=ft.Icons.DELETE_OUTLINE, icon_size=16, tooltip="删除本条",
-                            icon_color="#888888",
-                            on_click=_delete_self) if can_regenerate else ft.Container(width=0),
-                    ], spacing=2, tight=True)
+                    copy_btn = ft.IconButton(
+                        icon=ft.Icons.COPY_OUTLINED, icon_size=16, tooltip="复制",
+                        icon_color="#888888", on_click=_do_copy, visible=True)
+                    regen_btn = ft.IconButton(
+                        icon=ft.Icons.REFRESH, icon_size=16, tooltip="重新生成",
+                        icon_color="#888888",
+                        on_click=lambda e: regenerate_last(),
+                        visible=can_regenerate)
+                    del_btn = ft.IconButton(
+                        icon=ft.Icons.DELETE_OUTLINE, icon_size=16, tooltip="删除本条",
+                        icon_color="#888888",
+                        on_click=_delete_self,
+                        visible=can_regenerate)
+                    action_row = ft.Row([copy_btn, regen_btn, del_btn], spacing=2, tight=True)
+                    content_ref["actions"] = (regen_btn, del_btn)
+
                     bubble = ft.Container(
                         content=ft.Column([content_col, action_row], spacing=4),
                         padding=ft.Padding(left=14, right=8, top=10, bottom=6),
@@ -2338,10 +2337,8 @@ def main(page: ft.Page):
                         shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
                         width=300,
                     )
-                    row = ft.Row([
-                        bubble,
-                        ft.Container(expand=True),
-                    ], alignment=ft.MainAxisAlignment.START)
+                    row = ft.Row([bubble, ft.Container(expand=True)],
+                                 alignment=ft.MainAxisAlignment.START)
                     content_ref["row"] = row
                     return row, content_col
 
@@ -2449,11 +2446,14 @@ def main(page: ft.Page):
                     page.update()
                     if insert_user_bubble:
                         save_chat_message(subject, "user", content)
-                    current_messages = list(all_messages)
-                    current_messages.append({"role": "user", "content": content})
+                    hist_now = load_chat_history(subject)
+                    rebuilt = [{"role": "system", "content": system_prompt}]
+                    for _m in hist_now[-30:]:
+                        rebuilt.append({"role": _m["role"], "content": _m["content"]})
+                    current_messages = rebuilt
                     ai_response = {"text": ""}
 
-                    content_ref = {"col": None, "md": None, "row": None}
+                    content_ref = {"col": None, "md": None, "row": None, "actions": None}
                     bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref)
                     last_ai_content_ref["col"] = content_col
                     chat_history_display.controls.append(bubble_row)
@@ -2463,7 +2463,7 @@ def main(page: ft.Page):
                     def on_chunk(text):
                         ai_response["text"] = text
                         now = time.time()
-                        if now - last_update_t["t"] < 0.12:
+                        if now - last_update_t["t"] < 0.2:
                             return
                         last_update_t["t"] = now
                         try:
@@ -2510,6 +2510,10 @@ def main(page: ft.Page):
                                     ink=True,
                                 )
                                 content_ref["col"].controls.append(chart_btn)
+                            acts = content_ref.get("actions")
+                            if acts:
+                                acts[0].visible = True
+                                acts[1].visible = True
                         except Exception:
                             pass
                         send_btn.visible = True
@@ -2519,6 +2523,8 @@ def main(page: ft.Page):
                             update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
                         page.update()
+
+                    threading.Thread(target=ai_thread, daemon=True).start()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
 
