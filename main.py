@@ -2196,7 +2196,6 @@ def main(page: ft.Page):
                     accumulated = ""
                     for line in resp.iter_lines(decode_unicode=True):
                         if stop_flag:
-                            on_chunk(accumulated + "\n\n[已停止]")
                             break
                         if line and line.startswith('data: ') and line[6:].strip() != '[DONE]':
                             try:
@@ -2237,6 +2236,10 @@ def main(page: ft.Page):
 - 回答要简洁、准确、有条理。
 - 请主动引用你对这个学生的记忆，让学生感到你了解他。"""
                 system_prompt += """
+
+【继续生成规则】
+- 如果历史对话里最后一条 assistant 消息明显没说完（用户随后说"继续""接着说"等），请直接接着上一条继续写，不要重新开始、不要重复已写内容。
+- 不要输出"[已停止]"之类的元信息。
 
 【可视化规则】
 当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，优先用图形表达：
@@ -2281,19 +2284,35 @@ def main(page: ft.Page):
 
                 def make_ai_bubble(text, can_regenerate=True, content_ref=None):
                     if content_ref is None:
-                        content_ref = {"col": None}
-                    content_col = ft.Column([
-                        ft.Text(text, size=14, selectable=True, color="#EEEEEE"),
-                    ], spacing=4)
+                        content_ref = {"col": None, "md": None, "row": None}
+                    md = ft.Markdown(
+                        value=text,
+                        selectable=True,
+                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+                        code_theme="atom-one-dark",
+                        on_tap_link=lambda e: page.launch_url(e.data),
+                    )
+                    content_col = ft.Column([md], spacing=4)
                     content_ref["col"] = content_col
+                    content_ref["md"] = md
 
                     def _do_copy(e):
                         try:
-                            current = content_col.controls[0].value or ""
+                            current = md.value or ""
                             page.set_clipboard(current)
                             show_toast("已复制", "green")
                         except Exception:
                             show_toast("复制失败", "red")
+
+                    def _delete_self(e):
+                        try:
+                            target_row = content_ref.get("row")
+                            if target_row and target_row in chat_history_display.controls:
+                                chat_history_display.controls.remove(target_row)
+                                page.update()
+                                show_toast("已删除本条", "info")
+                        except Exception as ex:
+                            show_toast(f"删除失败：{str(ex)[:30]}", "red")
 
                     action_row = ft.Row([
                         ft.IconButton(
@@ -2305,6 +2324,10 @@ def main(page: ft.Page):
                             icon_color="#888888",
                             on_click=lambda e: regenerate_last(),
                         ) if can_regenerate else ft.Container(width=0),
+                        ft.IconButton(
+                            icon=ft.Icons.DELETE_OUTLINE, icon_size=16, tooltip="删除本条",
+                            icon_color="#888888",
+                            on_click=_delete_self) if can_regenerate else ft.Container(width=0),
                     ], spacing=2, tight=True)
                     bubble = ft.Container(
                         content=ft.Column([content_col, action_row], spacing=4),
@@ -2315,10 +2338,12 @@ def main(page: ft.Page):
                         shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
                         width=300,
                     )
-                    return ft.Row([
+                    row = ft.Row([
                         bubble,
                         ft.Container(expand=True),
-                    ], alignment=ft.MainAxisAlignment.START), content_col
+                    ], alignment=ft.MainAxisAlignment.START)
+                    content_ref["row"] = row
+                    return row, content_col
 
                 for msg in history:
                     if msg["role"] == "user":
@@ -2428,18 +2453,25 @@ def main(page: ft.Page):
                     current_messages.append({"role": "user", "content": content})
                     ai_response = {"text": ""}
 
-                    content_ref = {"col": None}
+                    content_ref = {"col": None, "md": None, "row": None}
                     bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref)
                     last_ai_content_ref["col"] = content_col
                     chat_history_display.controls.append(bubble_row)
                     page.update()
 
+                    last_update_t = {"t": 0.0}
                     def on_chunk(text):
                         ai_response["text"] = text
+                        now = time.time()
+                        if now - last_update_t["t"] < 0.12:
+                            return
+                        last_update_t["t"] = now
                         try:
-                            if content_ref["col"] and len(content_ref["col"].controls) > 0:
+                            if content_ref.get("md"):
+                                content_ref["md"].value = text if text else "▌"
+                            elif content_ref["col"] and len(content_ref["col"].controls) > 0:
                                 content_ref["col"].controls[0].value = text if text else "▌"
-                                page.update()
+                            page.update()
                         except Exception:
                             pass
 
@@ -2448,13 +2480,17 @@ def main(page: ft.Page):
                         generation_active = True
                         stop_flag = False
                         try:
-                            call_ai_stream(current_messages, "auto", on_chunk)
+                            final_accum = call_ai_stream(current_messages, "auto", on_chunk)
+                            if final_accum is not None:
+                                ai_response["text"] = final_accum
                         finally:
                             generation_active = False
                         try:
                             final_text = ai_response["text"] if ai_response["text"] else "（无回应）"
                             clean_text, chart_html = extract_chart_block(final_text)
-                            if content_ref["col"] and len(content_ref["col"].controls) > 0:
+                            if content_ref.get("md"):
+                                content_ref["md"].value = clean_text if clean_text else "（无回应）"
+                            elif content_ref["col"] and len(content_ref["col"].controls) > 0:
                                 content_ref["col"].controls[0].value = clean_text if clean_text else "（无回应）"
                             if chart_html and content_ref["col"]:
                                 def make_view(h=chart_html):
@@ -2483,6 +2519,8 @@ def main(page: ft.Page):
                             update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
                         page.update()
+
+                    threading.Thread(target=ai_thread, daemon=True).start()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
 
@@ -3243,7 +3281,7 @@ def main(page: ft.Page):
                 search_row = ft.Row([search_input, local_search_btn, ai_search_btn], spacing=10)
                 list_view = ft.ListView(spacing=10, expand=True)
 
-                def render_list(display_list=None):
+                def render_list(display_list=None, matched_count=None):
                     list_view.controls.clear()
                     if display_list is None:
                         display_list = [(it, None) for it in subject_items]
@@ -3253,9 +3291,19 @@ def main(page: ft.Page):
                             padding=20))
                         page.update()
                         return
+                    divider_added = False
                     for idx, pair in enumerate(display_list):
                         try:
                             item, score = pair
+                            is_matched = score is not None and score > 0
+                            if matched_count is not None and not is_matched and not divider_added and idx > 0:
+                                divider_added = True
+                                list_view.controls.append(ft.Container(
+                                    content=ft.Text("──── 以下为其他错题 ────", size=12,
+                                                    color=ft.Colors.GREY_600,
+                                                    text_align=ft.TextAlign.CENTER),
+                                    alignment=ft.alignment.center,
+                                    padding=ft.Padding(left=0, right=0, top=14, bottom=8)))
                             original = item.get("original", "")
                             mistake = item.get("mistake", "")
                             answer = item.get("answer", "")
@@ -3267,7 +3315,7 @@ def main(page: ft.Page):
                             tag_text = "、".join(shown_tags) if shown_tags else "未分类"
                             if len(tags) > 3:
                                 tag_text += f" +{len(tags) - 3}"
-                            is_highlighted = score is not None and score > 0
+                            is_highlighted = is_matched
                             bg_color = "#3D3A28" if is_highlighted else "#1F1F26"
                             status = item.get("status", "未看")
                             status_color = {"未看": "#9E9E9E", "已看": "#4CAF50",
@@ -3573,15 +3621,17 @@ def main(page: ft.Page):
                         return
                     _, score_map = weighted_search_errors(subject_items, q)
                     if not score_map:
-                        search_status.value = f"❌ 本地没有匹配「{q}」的错题"
+                        search_status.value = f"❌ 本地没有匹配「{q}」的错题（下方显示全部）"
                         search_status.color = "#FFB74D"
-                        render_list([])
+                        render_list(None)
                         page.update()
                         return
                     ranked = sorted(score_map.items(), key=lambda x: -x[1])
-                    display_list = [(subject_items[i], s) for i, s in ranked]
-                    render_list(display_list)
-                    search_status.value = f"✅ 本地加权搜索：{len(display_list)} 条（按匹配度排序）"
+                    matched = [(subject_items[i], s) for i, s in ranked]
+                    matched_idx = set(i for i, _ in ranked)
+                    unmatched = [(it, None) for i, it in enumerate(subject_items) if i not in matched_idx]
+                    render_list(matched + unmatched, matched_count=len(matched))
+                    search_status.value = f"✅ 匹配 {len(matched)} 条（已置顶），其余 {len(unmatched)} 条在下"
                     search_status.color = "#81C784"
                     page.update()
 
