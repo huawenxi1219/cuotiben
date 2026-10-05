@@ -1710,13 +1710,17 @@ def main(page: ft.Page):
                     if "<svg" not in content.lower():
                         show_toast("不是有效的 SVG", "red")
                         return
-                    b64 = base64.b64encode(content.encode("utf-8")).decode()
-                    src = f"data:image/svg+xml;base64,{b64}"
+                    svg_dir = os.path.join(DATA_DIR, "charts")
+                    os.makedirs(svg_dir, exist_ok=True)
+                    fname = f"chart_{int(time.time()*1000)}.svg"
+                    fpath = os.path.join(svg_dir, fname)
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        f.write(content)
                     dlg = ft.AlertDialog(
                         title=ft.Text("📊 图表"),
                         content=ft.Container(
                             content=ft.InteractiveViewer(
-                                content=ft.Image(src=src, fit=ft.ImageFit.CONTAIN),
+                                content=ft.Image(src=fpath, fit=ft.ImageFit.CONTAIN),
                                 min_scale=1.0, max_scale=6.0,
                                 pan_enabled=True, scale_enabled=True, expand=True,
                             ),
@@ -2283,21 +2287,24 @@ def main(page: ft.Page):
 
                 def make_ai_bubble(text, can_regenerate=True, content_ref=None):
                     if content_ref is None:
-                        content_ref = {"col": None, "md": None, "row": None, "actions": None}
+                        content_ref = {"col": None, "md": None, "stream": None, "row": None, "actions": None}
+                    stream_text = ft.Text(text or "▌", size=14, selectable=True, color="#EEEEEE")
                     md = ft.Markdown(
-                        value=text,
+                        value="",
                         selectable=True,
                         extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
                         code_theme="atom-one-dark",
                         on_tap_link=lambda e: page.launch_url(e.data),
                     )
-                    content_col = ft.Column([md], spacing=4)
+                    content_col = ft.Column([stream_text], spacing=4)
                     content_ref["col"] = content_col
                     content_ref["md"] = md
+                    content_ref["stream"] = stream_text
 
                     def _do_copy(e):
                         try:
-                            page.set_clipboard(md.value or "")
+                            src = md.value if md.value else (stream_text.value or "")
+                            page.set_clipboard(src)
                             show_toast("已复制", "green")
                         except Exception:
                             show_toast("复制失败", "red")
@@ -2316,7 +2323,7 @@ def main(page: ft.Page):
                         icon=ft.Icons.COPY_OUTLINED, icon_size=16, tooltip="复制",
                         icon_color="#888888", on_click=_do_copy, visible=True)
                     regen_btn = ft.IconButton(
-                        icon=ft.Icons.REFRESH, icon_size=16, tooltip="重新生成",
+                        icon=ft.Icons.REFRESH, icon_size=16, tooltip="重新思考",
                         icon_color="#888888",
                         on_click=lambda e: regenerate_last(),
                         visible=can_regenerate)
@@ -2450,6 +2457,8 @@ def main(page: ft.Page):
                     rebuilt = [{"role": "system", "content": system_prompt}]
                     for _m in hist_now[-30:]:
                         rebuilt.append({"role": _m["role"], "content": _m["content"]})
+                    if (not rebuilt) or rebuilt[-1].get("role") != "user" or rebuilt[-1].get("content") != content:
+                        rebuilt.append({"role": "user", "content": content})
                     current_messages = rebuilt
                     ai_response = {"text": ""}
 
@@ -2463,14 +2472,12 @@ def main(page: ft.Page):
                     def on_chunk(text):
                         ai_response["text"] = text
                         now = time.time()
-                        if now - last_update_t["t"] < 0.2:
+                        if now - last_update_t["t"] < 0.1:
                             return
                         last_update_t["t"] = now
                         try:
-                            if content_ref.get("md"):
-                                content_ref["md"].value = text if text else "▌"
-                            elif content_ref["col"] and len(content_ref["col"].controls) > 0:
-                                content_ref["col"].controls[0].value = text if text else "▌"
+                            if content_ref.get("stream"):
+                                content_ref["stream"].value = text if text else "▌"
                             page.update()
                         except Exception:
                             pass
@@ -2488,10 +2495,10 @@ def main(page: ft.Page):
                         try:
                             final_text = ai_response["text"] if ai_response["text"] else "（无回应）"
                             clean_text, chart_html = extract_chart_block(final_text)
-                            if content_ref.get("md"):
-                                content_ref["md"].value = clean_text if clean_text else "（无回应）"
-                            elif content_ref["col"] and len(content_ref["col"].controls) > 0:
-                                content_ref["col"].controls[0].value = clean_text if clean_text else "（无回应）"
+                            display_text = clean_text if clean_text else "（无回应）"
+                            if content_ref.get("md") and content_ref.get("col"):
+                                content_ref["md"].value = display_text
+                                content_ref["col"].controls[0] = content_ref["md"]
                             if chart_html and content_ref["col"]:
                                 def make_view(h=chart_html):
                                     def view(e):
@@ -2523,12 +2530,6 @@ def main(page: ft.Page):
                             update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
                         page.update()
-
-                    threading.Thread(target=ai_thread, daemon=True).start()
-
-                    threading.Thread(target=ai_thread, daemon=True).start()
-
-                    threading.Thread(target=ai_thread, daemon=True).start()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
 
@@ -4205,14 +4206,44 @@ def main(page: ft.Page):
                         days_left = 365
                     subject_errors = {}
                     for err in errors:
-                        subject_errors[err.get("subject", "未知")] = \
-                            subject_errors.get(err.get("subject", "未知"), 0) + 1
+                        s = err.get("subject", "未知")
+                        subject_errors[s] = subject_errors.get(s, 0) + 1
                     weak_know = sorted(profile.get("weak_knowledge", {}).items(),
                                        key=lambda x: x[1], reverse=True)[:5]
-                    prompt = f"""你是高三学习规划师。距离高考{days_left}天。请生成今日学习计划（纯文本）：
-各科错题数：{json.dumps(subject_errors, ensure_ascii=False)}
-薄弱知识点：{json.dumps(weak_know, ensure_ascii=False)}
-格式：1.总体建议 2.3-5个具体任务（科目+内容+耗时） 3.鼓励语"""
+                    errors_sorted = sorted(errors, key=lambda x: x.get("timestamp", 0), reverse=True)
+                    recent = errors_sorted[:15]
+                    detail_lines = []
+                    for i, e in enumerate(recent):
+                        tags = "、".join(e.get("tags", []))
+                        orig = (e.get("original", "") or e.get("question", ""))[:150]
+                        mistake = e.get("mistake", "")[:100]
+                        answer = e.get("answer", "")[:100]
+                        detail_lines.append(
+                            f"[{i+1}][{e.get('subject', '')}][{tags}]\n"
+                            f"  题目：{orig}\n"
+                            f"  错因：{mistake}\n"
+                            f"  答案：{answer}"
+                        )
+                    error_block = "\n".join(detail_lines) if detail_lines else "（暂无错题）"
+
+                    prompt = f"""你是高三学习规划师，距离高考还有 {days_left} 天。请分析下面这些**真实错题**，给出具体、可执行的学习建议。
+
+【硬性要求】
+- 禁止出现"多练习""加强理解""夯实基础""查漏补缺"这类空话
+- 每条建议必须点名具体题目或具体知识点
+- 指出每道题真正的错误原因（不是照抄"错因"字段，而是从题目推断）
+- 给出 3-5 个今天就能做的任务，每个任务必须包含：科目、具体内容、预计耗时
+- 最后 2-3 句真诚的鼓励，不要套话
+
+【最近错题（按时间倒序）】
+{error_block}
+
+【各科错题数】
+{json.dumps(subject_errors, ensure_ascii=False)}
+
+【系统统计的薄弱知识点】
+{json.dumps(weak_know, ensure_ascii=False)}
+"""
                     api_key, api_url, api_model, _v = get_api_endpoint()
                     if not api_key:
                         target.value = "❌ 未配置 API 密钥"
@@ -4225,7 +4256,7 @@ def main(page: ft.Page):
                                                       "Content-Type": "application/json"},
                                              json={"model": api_model,
                                                    "messages": [{"role": "user", "content": prompt}],
-                                                   "temperature": 0.7, "max_tokens": 800}, timeout=30)
+                                                   "temperature": 0.5, "max_tokens": 1500}, timeout=60)
                         if resp.status_code == 200:
                             target.value = resp.json()["choices"][0]["message"]["content"]
                             target.color = "#FFFFFF"
