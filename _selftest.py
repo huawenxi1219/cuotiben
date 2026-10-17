@@ -2,7 +2,7 @@
 """main.py 改动功能的快速自检脚本（不启动 GUI）。
 用法：在任意临时目录下运行本脚本，DATA_DIR 会指向临时目录，不污染真实数据。
 """
-import os, sys, json, tempfile, shutil
+import os, sys, json, tempfile, shutil, time
 
 APP_DIR = r"C:\myapp"
 sys.path.insert(0, APP_DIR)
@@ -56,7 +56,37 @@ spec = json.loads('{"type":"pie","title":"占比","items":[{"name":"A","value":1
 svg2 = main.render_chart_from_spec(spec)
 check("render pie 正常", svg2 and "<svg" in svg2, f"len={len(svg2) if svg2 else 0}")
 
-# 4. 清理临时目录
+# 4. 手环词表导出 build_band_wordlist
+# apple 现状：level=0, interval=1, 明天到期；新增 banana 为新词（应标记为到期优先）
+vocab2 = main.load_jsonl(main.VOCAB_FILE)
+if not any(w.get("word") == "banana" for w in vocab2):
+    vocab2.append({"word": "banana", "meaning": "香蕉"})
+main.ensure_learning_field(vocab2[-1])
+main.save_jsonl(main.VOCAB_FILE, vocab2)
+wl = main.build_band_wordlist("due", 50)
+check("词表含2词", len(wl["words"]) == 2, f"len={len(wl['words'])}")
+check("词表协议字段", all(k in wl["words"][0] for k in ("w", "m", "e", "i", "lvl", "c", "wc", "next")), str(wl["words"][0].keys()))
+nxt_b = [x for x in wl["words"] if x["w"] == "banana"][0]["next"]
+now_ms = int(time.time() * 1000)
+check("新词导出为到期(3天前)", now_ms - nxt_b > 2 * main.BAND_DAY_MS, f"距今 {(now_ms - nxt_b) / main.BAND_DAY_MS:.1f} 天")
+check("due模式到期词排前", wl["words"][0]["w"] == "banana", wl["words"][0]["w"])
+
+# 5. 手环记录回收 merge_band_records
+recs = [
+    {"word": "apple", "action": "know", "t": "2026-10-18 10:00:00"},
+    {"word": "apple", "action": "know", "t": "2026-10-18 10:00:00"},   # 重复 → 应去重
+    {"word": "banana", "action": "forget", "t": "2026-10-18 10:05:00"},
+    {"word": "banana", "action": "forget", "t": "2026-10-18 10:06:00"},  # 连续错 2 次
+]
+merged, updated, new_due, bad = main.merge_band_records(recs)
+check("回收3条(去重1)", merged == 3, f"merged={merged}")
+check("更新2个词", updated == 2, f"updated={updated}")
+check("新增待复习计数正常", isinstance(new_due, int) and new_due >= 0, f"new_due={new_due}")
+check("连续错词提醒 banana", bad == ["banana"], str(bad))
+Lb = [w for w in main.load_jsonl(main.VOCAB_FILE) if w["word"] == "banana"][0]["learning"]
+check("合并后 banana 重置学习", Lb.get("status") == "learning" and Lb.get("interval") == 1, f"interval={Lb.get('interval')}")
+
+# 6. 清理临时目录
 try:
     shutil.rmtree(tmp, ignore_errors=True)
 except Exception:

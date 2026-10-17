@@ -149,10 +149,16 @@ def schedule_next_review(level):
     return REVIEW_INTERVALS[idx]
 
 
-def update_word_learning(word, result):
-    """SM-2 间隔重复算法：记录每次选择的确切时间，按难度系数动态安排复习"""
+def update_word_learning(word, result, review_time=None):
+    """SM-2 间隔重复算法：记录每次选择的确切时间，按难度系数动态安排复习
+    review_time: 可选，手环同步时传入原始选择时间（格式 YYYY-MM-DD HH:MM:SS）"""
     existing = load_jsonl(VOCAB_FILE)
     now_dt = datetime.now()
+    if review_time:
+        try:
+            now_dt = datetime.strptime(str(review_time).strip(), "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            now_dt = datetime.now()
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
     for i, w in enumerate(existing):
         if w.get("word", "").lower() == word.lower():
@@ -205,6 +211,116 @@ def update_word_learning(word, result):
             existing[i] = w
             break
     save_jsonl(VOCAB_FILE, existing)
+
+
+# ========== 手环背单词：词表导出 / 记录回收（与手环端「池鱼单词」协议一致） ==========
+BAND_DAY_MS = 86400000
+
+
+def _str_to_ms(date_str):
+    """YYYY-MM-DD HH:MM:SS → 毫秒时间戳；解析失败返回 0"""
+    try:
+        dt = datetime.strptime(str(date_str).strip(), "%Y-%m-%d %H:%M:%S")
+        return int(dt.timestamp() * 1000)
+    except Exception:
+        return 0
+
+
+def build_band_wordlist(scope="due", count=50):
+    """按协议生成词表 JSON：{version, words:[{w,m,e,i,lvl,c,wc,next}]}
+    scope: due=今日到期优先 low=熟练度低优先 new=新词优先 all=全部按紧急度"""
+    all_words = load_jsonl(VOCAB_FILE)
+    today = datetime.now().strftime("%Y-%m-%d")
+    now_ms = int(datetime.now().timestamp() * 1000)
+    scored = []
+    for w in all_words:
+        ensure_learning_field(w)
+        L = w["learning"]
+        word = w.get("word", "")
+        if not word:
+            continue
+        lvl = int(L.get("level", 0))
+        status = L.get("status", "new")
+        nxt = L.get("next_review", "")
+        due = 1 if (nxt and nxt <= today) else 0
+        wrong = int(L.get("wrong_count", 0))
+        if scope == "due":
+            key = (-due, lvl, -wrong)          # 到期 > 低熟练 > 错多
+        elif scope == "low":
+            key = (lvl, -due, -wrong)
+        elif scope == "new":
+            key = (0 if status == "new" else 1, lvl, -due)
+        else:  # all
+            key = (-due, lvl, -wrong, w.get("word", "").lower())
+        scored.append((key, w, L, word))
+    scored.sort(key=lambda x: x[0])
+    selected = scored[:max(1, min(count, len(scored)))]
+    words_out = []
+    for _key, w, L, word in selected:
+        last_review = L.get("last_review", "")
+        next_ts = _str_to_ms(last_review)
+        if next_ts <= 0:
+            # 从未学过的新词：标记为 3 天前，手环端会按"到期"优先问
+            next_ts = now_ms - 3 * BAND_DAY_MS
+        words_out.append({
+            "w": word,
+            "m": w.get("meaning", "") or w.get("释义", ""),
+            "e": float(L.get("ease", 2.5)),
+            "i": int(L.get("interval", 0)),
+            "lvl": int(L.get("level", 0)),
+            "c": int(L.get("correct_count", 0)),
+            "wc": int(L.get("wrong_count", 0)),
+            "next": next_ts,
+        })
+    return {"version": 1, "words": words_out}
+
+
+def merge_band_records(records):
+    """智能合并手环学习记录：
+    - 按 (单词, 选择时间) 去重
+    - 用原始选择时间更新手机 SRS（SM-2）
+    - 返回 (回收条数, 更新词数, 新增待复习词数, 连续错词列表)"""
+    seen = set()
+    merged_count = 0
+    words_updated = set()
+    consecutive_wrong = {}
+    today = datetime.now().strftime("%Y-%m-%d")
+    new_due = set()
+    for r in records or []:
+        if not isinstance(r, dict):
+            continue
+        word = r.get("word", "")
+        t = r.get("t", "")
+        action = r.get("action", "")
+        if not word or not t or action not in ("know", "fuzzy", "forget"):
+            continue
+        key = (word.lower(), str(t))
+        if key in seen:
+            continue
+        seen.add(key)
+        merged_count += 1
+        try:
+            update_word_learning(word, action, review_time=t)
+        except Exception:
+            continue
+        words_updated.add(word.lower())
+        if action == "forget":
+            consecutive_wrong[word] = consecutive_wrong.get(word, 0) + 1
+        else:
+            consecutive_wrong[word] = 0
+    # 统计合并后今日待复习新增（更新过的词里 next_review <= 今天 且 状态非 new）
+    if words_updated:
+        for w in load_jsonl(VOCAB_FILE):
+            if w.get("word", "").lower() not in words_updated:
+                continue
+            ensure_learning_field(w)
+            L = w["learning"]
+            if L.get("status") == "new":
+                continue
+            if L.get("next_review", "") and L["next_review"] <= today:
+                new_due.add(w["word"])
+    bad = [w for w, n in consecutive_wrong.items() if n >= 2]
+    return merged_count, len(words_updated), len(new_due), bad
 
 
 def get_today_new_words(limit):
@@ -5130,6 +5246,108 @@ def main(page: ft.Page):
             page.overlay.append(restore_picker)
             page.overlay.append(merge_picker)
 
+            # ---------- 手环背单词 操控中心 ----------
+            band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+            band_scope = ft.Dropdown(
+                label="单词来源",
+                width=170,
+                options=[ft.dropdown.Option("due", "今日到期优先"),
+                         ft.dropdown.Option("low", "熟练度低优先"),
+                         ft.dropdown.Option("new", "新词优先"),
+                         ft.dropdown.Option("all", "全部按紧急度")],
+                value="due")
+            band_count_field = ft.TextField(label="导出数量", value="50", width=120,
+                                            keyboard_type=ft.KeyboardType.NUMBER)
+            band_export_picker = ft.FilePicker(on_result=lambda e: on_band_export_result(e))
+            band_records_picker = ft.FilePicker(on_result=lambda e: on_band_records_result(e))
+            page.overlay.append(band_export_picker)
+            page.overlay.append(band_records_picker)
+
+            def on_band_export_click(e):
+                if app_state["busy"]:
+                    show_toast(f"⏳ 正在「{app_state['busy']}」，先等它跑完", "orange")
+                    return
+                ts = time.strftime("%Y%m%d_%H%M%S")
+                band_export_picker.save_file(
+                    dialog_title="保存词表文件（供手环同步使用）",
+                    file_name=f"池鱼词表_{ts}.json",
+                    file_type=ft.FilePickerFileType.ANY,
+                    allowed_extensions=["json"])
+
+            def on_band_export_result(e: ft.FilePickerResultEvent):
+                try:
+                    count = int((band_count_field.value or "50").strip())
+                except Exception:
+                    count = 50
+                count = max(1, min(count, 2000))
+                try:
+                    payload = build_band_wordlist(band_scope.value or "due", count)
+                except Exception as ex:
+                    band_status.value = f"❌ 生成词表失败：{ex}"
+                    band_status.color = "#EF5350"
+                    page.update()
+                    return
+                n = len(payload["words"])
+
+                def do_save():
+                    try:
+                        if e.path:
+                            with open(e.path, "w", encoding="utf-8") as f:
+                                json.dump(payload, f, ensure_ascii=False)
+                            band_status.value = f"✅ 已导出 {n} 词：{e.path}"
+                        else:
+                            # 保存对话框取消或平台不支持 → 兜底写应用目录
+                            fallback = os.path.join(
+                                DATA_DIR, f"手环词表_{time.strftime('%Y%m%d_%H%M%S')}.json")
+                            with open(fallback, "w", encoding="utf-8") as f:
+                                json.dump(payload, f, ensure_ascii=False)
+                            band_status.value = f"✅ 已生成 {n} 词：{fallback}"
+                        band_status.color = "#81C784"
+                    except Exception as ex:
+                        band_status.value = f"❌ 导出失败：{ex}"
+                        band_status.color = "#EF5350"
+                    page.update()
+
+                threading.Thread(target=do_save, daemon=True).start()
+
+            def on_band_records_click(e):
+                if app_state["busy"]:
+                    show_toast(f"⏳ 正在「{app_state['busy']}」，先等它跑完", "orange")
+                    return
+                band_records_picker.pick_files(
+                    dialog_title="选择手环同步的 records 记录文件",
+                    allowed_extensions=["json"], allow_multiple=False)
+
+            def on_band_records_result(e: ft.FilePickerResultEvent):
+                if not e.files or len(e.files) == 0:
+                    return
+                path = e.files[0].path
+
+                def do_merge():
+                    try:
+                        with open(path, encoding="utf-8") as f:
+                            payload = json.load(f)
+                        records = payload.get("records") if isinstance(payload, dict) else payload
+                        merged, updated, new_due, bad = merge_band_records(records)
+                        msg = (f"📥 回收 {merged} 条\n✏️ 更新 {updated} 个单词\n"
+                               f"📅 新增待复习 {new_due} 个")
+                        if bad:
+                            msg += f"\n\n⚠️ 连续错词提醒：{'、'.join(bad[:10])}"
+                        dlg = ft.AlertDialog(
+                            title=ft.Text("⌚ 手环学习记录已同步"),
+                            content=ft.Text(msg, size=14, selectable=True),
+                            actions=[ft.TextButton("好", on_click=lambda x: page.close(dlg))])
+                        page.open(dlg)
+                    except Exception as ex:
+                        dlg = ft.AlertDialog(
+                            title=ft.Text("⌚ 同步失败"),
+                            content=ft.Text(f"解析记录文件出错：\n{ex}", size=14, selectable=True),
+                            actions=[ft.TextButton("好", on_click=lambda x: page.close(dlg))])
+                        page.open(dlg)
+                    page.update()
+
+                threading.Thread(target=do_merge, daemon=True).start()
+
             def on_backup_result(e: ft.FilePickerResultEvent):
                 if not e.path:
                     return
@@ -5269,6 +5487,16 @@ def main(page: ft.Page):
                 ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
                                   icon=ft.Icons.SETTINGS),
                 mine_msg,
+                ft.Divider(),
+                ft.Text("⌚ 手环背单词", size=20),
+                ft.Row([band_scope, band_count_field]),
+                ft.Row([
+                    ft.ElevatedButton("📤 生成词表", icon=ft.Icons.UPLOAD_FILE,
+                                      on_click=on_band_export_click),
+                    ft.ElevatedButton("📥 导入记录", icon=ft.Icons.DOWNLOAD_DONE,
+                                      on_click=on_band_records_click),
+                ]),
+                band_status,
                 ft.Divider(),
                 ft.Text("✅ 学习任务清单", size=20),
                 ft.Row([new_task_input, ft.ElevatedButton("添加", on_click=add_task)]),
