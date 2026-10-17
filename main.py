@@ -2365,6 +2365,7 @@ def main(page: ft.Page):
             def on_ball_pan_start(e):
                 ball_state["dragging"] = True
                 ball_state["moved"] = False
+                ball_inner.scale = 0.9  # 按压反馈
 
             def on_ball_pan_update(e):
                 if not ball_state["dragging"]:
@@ -2402,6 +2403,7 @@ def main(page: ft.Page):
 
             def on_ball_pan_end(e):
                 ball_state["dragging"] = False
+                ball_inner.scale = 1.0  # 松开恢复
                 try:
                     w = page.width or (page.window.width if page.window else None) or 360
                     h = page.height or (page.window.height if page.window else None) or 640
@@ -2419,6 +2421,7 @@ def main(page: ft.Page):
                 page.update()
 
             def on_ball_tap(e):
+                ball_inner.scale = 1.0
                 if ball_state.get("moved"):
                     ball_state["moved"] = False
                     return
@@ -2427,19 +2430,21 @@ def main(page: ft.Page):
                 else:
                     open_contact_panel(e)
 
+            ball_inner = ft.Container(
+                content=ft.Text("AI", size=20, color="white", weight=ft.FontWeight.BOLD),
+                width=56,
+                height=56,
+                border_radius=28,
+                bgcolor="#DD1C1C22",
+                blur=12,
+                border=ft.border.all(1, ft.Colors.WHITE24),
+                shadow=ft.BoxShadow(blur_radius=22, color="#99000000"),
+                alignment=ft.alignment.center,
+                ink=True,
+                animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+            )
             ai_ball = ft.GestureDetector(
-                content=ft.Container(
-                    content=ft.Text("AI", size=20, color="white", weight=ft.FontWeight.BOLD),
-                    width=56,
-                    height=56,
-                    border_radius=28,
-                    bgcolor="#DD1C1C22",
-                    blur=12,
-                    border=ft.border.all(1, ft.Colors.WHITE24),
-                    shadow=ft.BoxShadow(blur_radius=22, color="#99000000"),
-                    alignment=ft.alignment.center,
-                    ink=True,
-                ),
+                content=ball_inner,
                 drag_interval=20,
                 on_tap=on_ball_tap,
                 on_pan_start=on_ball_pan_start,
@@ -2464,6 +2469,10 @@ def main(page: ft.Page):
                 padding=20,
                 border=ft.border.all(1, ft.Colors.WHITE24),
                 shadow=ft.BoxShadow(blur_radius=30, color="#88000000"),
+                offset=ft.Offset(0, 0.04),
+                animate_offset=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
+                animate_opacity=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
+                opacity=0,
             )
             current_chat_subject = "总AI"
             stop_flag = False
@@ -2479,7 +2488,13 @@ def main(page: ft.Page):
                 current_chat_subject = subject
                 close_contact_panel()
                 chat_dialog.content = build_chat_window(subject, initial_message, auto_send)
+                # 弹入动画：先下沉+透明，再滑上来淡入
+                chat_dialog.offset = ft.Offset(0, 0.04)
+                chat_dialog.opacity = 0
                 chat_dialog.visible = True
+                page.update()
+                chat_dialog.offset = ft.Offset(0, 0)
+                chat_dialog.opacity = 1
                 page.update()
 
             def call_ai_stream(messages, model_name, on_chunk):
@@ -5306,7 +5321,8 @@ def main(page: ft.Page):
                 ft.Container(height=20),
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
-            current_page = ft.Container(expand=True)
+            current_page = ft.Container(expand=True,
+                                        animate_opacity=ft.Animation(220, ft.AnimationCurve.EASE_OUT))
 
             def switch_page(index):
                 if index == 0:
@@ -5315,6 +5331,9 @@ def main(page: ft.Page):
                     current_page.content = subject_page
                 elif index == 2:
                     current_page.content = mine_page
+                current_page.opacity = 0
+                page.update()
+                current_page.opacity = 1
                 page.update()
 
             page.navigation_bar = ft.NavigationBar(
