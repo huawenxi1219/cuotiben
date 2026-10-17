@@ -150,28 +150,58 @@ def schedule_next_review(level):
 
 
 def update_word_learning(word, result):
+    """SM-2 间隔重复算法：记录每次选择的确切时间，按难度系数动态安排复习"""
     existing = load_jsonl(VOCAB_FILE)
-    today = datetime.now().strftime("%Y-%m-%d")
+    now_dt = datetime.now()
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
     for i, w in enumerate(existing):
         if w.get("word", "").lower() == word.lower():
             ensure_learning_field(existing[i])
             L = existing[i]["learning"]
             L["review_count"] = L.get("review_count", 0) + 1
-            L["last_review"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            L["last_review"] = now_str
+            # 初始化 SRS 字段
+            if "ease" not in L or not isinstance(L.get("ease"), (int, float)):
+                L["ease"] = 2.5
+            if "interval" not in L or not isinstance(L.get("interval"), (int, float)):
+                L["interval"] = 0
+            if "history" not in L or not isinstance(L.get("history"), list):
+                L["history"] = []
+            # SM-2 质量分：认识/答对=5，模糊=3，忘记/答错=1
             if result in ("know", "quiz_correct"):
-                L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
-                L["correct_count"] = L.get("correct_count", 0) + 1
-                days = schedule_next_review(L["level"])
-                L["next_review"] = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
-                L["status"] = "mastered" if L["level"] >= 4 else "review"
+                q = 5
             elif result == "fuzzy":
-                L["next_review"] = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-                L["status"] = "learning"
-            elif result in ("forget", "quiz_wrong"):
-                L["level"] = 0
+                q = 3
+            else:  # forget / quiz_wrong
+                q = 1
+            ease = float(L["ease"])
+            interval = int(L["interval"])
+            if q >= 3:
+                if interval == 0:
+                    interval = 1
+                elif interval == 1:
+                    interval = 3
+                else:
+                    interval = max(2, round(interval * ease))
+                ease = max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
+                L["correct_count"] = L.get("correct_count", 0) + 1
+                L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
+                L["status"] = "mastered" if L["level"] >= 4 else "review"
+            else:
+                # 答错/忘记：大幅缩短间隔，降低难度系数，重新进入学习
+                if interval <= 1:
+                    interval = 1
+                else:
+                    interval = max(1, round(interval * 0.3))
+                ease = max(1.3, ease - 0.2)
+                L["level"] = max(0, L.get("level", 0) - 2)
                 L["wrong_count"] = L.get("wrong_count", 0) + 1
-                L["next_review"] = today
                 L["status"] = "learning"
+            L["ease"] = round(ease, 2)
+            L["interval"] = interval
+            L["next_review"] = (now_dt + timedelta(days=interval)).strftime("%Y-%m-%d")
+            L["history"].append({"time": now_str, "action": result})
+            L["history"] = L["history"][-200:]  # 只保留最近 200 次选择记录
             existing[i] = w
             break
     save_jsonl(VOCAB_FILE, existing)
@@ -1033,26 +1063,28 @@ def auto_tag_error(timestamp):
     api_key = _cfg.get(_info["key_field"], "").strip()
     if not api_key:
         return
-    prompt = f"""你是一个专业的高中老师。请给下面这道错题打 5-8 个标签。
+    prompt = f"""你是一个专业的高中老师。请给下面这道错题打尽量多且精准的标签。
 
-标签要覆盖以下角度（不必每个都有，但尽量丰富）：
-- 知识点（如：二次函数、导数应用、电磁感应）
-- 题型（如：求最值、证明题、实验题）
-- 易错点（如：忽略定义域、符号错误、单位漏写）
-- 方法（如：配方法、数形结合、控制变量法）
+标签要覆盖以下角度（每个角度都可打多个，不必每道题都齐，但多多益善）：
+- 知识点（如：二次函数、导数应用、电磁感应、非谓语动词）
+- 题型（如：求最值、证明题、实验题、选择题）
+- 易错点（如：忽略定义域、符号错误、单位漏写、时态混用）
+- 方法（如：配方法、数形结合、控制变量法、排除法）
 - 难度（如：基础、中档、压轴）
-- 陷阱（如：分类讨论遗漏、隐含条件）
+- 陷阱（如：分类讨论遗漏、隐含条件、干扰项设计）
 
 要求：
-- 每个标签 2-6 个字，简洁
+- 至少 8 个标签，最多 30 个，每个都必须精准有用，不要凑数
+- 每个标签 2-8 个字，简洁
 - 不要重复
-- 不要出现"数学""题目"这种无意义的词
+- 不要出现"数学""题目""易错"这种泛泛无意义的词
+- 标签越具体越好（如"氧化还原配平"好于"化学"）
 
 题目内容：
 {content_text[:600]}
 
 返回 JSON：
-{{"tags": ["标签1", "标签2", "标签3", "标签4", "标签5"], "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他", "difficulty": 1-5, "reason": "简短错误分析"}}
+{{"tags": ["标签1", "标签2", "标签3", "标签4", "标签5", "标签6", "标签7", "标签8"], "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他", "difficulty": 1-5, "reason": "简短错误分析"}}
 只输出 JSON。"""
     try:
         resp = requests.post(_info["url"],
@@ -1079,7 +1111,7 @@ def auto_tag_error(timestamp):
                 fallback_kp = extract_keywords_fallback(content_text)
                 if fallback_kp:
                     tags.append(fallback_kp)
-            tags = tags[:9]
+            tags = tags[:30]
             error_type = tag_data.get("error_type", "")
             difficulty = tag_data.get("difficulty", 0)
             errors = load_jsonl(ERRORS_FILE)
@@ -1482,6 +1514,40 @@ def extract_chart_block(text):
     if m2:
         return (text[:m2.start()] + text[m2.end():]).strip(), m2.group(1).strip()
     return text, None
+
+
+def build_ctx(history, max_chars=20000, per_msg_cap=800):
+    """按字符预算从历史中取最近的对话，尽量多带上下文。
+    返回按时间正序的消息列表（每条截断到 per_msg_cap 字符）。"""
+    ctx = []
+    total = 0
+    for msg in reversed(history):
+        c = msg.get("content", "")
+        if not isinstance(c, str) or not c.strip():
+            continue
+        c = c[:per_msg_cap]
+        if total + len(c) > max_chars:
+            break
+        total += len(c)
+        ctx.append({"role": msg["role"], "content": c})
+    ctx.reverse()
+    return ctx
+
+
+def save_svg_chart(svg_text):
+    """把 SVG 图表存成文件，返回路径；失败返回 None"""
+    try:
+        svg_dir = os.path.join(DATA_DIR, "charts")
+        os.makedirs(svg_dir, exist_ok=True)
+        fname = f"chart_{int(time.time()*1000)}.svg"
+        fpath = os.path.join(svg_dir, fname)
+        with open(fpath, "w", encoding="utf-8") as f:
+            f.write(svg_text)
+        return fpath
+    except BaseException:
+        return None
+
+
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
                        '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
@@ -2001,11 +2067,21 @@ def main(page: ft.Page):
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
                 value="数学", width=150,
             )
-            original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3)
-            mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2)
-            answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2)
-            idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2)
-            tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False)
+            original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3,
+                                           border_radius=14, filled=True, fill_color="#1F1F26",
+                                           border_color="#3A3A45", focused_border_color="#FF8A65")
+            mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2,
+                                         border_radius=14, filled=True, fill_color="#1F1F26",
+                                         border_color="#3A3A45", focused_border_color="#FF8A65")
+            answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2,
+                                        border_radius=14, filled=True, fill_color="#1F1F26",
+                                        border_color="#3A3A45", focused_border_color="#FF8A65")
+            idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2,
+                                      border_radius=14, filled=True, fill_color="#1F1F26",
+                                      border_color="#3A3A45", focused_border_color="#FF8A65")
+            tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False,
+                                      border_radius=14, filled=True, fill_color="#1F1F26",
+                                      border_color="#3A3A45", focused_border_color="#FF8A65")
 
             progress_status = ft.Text("", size=14)
             progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
@@ -2037,6 +2113,20 @@ def main(page: ft.Page):
                         page.update()
                         result = analyze_single_image(path)
                         if result:
+                            if result.get("question"):
+                                q_text = str(result["question"]).strip()
+                                if q_text and q_text.lower() != "null":
+                                    if original_input.value.strip():
+                                        original_input.value += "\n\n" + q_text
+                                    else:
+                                        original_input.value = q_text
+                            if result.get("answer"):
+                                a_text = str(result["answer"]).strip()
+                                if a_text and a_text.lower() != "null":
+                                    if answer_input.value.strip():
+                                        answer_input.value += "\n\n" + a_text
+                                    else:
+                                        answer_input.value = a_text
                             if result.get("knowledge_point"):
                                 current_tags = tags_input.value.strip()
                                 if current_tags:
@@ -2069,9 +2159,11 @@ def main(page: ft.Page):
                         img_b64 = base64.b64encode(f.read()).decode("utf-8")
                 except BaseException:
                     return None
-                prompt = """请分析这张图片中的题目内容，并返回以下 JSON 格式：
+                prompt = """请仔细识别这张图片中的题目内容，并返回以下 JSON 格式：
 {
-  "knowledge_point": "该题涉及的知识点（如：三角函数、力学、语法等）",
+  "question": "【最重要】完整、逐字抄录图片中的题目原文，包括题干和全部选项（A. B. C. D. 等）以及图表中的关键文字，一字不差，不要省略、不要概括、不要翻译；如果一张图有多道题，只识别最完整、最清晰的一道题",
+  "answer": "如果图片中可见标准答案或解析，照录答案内容；没有则填空字符串",
+  "knowledge_point": "该题涉及的知识点（如：三角函数、力学、非谓语动词等）",
   "error_type": "学生可能的错因（如：公式记错、审题不清、计算错误）",
   "difficulty": 1-5 的整数（1最简单，5最难）
 }
@@ -2129,7 +2221,9 @@ def main(page: ft.Page):
                 options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]],
                 value="数学", width=150,
             )
-            note_content_input = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=4)
+            note_content_input = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=4,
+                                               border_radius=14, filled=True, fill_color="#1F1F26",
+                                               border_color="#3A3A45", focused_border_color="#FF8A65")
             note_picker_col, note_files, reset_note_picker = make_file_picker_button(
                 "📷 笔记图片（可多选）", "image", on_complete=None)
 
@@ -2144,32 +2238,73 @@ def main(page: ft.Page):
                 reset_note_picker()
                 show_toast(f"✅ {subj} 笔记已保存！", "green")
 
+            # ===== 苹果风 UI 组件 =====
+            def u_section(title, icon=None):
+                """分区标题：小号灰色字 + 细线"""
+                return ft.Row([
+                    ft.Text((icon + "  " if icon else "") + title,
+                            size=13, weight=ft.FontWeight.W_600, color="#8E8E93"),
+                    ft.Container(expand=True, height=1, bgcolor="#2A2A32"),
+                ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+
+            def u_card(content, padding=18, radius=20, bg="#1C1C22"):
+                """苹果风卡片：圆角 + 细边框 + 柔和阴影"""
+                return ft.Container(
+                    content=content,
+                    padding=padding,
+                    border_radius=radius,
+                    bgcolor=bg,
+                    border=ft.border.all(1, "#2A2A32"),
+                    shadow=ft.BoxShadow(blur_radius=14, color="#22000000",
+                                        offset=ft.Offset(0, 4)),
+                )
+
+            def u_primary_btn(text, on_click, icon=None, color="#FF8A65"):
+                """全宽圆角主按钮"""
+                return ft.ElevatedButton(
+                    text, icon=icon, on_click=on_click,
+                    bgcolor=color, color="#FFFFFF",
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=14),
+                        padding=ft.Padding(left=20, right=20, top=14, bottom=14)),
+                    expand=True)
+
             home_page = ft.Column([
-                ft.Container(height=10),
-                ft.Text("📸 拍照录题", size=22, weight=ft.FontWeight.BOLD),
-                ft.Row([subj_dd], spacing=15) if not is_mobile else ft.Column([subj_dd]),
-                original_input,
-                mistake_input,
-                ft.Divider(),
-                ft.Text("🔄 可选补充", size=16),
-                answer_input,
-                idea_input,
-                tags_input,
-                ft.Divider(),
-                ft.Text("📎 附件上传", size=16),
-                picker_col1,
-                picker_col2,
-                picker_col3,
-                progress_row,
-                ft.ElevatedButton("💾 保存错题", on_click=submit_error),
-                ft.Divider(height=20),
-                ft.Text("📝 记笔记", size=22, weight=ft.FontWeight.BOLD),
-                ft.Row([note_subject_dd], spacing=15) if not is_mobile else ft.Column([note_subject_dd]),
-                note_content_input,
-                note_picker_col,
-                ft.ElevatedButton("💾 保存笔记", on_click=submit_note),
-                ft.Container(height=20),
-            ], spacing=15, scroll=ft.ScrollMode.AUTO)
+                ft.Container(height=6),
+                ft.Text("📸 拍照录题", size=24, weight=ft.FontWeight.BOLD),
+                ft.Text("拍下题目，AI 自动读取原文并分析错因", size=13, color="#8E8E93"),
+                u_card(ft.Column([
+                    ft.Row([subj_dd], spacing=15) if not is_mobile else ft.Column([subj_dd]),
+                    original_input,
+                    mistake_input,
+                ], spacing=12)),
+                u_section("可选补充", "✨"),
+                u_card(ft.Column([
+                    answer_input,
+                    idea_input,
+                    tags_input,
+                ], spacing=12)),
+                u_section("附件上传", "📎"),
+                u_card(ft.Column([
+                    picker_col1,
+                    picker_col2,
+                    picker_col3,
+                    progress_row,
+                ], spacing=10)),
+                ft.Container(height=4),
+                u_primary_btn("保存错题", submit_error, ft.Icons.SAVE),
+                ft.Container(height=18),
+                ft.Text("📝 记笔记", size=24, weight=ft.FontWeight.BOLD),
+                ft.Text("随手记录课堂重点与灵感", size=13, color="#8E8E93"),
+                u_card(ft.Column([
+                    ft.Row([note_subject_dd], spacing=15) if not is_mobile else ft.Column([note_subject_dd]),
+                    note_content_input,
+                    note_picker_col,
+                ], spacing=12)),
+                ft.Container(height=4),
+                u_primary_btn("保存笔记", submit_note, ft.Icons.SAVE_OUTLINED),
+                ft.Container(height=24),
+            ], spacing=14, scroll=ft.ScrollMode.AUTO)
 
             AI_SUBJECTS = [("总AI", "🤖"), ("数学", "📐"), ("语文", "📜"), ("英语", "📝"),
                            ("物理", "⚛️"), ("化学", "🧪"), ("生物", "🧬"),
@@ -2392,9 +2527,7 @@ def main(page: ft.Page):
                     _provider_name = "AI"
                     _model_name = ""
                 history = load_chat_history(subject)
-                context_messages = []
-                for msg in history[-20:]:
-                    context_messages.append({"role": msg["role"], "content": msg["content"]})
+                context_messages = build_ctx(history, max_chars=20000)
                 memory_context = get_memory_context(subject if subject != "总AI" else None)
                 profile_summary = get_profile_summary()
                 strategy = get_teaching_strategy(subject if subject != "总AI" else None)
@@ -2418,7 +2551,7 @@ def main(page: ft.Page):
                 system_prompt += """
 
 【继续生成规则】
-- 如果历史对话里最后一条 assistant 消息明显没说完，用户又说"继续""接着说"等，请直接接着上一条继续写，不要重新开始。
+- 如果历史对话里最后一条 assistant 消息带有「〔未完成，等待继续〕」标记，或明显只写了一半就结束，用户又说"继续""接着说"等，请直接从上次断掉的最后一个字后面接着写，不要重新开始、不要做总结、不要重复已经写过的内容。
 
 【可视化规则 - 必须遵守】
 当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，在回复最末尾附一个 ```chart 代码块，内容必须是 JSON。
@@ -2455,11 +2588,11 @@ def main(page: ft.Page):
 
                 if context_messages:
                     system_prompt += "\n\n以下是最近的对话历史（仅作上下文参考，不要重复历史内容）：\n"
-                    for msg in context_messages[-15:]:
+                    for msg in context_messages[-6:]:
                         role_label = "学生" if msg["role"] == "user" else "老师"
-                        system_prompt += f"[{role_label}]: {msg['content'][:200]}\n"
+                        system_prompt += f"[{role_label}]: {msg['content'][:300]}\n"
                 all_messages = [{"role": "system", "content": system_prompt}]
-                for msg in context_messages[-15:]:
+                for msg in context_messages:
                     all_messages.append(msg)
 
                 chat_history_display = ft.ListView(spacing=12, expand=True, auto_scroll=True)
@@ -2536,8 +2669,15 @@ def main(page: ft.Page):
                         shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
                         width=300,
                     )
-                    row = ft.Row([bubble, ft.Container(expand=True)],
-                                 alignment=ft.MainAxisAlignment.START)
+                    avatar = ft.Container(
+                        content=ft.Text("AI", size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
+                        width=30, height=30, border_radius=15,
+                        bgcolor="#FF8A65", alignment=ft.alignment.center,
+                        shadow=ft.BoxShadow(blur_radius=6, color="#44FF8A65"),
+                    )
+                    row = ft.Row([avatar, bubble, ft.Container(expand=True)],
+                                 alignment=ft.MainAxisAlignment.START,
+                                 vertical_alignment=ft.CrossAxisAlignment.START)
                     content_ref["row"] = row
                     return row, content_col
 
@@ -2552,6 +2692,16 @@ def main(page: ft.Page):
                                 def view(e):
                                     show_chart_overlay(h)
                                 return view
+                            _svg_path = save_svg_chart(chart_html)
+                            if _svg_path:
+                                content_col.controls.append(
+                                    ft.Container(
+                                        content=ft.Image(src=_svg_path, fit=ft.ImageFit.CONTAIN,
+                                                         width=250, border_radius=12),
+                                        on_click=make_view(), ink=True,
+                                        border=ft.border.all(1, "#3A3A45"),
+                                        border_radius=12,
+                                    ))
                             chart_btn = ft.Container(
                                 content=ft.Row([
                                     ft.Text("📊", size=16),
@@ -2647,7 +2797,7 @@ def main(page: ft.Page):
                         save_chat_message(subject, "user", content)
                     hist_now = load_chat_history(subject)
                     rebuilt = [{"role": "system", "content": system_prompt}]
-                    for _m in hist_now[-30:]:
+                    for _m in build_ctx(hist_now, max_chars=20000):
                         rebuilt.append({"role": _m["role"], "content": _m["content"]})
                     if (not rebuilt) or rebuilt[-1].get("role") != "user" or rebuilt[-1].get("content") != content:
                         rebuilt.append({"role": "user", "content": content})
@@ -2697,12 +2847,16 @@ def main(page: ft.Page):
                         nonlocal generation_active, stop_flag
                         generation_active = True
                         stop_flag = False
+                        was_stopped = {"v": False}
                         try:
                             final_accum = call_ai_stream(current_messages, "auto", on_chunk)
+                            was_stopped["v"] = bool(stop_flag)
                             if final_accum is not None:
                                 ai_response["text"] = final_accum
                         finally:
                             generation_active = False
+                        if was_stopped["v"] and ai_response["text"]:
+                            ai_response["text"] = ai_response["text"].rstrip() + "〔未完成，等待继续〕"
                         try:
                             final_text = ai_response["text"] if ai_response["text"] else "（无回应）"
                             clean_text, chart_html = extract_chart_block(final_text)
@@ -2715,6 +2869,16 @@ def main(page: ft.Page):
                                     def view(e):
                                         show_chart_overlay(h)
                                     return view
+                                _svg_path = save_svg_chart(chart_html)
+                                if _svg_path:
+                                    content_ref["col"].controls.append(
+                                        ft.Container(
+                                            content=ft.Image(src=_svg_path, fit=ft.ImageFit.CONTAIN,
+                                                             width=250, border_radius=12),
+                                            on_click=make_view(), ink=True,
+                                            border=ft.border.all(1, "#3A3A45"),
+                                            border_radius=12,
+                                        ))
                                 chart_btn = ft.Container(
                                     content=ft.Row([
                                         ft.Text("📊", size=16),
@@ -2916,6 +3080,24 @@ def main(page: ft.Page):
                     content_children.append(ft.Text("🔗 短语", size=14, weight=ft.FontWeight.BOLD))
                     for ph in phrases:
                         content_children.append(ft.Text(f"• {ph}", size=13, color="#4DB6AC"))
+
+                # 学习记录：每次选择 会/不会/模糊 的时间与结果
+                _hist = word_data.get("learning", {}).get("history", []) if isinstance(word_data.get("learning"), dict) else []
+                _act_labels = {"know": "✅ 认识", "forget": "❌ 不认识", "fuzzy": "🤔 模糊",
+                               "quiz_correct": "✅ 答对", "quiz_wrong": "❌ 答错"}
+                _next_rev = word_data.get("learning", {}).get("next_review", "") if isinstance(word_data.get("learning"), dict) else ""
+                _ease = word_data.get("learning", {}).get("ease", 2.5) if isinstance(word_data.get("learning"), dict) else 2.5
+                if _hist:
+                    content_children.append(ft.Divider(height=1))
+                    content_children.append(ft.Text("⏱ 学习记录", size=14, weight=ft.FontWeight.BOLD))
+                    for h in _hist[-8:][::-1]:
+                        act = _act_labels.get(str(h.get("action", "")), str(h.get("action", "")))
+                        content_children.append(
+                            ft.Text(f"  {h.get('time', '')}  {act}",
+                                    size=12, color=ft.Colors.GREY_400))
+                    content_children.append(
+                        ft.Text(f"  难度系数 {_ease} · 下次复习 {_next_rev or '—'}",
+                                size=12, color="#FFB74D"))
                 
                 nw_set = set(_load_user_new_words())
                 is_in_nw = word in nw_set
