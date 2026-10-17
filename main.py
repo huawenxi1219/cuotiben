@@ -14,6 +14,8 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 import traceback
+import http.server
+import urllib.parse
 
 DEBUG = True
 
@@ -321,6 +323,97 @@ def merge_band_records(records):
                 new_due.add(w["word"])
     bad = [w for w, n in consecutive_wrong.items() if n >= 2]
     return merged_count, len(words_updated), len(new_due), bad
+
+
+# ========== 手环本地同步服务（伴生App「池鱼手环同步」直连，无需手动传文件） ==========
+BAND_HTTP_PORT = 8765
+band_http_server = None
+band_http_running = False
+band_http_lock = threading.Lock()
+
+
+def start_band_http_server():
+    """在 127.0.0.1:8765 起本地同步服务：
+    GET  /api/wordlist?scope=due&count=50   → 词表 JSON（伴生App推送用）
+    POST /api/records                       → 接收手环记录并智能合并
+    GET  /health                            → 服务状态"""
+    global band_http_server, band_http_running
+    if band_http_running:
+        return True
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def _send(self, obj, code=200):
+            try:
+                data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception:
+                pass
+
+        def do_GET(self):
+            parsed = urllib.parse.urlparse(self.path)
+            if parsed.path == "/health":
+                self._send({"ok": True, "name": "池鱼Study同步服务", "port": BAND_HTTP_PORT})
+            elif parsed.path == "/api/wordlist":
+                q = urllib.parse.parse_qs(parsed.query)
+                scope = q.get("scope", ["due"])[0]
+                try:
+                    count = int(q.get("count", ["50"])[0])
+                except Exception:
+                    count = 50
+                with band_http_lock:
+                    try:
+                        payload = build_band_wordlist(scope, count)
+                        self._send(payload)
+                    except Exception as ex:
+                        self._send({"error": str(ex)}, 500)
+            else:
+                self._send({"error": "not found"}, 404)
+
+        def do_POST(self):
+            parsed = urllib.parse.urlparse(self.path)
+            if parsed.path == "/api/records":
+                try:
+                    length = int(self.headers.get("Content-Length", 0))
+                    body = self.rfile.read(length).decode("utf-8") if length else "[]"
+                    records = json.loads(body)
+                    if isinstance(records, dict):
+                        records = records.get("records", [])
+                    with band_http_lock:
+                        merged, updated, new_due, bad = merge_band_records(records)
+                    self._send({"merged": merged, "updated": updated,
+                                "new_due": new_due, "bad": bad})
+                except Exception as ex:
+                    self._send({"error": str(ex)}, 500)
+            else:
+                self._send({"error": "not found"}, 404)
+
+    try:
+        server = http.server.HTTPServer(("127.0.0.1", BAND_HTTP_PORT), _Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        band_http_server = server
+        band_http_running = True
+        return True
+    except Exception:
+        band_http_running = False
+        return False
+
+
+def stop_band_http_server():
+    global band_http_server, band_http_running
+    if band_http_server:
+        try:
+            band_http_server.shutdown()
+        except Exception:
+            pass
+        band_http_server = None
+    band_http_running = False
 
 
 def get_today_new_words(limit):
@@ -5248,6 +5341,10 @@ def main(page: ft.Page):
 
             # ---------- 手环背单词 操控中心 ----------
             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+            band_http_status = ft.Text("🔌 本地同步服务：未启动", size=13, color=ft.Colors.GREY_500)
+            band_http_btn = ft.ElevatedButton(
+                "🔗 启动本地同步", icon=ft.Icons.SENSOR_DOOR,
+                on_click=lambda e: toggle_band_http(e))
             band_scope = ft.Dropdown(
                 label="单词来源",
                 width=170,
@@ -5262,6 +5359,51 @@ def main(page: ft.Page):
             band_records_picker = ft.FilePicker(on_result=lambda e: on_band_records_result(e))
             page.overlay.append(band_export_picker)
             page.overlay.append(band_records_picker)
+
+            def refresh_band_http_ui():
+                if band_http_running:
+                    band_http_btn.text = "🔗 停止本地同步"
+                    band_http_status.value = (f"🟢 服务运行中：http://127.0.0.1:{BAND_HTTP_PORT}"
+                                              f"\n伴生App「池鱼手环同步」可直连，收回记录自动回传")
+                    band_http_status.color = "#81C784"
+                else:
+                    band_http_btn.text = "🔗 启动本地同步"
+                    band_http_status.value = "🔌 本地同步服务：未启动"
+                    band_http_status.color = ft.Colors.GREY_500
+                page.update()
+
+            def toggle_band_http(e):
+                if band_http_running:
+                    stop_band_http_server()
+                    show_toast("已停止本地同步", "orange")
+                else:
+                    if start_band_http_server():
+                        show_toast("本地同步已启动，可一键推送", "green")
+                    else:
+                        show_toast("启动失败（端口占用？），改用文件方式", "red")
+                refresh_band_http_ui()
+
+            def on_band_quick_push(e):
+                """一键推送：拉起伴生App，从本地服务拉词表推手环"""
+                if app_state["busy"]:
+                    show_toast(f"⏳ 正在「{app_state['busy']}」，先等它跑完", "orange")
+                    return
+                if not band_http_running:
+                    if not start_band_http_server():
+                        show_toast("本地同步未启动，先点启动", "red")
+                        return
+                    refresh_band_http_ui()
+                scope = band_scope.value or "due"
+                count = 50
+                try:
+                    count = int((band_count_field.value or "50").strip())
+                except Exception:
+                    count = 50
+                try:
+                    page.launch_url(f"chiyu-sync://push?scope={scope}&count={count}")
+                    show_toast("已拉起伴生App，正在推送…", "green")
+                except Exception as ex:
+                    show_toast(f"拉起失败（装了伴生App吗？）：{ex}", "red")
 
             def on_band_export_click(e):
                 if app_state["busy"]:
@@ -5489,9 +5631,13 @@ def main(page: ft.Page):
                 mine_msg,
                 ft.Divider(),
                 ft.Text("⌚ 手环背单词", size=20),
+                band_http_btn,
+                band_http_status,
                 ft.Row([band_scope, band_count_field]),
                 ft.Row([
-                    ft.ElevatedButton("📤 生成词表", icon=ft.Icons.UPLOAD_FILE,
+                    ft.ElevatedButton("🚀 一键推送", icon=ft.Icons.SEND,
+                                      on_click=on_band_quick_push),
+                    ft.ElevatedButton("📤 存为文件", icon=ft.Icons.UPLOAD_FILE,
                                       on_click=on_band_export_click),
                     ft.ElevatedButton("📥 导入记录", icon=ft.Icons.DOWNLOAD_DONE,
                                       on_click=on_band_records_click),
