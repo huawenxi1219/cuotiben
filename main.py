@@ -1249,6 +1249,26 @@ def extract_keywords_fallback(text):
         if re.search(pattern, text):
             return kp
     return ""
+def pick_relevant_errors(query, subject=None, limit=5):
+    errors = load_jsonl(ERRORS_FILE)
+    if subject and subject != "总AI":
+        errors = [e for e in errors if e.get("subject") == subject]
+    if not errors:
+        return []
+    kws = [k.lower() for k in (query or "").split() if k.strip()]
+    scored = []
+    for e in errors:
+        s = 0.5
+        tags = " ".join(str(t) for t in e.get("tags", [])).lower()
+        text = ((e.get("original", "") or e.get("question", "")) + " " + str(e.get("mistake", ""))).lower()
+        for kw in kws:
+            if kw and kw in tags:
+                s += 5
+            if kw and kw in text:
+                s += 2
+        scored.append((s, e))
+    scored.sort(key=lambda x: -x[0])
+    return [e for _, e in scored[:limit]]
 def weighted_search_errors(items, query):
     """多关键词加权搜索错题。返回 (按分数降序的items, 分数map)"""
     if not query or not query.strip():
@@ -1287,31 +1307,180 @@ def weighted_search_errors(items, query):
     ordered_items = [items[i] for i, _ in scored]
     score_map = {i: s for i, s in scored}
     return ordered_items, score_map
+def _svg_bar(title, labels, values, unit=""):
+    n = len(labels)
+    if n == 0:
+        return ""
+    W, H = 660, 380
+    pad_l, pad_r, pad_t, pad_b = 60, 40, 60, 80
+    cw = W - pad_l - pad_r
+    ch = H - pad_t - pad_b
+    max_v = max(values) if values else 1
+    max_v = max(max_v, 1)
+    bar_w = cw / n * 0.6
+    gap = cw / n
+    colors = ["#FF8A65", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
+              "#4DB6AC", "#F06292", "#FFD54F", "#9575CD"]
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
+         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<text x="{W/2}" y="34" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>']
+    for i in range(5):
+        y = pad_t + ch * i / 4
+        v = max_v * (4 - i) / 4
+        p.append(f'<line x1="{pad_l}" y1="{y}" x2="{W-pad_r}" y2="{y}" stroke="#2F2F38" stroke-width="1"/>')
+        p.append(f'<text x="{pad_l-8}" y="{y+4}" fill="#777777" font-size="10" text-anchor="end">{v:.0f}{unit}</text>')
+    for i, (lb, v) in enumerate(zip(labels, values)):
+        x = pad_l + gap * i + (gap - bar_w) / 2
+        bh = ch * (v / max_v) if max_v else 0
+        y = pad_t + ch - bh
+        c = colors[i % len(colors)]
+        p.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" fill="{c}" rx="5"/>')
+        p.append(f'<text x="{x+bar_w/2:.1f}" y="{y-6:.1f}" fill="#EEEEEE" font-size="12" font-weight="bold" text-anchor="middle">{v}</text>')
+        lb2 = lb if len(lb) <= 6 else lb[:6]
+        p.append(f'<text x="{x+bar_w/2:.1f}" y="{H-pad_b+22}" fill="#CCCCCC" font-size="12" text-anchor="middle">{lb2}</text>')
+    p.append('</svg>')
+    return "".join(p)
+
+
+def _svg_pie(title, items):
+    import math
+    if not items:
+        return ""
+    W, H = 660, 400
+    cx, cy, r, r2 = 220, 220, 120, 72
+    total = sum(it.get("value", 0) for it in items) or 1
+    colors = ["#FF8A65", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
+              "#4DB6AC", "#F06292", "#FFD54F", "#9575CD"]
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
+         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<text x="{W/2}" y="34" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>']
+    angle = -math.pi / 2
+    for i, it in enumerate(items):
+        frac = it.get("value", 0) / total
+        a2 = angle + frac * 2 * math.pi
+        x1 = cx + r * math.cos(angle); y1 = cy + r * math.sin(angle)
+        x2 = cx + r * math.cos(a2); y2 = cy + r * math.sin(a2)
+        x3 = cx + r2 * math.cos(a2); y3 = cy + r2 * math.sin(a2)
+        x4 = cx + r2 * math.cos(angle); y4 = cy + r2 * math.sin(angle)
+        large = 1 if frac > 0.5 else 0
+        d = f"M {x1:.1f} {y1:.1f} A {r} {r} 0 {large} 1 {x2:.1f} {y2:.1f} L {x3:.1f} {y3:.1f} A {r2} {r2} 0 {large} 0 {x4:.1f} {y4:.1f} Z"
+        c = colors[i % len(colors)]
+        p.append(f'<path d="{d}" fill="{c}"/>')
+        angle = a2
+    p.append(f'<text x="{cx}" y="{cy-2}" fill="#EEEEEE" font-size="24" font-weight="bold" text-anchor="middle">{int(total)}</text>')
+    p.append(f'<text x="{cx}" y="{cy+20}" fill="#888888" font-size="12" text-anchor="middle">总计</text>')
+    ly = 110
+    for i, it in enumerate(items):
+        c = colors[i % len(colors)]
+        p.append(f'<rect x="420" y="{ly-12}" width="14" height="14" fill="{c}" rx="3"/>')
+        p.append(f'<text x="444" y="{ly}" fill="#CCCCCC" font-size="13">{it.get("name","")}</text>')
+        p.append(f'<text x="620" y="{ly}" fill="#EEEEEE" font-size="13" text-anchor="end">{it.get("value",0)}</text>')
+        ly += 30
+    p.append('</svg>')
+    return "".join(p)
+
+
+def _svg_timeline(title, events):
+    if not events:
+        return ""
+    W = 660
+    n = len(events)
+    row_h = 88
+    H = 100 + n * row_h
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
+         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<text x="{W/2}" y="36" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>',
+         f'<line x1="130" y1="70" x2="130" y2="{H-30}" stroke="#3A3A45" stroke-width="2"/>']
+    for i, ev in enumerate(events):
+        y = 90 + i * row_h
+        p.append(f'<circle cx="130" cy="{y}" r="7" fill="#FF8A65"/>')
+        p.append(f'<circle cx="130" cy="{y}" r="13" fill="none" stroke="#FF8A65" stroke-opacity="0.3" stroke-width="2"/>')
+        p.append(f'<text x="108" y="{y+4}" fill="#888888" font-size="11" text-anchor="end">{ev.get("date","")}</text>')
+        p.append(f'<text x="160" y="{y-2}" fill="#EEEEEE" font-size="14" font-weight="bold">{ev.get("title","")}</text>')
+        desc = ev.get("desc", "")
+        if len(desc) > 42:
+            desc = desc[:42] + "..."
+        p.append(f'<text x="160" y="{y+18}" fill="#AAAAAA" font-size="12">{desc}</text>')
+    p.append('</svg>')
+    return "".join(p)
+
+
+def _svg_flow(title, steps):
+    if not steps:
+        return ""
+    n = len(steps)
+    card_w, card_h, gap = 138, 116, 16
+    W = 40 + n * card_w + (n - 1) * gap + 40
+    H = 250
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
+         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<text x="{W/2}" y="38" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>']
+    sm = {"ok": ("#1E3A22", "#66BB6A", "✓"),
+          "warn": ("#3A3418", "#FFB74D", "!"),
+          "err": ("#3A1E1E", "#EF5350", "✗"),
+          "none": ("#2A2A32", "#888888", "·")}
+    for i, st in enumerate(steps):
+        x = 40 + i * (card_w + gap)
+        y = 76
+        bg, border, mark = sm.get(st.get("status", "none"), sm["none"])
+        p.append(f'<rect x="{x}" y="{y}" width="{card_w}" height="{card_h}" rx="14" fill="{bg}" stroke="{border}" stroke-width="1.5"/>')
+        p.append(f'<text x="{x+14}" y="{y+26}" fill="{border}" font-size="13" font-weight="bold">{i+1} {mark}</text>')
+        label = st.get("label", "")
+        if len(label) > 9:
+            label = label[:9]
+        p.append(f'<text x="{x+14}" y="{y+52}" fill="#EEEEEE" font-size="14" font-weight="bold">{label}</text>')
+        desc = st.get("desc", "")
+        l1 = desc[:15]
+        l2 = desc[15:30]
+        p.append(f'<text x="{x+14}" y="{y+74}" fill="#AAAAAA" font-size="11">{l1}</text>')
+        if l2:
+            p.append(f'<text x="{x+14}" y="{y+90}" fill="#AAAAAA" font-size="11">{l2}</text>')
+        if i < n - 1:
+            ax = x + card_w
+            ay = y + card_h / 2
+            p.append(f'<path d="M {ax} {ay} L {ax+gap-4} {ay} L {ax+gap-9} {ay-5} M {ax+gap-4} {ay} L {ax+gap-9} {ay+5}" stroke="#555" stroke-width="1.5" fill="none"/>')
+    p.append('</svg>')
+    return "".join(p)
+
+
+def render_chart_from_spec(spec):
+    t = spec.get("type", "")
+    title = spec.get("title", "")
+    try:
+        if t == "bar":
+            return _svg_bar(title, spec.get("labels", []), spec.get("values", []), spec.get("unit", ""))
+        if t == "pie":
+            return _svg_pie(title, spec.get("items", []))
+        if t == "timeline":
+            return _svg_timeline(title, spec.get("events", []))
+        if t == "flow":
+            return _svg_flow(title, spec.get("steps", []))
+    except BaseException:
+        return ""
+    return ""
+
+
 def extract_chart_block(text):
-    """从 AI 回复中提取图表代码块。返回 (去块后的文本, 图表HTML或None)"""
     if not text:
         return text, None
-
-    m = re.search(r'```(svg|xml|html|echarts)\s*\n(.*?)```',
-                  text, re.DOTALL | re.IGNORECASE)
+    m = re.search(r'```chart\s*\n(.*?)```', text, re.DOTALL | re.IGNORECASE)
     if m:
-        kind = m.group(1).lower()
-        code = m.group(2).strip()
+        raw = m.group(1).strip()
         clean = (text[:m.start()] + text[m.end():]).strip()
-        if kind in ("svg", "xml"):
-            if "<svg" in code.lower():
-                return clean, code
-        elif kind == "html":
-            return clean, code
-        elif kind == "echarts":
-            return clean, "ECHARTS_UNSUPPORTED"
-
+        try:
+            spec = json.loads(raw)
+            svg = render_chart_from_spec(spec)
+            if svg:
+                return clean, svg
+        except BaseException:
+            pass
+        return clean, None
+    m = re.search(r'```(svg|xml)\s*\n(.*?)```', text, re.DOTALL | re.IGNORECASE)
+    if m and "<svg" in m.group(2).lower():
+        return (text[:m.start()] + text[m.end():]).strip(), m.group(2).strip()
     m2 = re.search(r'(<svg[\s\S]*?</svg>)', text, re.IGNORECASE)
     if m2:
-        svg = m2.group(1).strip()
-        clean = (text[:m2.start()] + text[m2.end():]).strip()
-        return clean, svg
-
+        return (text[:m2.start()] + text[m2.end():]).strip(), m2.group(1).strip()
     return text, None
 def clean_latex(text):
     superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
@@ -2235,23 +2404,7 @@ def main(page: ft.Page):
 - 对于作文类问题，请提供框架和例句。
 - 回答要简洁、准确、有条理。
 - 请主动引用你对这个学生的记忆，让学生感到你了解他。"""
-                system_prompt += """
-
-【继续生成规则】
-- 如果历史对话里最后一条 assistant 消息明显没说完（用户随后说"继续""接着说"等），请直接接着上一条继续写，不要重新开始、不要重复已写内容。
-
-【可视化规则 - 必须遵守】
-- 当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，必须用 ```svg 代码块输出纯 SVG 图。
-- 只能用 SVG，不要用 ECharts、不要用 HTML+JS（Android 端不支持）。
-- SVG 要求：
-  · 必须以 <svg ...> 开头、</svg> 结尾
-  · 必须写 viewBox（如 viewBox="0 0 600 400"），不要写固定 width/height
-  · 用 fill / stroke / 内联 style，不要引用外部资源
-  · 中文字体写 font-family="sans-serif"
-  · 颜色用深色主题配色（背景深、文字浅、重点色 #FF8A65 / #FFB74D / #81C784）
-- 一条回复最多 1 个 SVG 代码块
-- 不适合图形时用纯文字
-"""
+                
                 custom_skill = load_custom_skill()
                 if custom_skill:
                     system_prompt += f"\n\n额外的教学指导：{custom_skill}"
@@ -2261,6 +2414,45 @@ def main(page: ft.Page):
                     system_prompt += f"\n\n{profile_summary}"
                 if strategy:
                     system_prompt += f"\n\n{strategy}"
+
+                system_prompt += """
+
+【继续生成规则】
+- 如果历史对话里最后一条 assistant 消息明显没说完，用户又说"继续""接着说"等，请直接接着上一条继续写，不要重新开始。
+
+【可视化规则 - 必须遵守】
+当回答涉及趋势、占比、比较、流程、机制、因果、架构、关系、时间线、状态机、算法步骤、参数变化时，在回复最末尾附一个 ```chart 代码块，内容必须是 JSON。
+
+四种图表格式（按需选 1 个，严格替换里面的文字，不要加注释）：
+
+1. 柱状图：
+```chart
+{"type":"bar","title":"标题","labels":["A","B"],"values":[1,2],"unit":""}
+```
+
+2. 环形图：
+```chart
+{"type":"pie","title":"标题","items":[{"name":"A","value":10},{"name":"B","value":20}]}
+```
+
+3. 时间线：
+```chart
+{"type":"timeline","title":"标题","events":[{"date":"10-05","title":"事件","desc":"描述"}]}
+```
+
+4. 流程图：
+```chart
+{"type":"flow","title":"标题","steps":[{"label":"步骤1","status":"ok","desc":"说明"},{"label":"步骤2","status":"warn","desc":"说明"}]}
+```
+
+要求：
+- 必须严格合法 JSON，不要用单引号，不要多余的标点。
+- status 取值只能是：ok（绿） / warn（黄） / err（红） / none（灰）。
+- 一条回复最多 1 个 chart 块。
+- 不要自己手画 <svg> 标签，不要用 ECharts，不要用 HTML。
+- 不适合图形时，直接用纯文本，不要输出 chart 块。
+"""
+
                 if context_messages:
                     system_prompt += "\n\n以下是最近的对话历史（仅作上下文参考，不要重复历史内容）：\n"
                     for msg in context_messages[-15:]:
@@ -2459,10 +2651,29 @@ def main(page: ft.Page):
                         rebuilt.append({"role": _m["role"], "content": _m["content"]})
                     if (not rebuilt) or rebuilt[-1].get("role") != "user" or rebuilt[-1].get("content") != content:
                         rebuilt.append({"role": "user", "content": content})
+                    try:
+                        rel = pick_relevant_errors(content, subject if subject != "总AI" else None, limit=5)
+                        if rel:
+                            lines = ["【学生错题本中的相关错题（请务必结合这些具体内容回答，不要泛泛而谈）】"]
+                            for i, e in enumerate(rel):
+                                tags = "、".join(str(t) for t in e.get("tags", []))
+                                orig = (e.get("original", "") or e.get("question", ""))[:200]
+                                mis = str(e.get("mistake", ""))[:120]
+                                ans = str(e.get("answer", ""))[:120]
+                                lines.append(f"[{i+1}] 科目：{e.get('subject','')}  标签：{tags}")
+                                lines.append(f"  题目：{orig}")
+                                if mis:
+                                    lines.append(f"  学生错误：{mis}")
+                                if ans:
+                                    lines.append(f"  正确答案：{ans}")
+                            rebuilt[0] = {"role": "system",
+                                          "content": rebuilt[0]["content"] + "\n\n" + "\n".join(lines)}
+                    except BaseException:
+                        pass
                     current_messages = rebuilt
                     ai_response = {"text": ""}
 
-                    content_ref = {"col": None, "md": None, "row": None, "actions": None}
+                    content_ref = {"col": None, "md": None, "stream": None, "row": None, "actions": None}
                     bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref)
                     last_ai_content_ref["col"] = content_col
                     chat_history_display.controls.append(bubble_row)
@@ -2638,7 +2849,7 @@ def main(page: ft.Page):
                 return word_data
 
             def _open_word_detail(word_data, on_close=None):
-                word_data = _fill_word_with_ai(word_data)
+                # 不再直接自动请求，防止卡死 UI
                 word = word_data.get("word", "")
                 phonetic = word_data.get("phonetic", "")
                 meaning = word_data.get("meaning", "")
@@ -2672,14 +2883,16 @@ def main(page: ft.Page):
                                 def make_gen_click(fw_word):
                                     def on_click(e):
                                         show_toast(f"⏳ 正在生成 {fw_word}...", "info")
-                                        new_d = generate_word_info(fw_word)
-                                        if new_d:
-                                            ev = load_jsonl(VOCAB_FILE)
-                                            ev.append(new_d)
-                                            save_jsonl(VOCAB_FILE, ev)
-                                            show_toast(f"✅ 已添加 {fw_word}", "green")
-                                        else:
-                                            show_toast(f"❌ 生成失败", "red")
+                                        def _bg():
+                                            new_d = generate_word_info(fw_word)
+                                            if new_d:
+                                                ev = load_jsonl(VOCAB_FILE)
+                                                ev.append(new_d)
+                                                save_jsonl(VOCAB_FILE, ev)
+                                                show_toast(f"✅ 已添加 {fw_word}", "green")
+                                            else:
+                                                show_toast(f"❌ 生成失败", "red")
+                                        threading.Thread(target=_bg, daemon=True).start()
                                     return on_click
                                 btn = ft.TextButton(
                                     text=fw, on_click=make_gen_click(fw),
@@ -2703,6 +2916,7 @@ def main(page: ft.Page):
                     content_children.append(ft.Text("🔗 短语", size=14, weight=ft.FontWeight.BOLD))
                     for ph in phrases:
                         content_children.append(ft.Text(f"• {ph}", size=13, color="#4DB6AC"))
+                
                 nw_set = set(_load_user_new_words())
                 is_in_nw = word in nw_set
 
@@ -2726,6 +2940,28 @@ def main(page: ft.Page):
                         border_radius=20,
                         padding=ft.Padding(left=16, right=16, top=8, bottom=8),
                         on_click=toggle_nw, ink=True))
+
+                if _needs_completion(word_data):
+                    def do_fill_ai(e):
+                        ai_btn.content.value = "⏳ 正在请求 AI..."
+                        ai_btn.disabled = True
+                        page.update()
+                        def _bg():
+                            filled_data = _fill_word_with_ai(word_data)
+                            page.close(dialog)
+                            _open_word_detail(filled_data, on_close=on_close)
+                            show_toast("✅ 补齐成功", "green")
+                        threading.Thread(target=_bg, daemon=True).start()
+
+                    ai_btn = ft.ElevatedButton(
+                        "🤖 使用 AI 补齐缺失信息",
+                        icon=ft.Icons.AUTO_AWESOME,
+                        bgcolor="#3A2A22",
+                        color="#FFB74D",
+                        on_click=do_fill_ai
+                    )
+                    content_children.append(ai_btn)
+
                 dialog = ft.AlertDialog(
                     title=ft.Text(""),
                     content=ft.Container(
@@ -2927,50 +3163,103 @@ def main(page: ft.Page):
                     ], spacing=8, expand=True)
 
                 def build_study_tab():
-                    today_new_limit = settings.get("daily_new", 20)
-                    today_new = get_today_new_words(today_new_limit)
-                    today_review = get_today_review_words(settings.get("daily_review_limit", 100))
-                    queue = [{"word": w, "mode": "review"} for w in today_review] + \
-                            [{"word": w, "mode": "new"} for w in today_new]
-                    state = {"idx": 0, "flipped": False}
+                    all_words = load_jsonl(VOCAB_FILE)
+                    now = datetime.now()
+                    pool = []
+                    for w in all_words:
+                        ensure_learning_field(w)
+                        L = w["learning"]
+                        base = 1.0
+                        base += L.get("wrong_count", 0) * 2.5
+                        base += max(0, 7 - L.get("level", 0)) * 1.2
+                        nxt = L.get("next_review", "")
+                        if nxt:
+                            try:
+                                d = datetime.strptime(nxt, "%Y-%m-%d")
+                                if d <= now:
+                                    base *= 3.0
+                            except BaseException:
+                                pass
+                        last = L.get("last_review", "")
+                        if last:
+                            try:
+                                dt = datetime.strptime(last, "%Y-%m-%d %H:%M:%S")
+                                days_since = (now - dt).days
+                                if days_since > 30:
+                                    base *= 4.0
+                                elif days_since > 14:
+                                    base *= 2.0
+                            except BaseException:
+                                pass
+                        if L.get("level", 0) >= 6:
+                            base *= 0.3
+                        pool.append([w, base])
+
+                    state = {"current": None, "flipped": False, "seen": {}, "learned": 0}
                     card_area = ft.Container(expand=True)
-                    progress_text = ft.Text("", size=13, color=ft.Colors.GREY_500)
-                    counter_text = ft.Text("", size=15, weight=ft.FontWeight.BOLD)
+                    counter_text = ft.Text("", size=14, color=ft.Colors.GREY_500)
                     action_area = ft.Container()
+
+                    def pick_next():
+                        if not pool:
+                            return None
+                        words = [p[0] for p in pool]
+                        weights = []
+                        for w, base in pool:
+                            wd = w.get("word", "")
+                            seen_n = state["seen"].get(wd, 0)
+                            weights.append(base / (1 + seen_n * 2))
+                        total = sum(weights)
+                        if total <= 0:
+                            return random.choice(words)
+                        r = random.random() * total
+                        acc = 0
+                        for w, wt in zip(words, weights):
+                            acc += wt
+                            if r <= acc:
+                                return w
+                        return words[-1]
 
                     def render_card():
                         card_area.content = None
                         action_area.content = None
-                        if state["idx"] >= len(queue):
+                        if not pool:
                             card_area.content = ft.Container(
                                 content=ft.Column([
-                                    ft.Text("🎉", size=60),
-                                    ft.Text("今日学习任务完成！", size=22, weight=ft.FontWeight.BOLD, color="#81C784"),
-                                    ft.Text(f"共复习 {len(today_review)} 词，新学 {len(today_new)} 词",
-                                            size=14, color=ft.Colors.GREY_500),
+                                    ft.Text("📚", size=60),
+                                    ft.Text("词库是空的", size=18, color=ft.Colors.GREY_500),
+                                    ft.Text("先去「词库」tab 添加单词", size=13, color=ft.Colors.GREY_500),
                                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                                     alignment=ft.MainAxisAlignment.CENTER, spacing=10),
                                 alignment=ft.alignment.center, expand=True)
-                            progress_text.value = ""
                             counter_text.value = ""
                             page.update()
                             return
-                        item = queue[state["idx"]]
-                        w = item["word"]
+                        if state["current"] is None:
+                            state["current"] = pick_next()
+                            state["flipped"] = False
+                        w = state["current"]
+                        if w is None:
+                            return
                         word = w.get("word", "")
                         phonetic = w.get("phonetic", "")
                         meaning = w.get("meaning", "")
                         example = w.get("example", "")
                         forms = w.get("forms", "")
-                        counter_text.value = f"{state['idx']+1} / {len(queue)}"
-                        progress_text.value = "复习" if item["mode"] == "review" else "新词"
+                        L = w.get("learning", {})
+                        level = L.get("level", 0)
+                        wrong_n = L.get("wrong_count", 0)
+                        counter_text.value = f"已学 {state['learned']} 张 · 等级 {level}/7 · 错 {wrong_n}"
                         if not state["flipped"]:
                             front = ft.Container(
                                 content=ft.Column([
-                                    ft.Text("🔊" if settings.get("show_phonetic") else "", size=30),
-                                    ft.Text(word, size=42, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                                    ft.Text("🔊", size=28),
+                                    ft.Text(word, size=42, weight=ft.FontWeight.BOLD,
+                                            text_align=ft.TextAlign.CENTER),
                                     ft.Container(height=20),
-                                    ft.Text("点击卡片显示释义", size=13, color=ft.Colors.GREY_500),
+                                    ft.Text("点击卡片显示释义" if wrong_n == 0
+                                            else f"这个词你错过 {wrong_n} 次",
+                                            size=13, color=ft.Colors.GREY_500),
                                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                                     alignment=ft.MainAxisAlignment.CENTER, spacing=10),
                                 alignment=ft.alignment.center, expand=True,
@@ -2991,8 +3280,10 @@ def main(page: ft.Page):
                                     ft.Text(phonetic, size=16, color="#FF8A65") if phonetic else ft.Text(""),
                                     ft.Divider(),
                                     ft.Text(meaning, size=18, color="#81C784"),
-                                    ft.Text(f"例句：{example}", size=13, italic=True, color=ft.Colors.GREY_400) if example else ft.Text(""),
-                                    ft.Text(f"变形：{forms}", size=13, color=ft.Colors.GREY_400) if forms else ft.Text(""),
+                                    ft.Text(f"例句：{example}", size=13, italic=True,
+                                            color=ft.Colors.GREY_400) if example else ft.Text(""),
+                                    ft.Text(f"变形：{forms}", size=13,
+                                            color=ft.Colors.GREY_400) if forms else ft.Text(""),
                                 ], spacing=8, scroll=ft.ScrollMode.AUTO),
                                 alignment=ft.alignment.top_left,
                                 bgcolor="#26262E", border_radius=20,
@@ -3010,21 +3301,37 @@ def main(page: ft.Page):
                         page.update()
 
                     def mark(result):
-                        if state["idx"] >= len(queue):
+                        w = state["current"]
+                        if not w:
                             return
-                        item = queue[state["idx"]]
-                        word = item["word"].get("word", "")
+                        word = w.get("word", "")
                         update_word_learning(word, result)
                         log_learning_event("vocab_study", "英语", kp=word,
-                                           detail=f"{item['mode']} - {result}",
-                                           correct=(result == "know"))
-                        state["idx"] += 1
+                                           detail=result, correct=(result == "know"))
+                        state["learned"] += 1
+                        state["seen"][word] = state["seen"].get(word, 0) + 1
+                        all_now = load_jsonl(VOCAB_FILE)
+                        for i, p in enumerate(pool):
+                            if p[0].get("word", "") == word:
+                                for nw in all_now:
+                                    if nw.get("word", "") == word:
+                                        pool[i][0] = nw
+                                        break
+                                L2 = pool[i][0].get("learning", {})
+                                base = 1.0
+                                base += L2.get("wrong_count", 0) * 2.5
+                                base += max(0, 7 - L2.get("level", 0)) * 1.2
+                                if L2.get("level", 0) >= 6:
+                                    base *= 0.3
+                                pool[i][1] = base
+                                break
+                        state["current"] = None
                         state["flipped"] = False
                         render_card()
 
                     render_card()
                     return ft.Column([
-                        ft.Row([counter_text, progress_text], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Row([counter_text], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                         ft.Container(content=card_area, expand=True),
                         action_area,
                     ], spacing=12, expand=True)
