@@ -2625,6 +2625,7 @@ def main(page: ft.Page):
                     content_ref["col"] = content_col
                     content_ref["md"] = md
                     content_ref["stream"] = stream_text
+                    content_ref["raw"] = text
 
                     def _do_copy(e):
                         try:
@@ -2640,6 +2641,21 @@ def main(page: ft.Page):
                             if target_row and target_row in chat_history_display.controls:
                                 chat_history_display.controls.remove(target_row)
                                 page.update()
+                                try:
+                                    fp = get_chat_history_file(subject)
+                                    hs = load_jsonl(fp)
+                                    raw = content_ref.get("raw", "")
+                                    raw_clean = extract_chart_block(raw)[0] if raw else ""
+                                    hs = [m for m in hs if not (
+                                        m.get("role") == "assistant"
+                                        and (
+                                            m.get("content", "") == raw
+                                            or (raw_clean and extract_chart_block(m.get("content", ""))[0] == raw_clean)
+                                        )
+                                    )]
+                                    save_jsonl(fp, hs)
+                                except Exception:
+                                    pass
                                 show_toast("已删除本条", "info")
                         except Exception as ex:
                             show_toast(f"删除失败：{str(ex)[:30]}", "red")
@@ -2766,10 +2782,20 @@ def main(page: ft.Page):
 
                 last_user_msg = {"text": ""}
                 last_ai_content_ref = {"col": None}
+                gen_token = {"id": 0}  # 代次令牌：防止旧生成线程串台/重复保存
 
                 def regenerate_last():
                     if not last_user_msg["text"]:
                         return
+                    # 先删掉历史文件里末尾的 assistant 消息，避免重新生成后出现重复回答
+                    try:
+                        fp = get_chat_history_file(subject)
+                        hs = load_jsonl(fp)
+                        while hs and hs[-1].get("role") == "assistant":
+                            hs.pop()
+                        save_jsonl(fp, hs)
+                    except Exception:
+                        pass
                     if last_ai_content_ref["col"]:
                         try:
                             chat_history_display.controls.pop()
@@ -2788,6 +2814,14 @@ def main(page: ft.Page):
 
                 def _send_internal(content, insert_user_bubble=True):
                     nonlocal generation_active, stop_flag
+                    # 如果正在生成，先停掉旧生成，防止并发线程串台
+                    if generation_active:
+                        stop_flag = True
+                        time.sleep(0.3)
+                    generation_active = False
+                    stop_flag = False
+                    gen_token["id"] += 1
+                    my_gen = gen_token["id"]
                     if insert_user_bubble:
                         chat_history_display.controls.append(make_user_bubble(content))
                     send_btn.visible = False
@@ -2831,6 +2865,8 @@ def main(page: ft.Page):
 
                     last_update_t = {"t": 0.0}
                     def on_chunk(text):
+                        if gen_token["id"] != my_gen:
+                            return  # 旧代次的流式回调直接丢弃
                         ai_response["text"] = text
                         now = time.time()
                         if now - last_update_t["t"] < 0.1:
@@ -2854,9 +2890,13 @@ def main(page: ft.Page):
                             if final_accum is not None:
                                 ai_response["text"] = final_accum
                         finally:
-                            generation_active = False
+                            if gen_token["id"] == my_gen:
+                                generation_active = False
+                        if gen_token["id"] != my_gen:
+                            return  # 过期线程，不再写界面/不保存历史
                         if was_stopped["v"] and ai_response["text"]:
                             ai_response["text"] = ai_response["text"].rstrip() + "〔未完成，等待继续〕"
+                        content_ref["raw"] = ai_response["text"]
                         try:
                             final_text = ai_response["text"] if ai_response["text"] else "（无回应）"
                             clean_text, chart_html = extract_chart_block(final_text)
