@@ -1627,7 +1627,7 @@ def _svg_bar(title, labels, values, unit=""):
     max_v = max(max_v, 1)
     bar_w = cw / n * 0.6
     gap = cw / n
-    colors = ["#FF8A65", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
+    colors = ["#1781FF", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
               "#4DB6AC", "#F06292", "#FFD54F", "#9575CD"]
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
          f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
@@ -1657,7 +1657,7 @@ def _svg_pie(title, items):
     W, H = 660, 400
     cx, cy, r, r2 = 220, 220, 120, 72
     total = sum(it.get("value", 0) for it in items) or 1
-    colors = ["#FF8A65", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
+    colors = ["#1781FF", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
               "#4DB6AC", "#F06292", "#FFD54F", "#9575CD"]
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
          f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
@@ -1701,8 +1701,8 @@ def _svg_timeline(title, events):
          f'<line x1="130" y1="70" x2="130" y2="{H-30}" stroke="#3A3A45" stroke-width="2"/>']
     for i, ev in enumerate(events):
         y = 90 + i * row_h
-        p.append(f'<circle cx="130" cy="{y}" r="7" fill="#FF8A65"/>')
-        p.append(f'<circle cx="130" cy="{y}" r="13" fill="none" stroke="#FF8A65" stroke-opacity="0.3" stroke-width="2"/>')
+        p.append(f'<circle cx="130" cy="{y}" r="7" fill="#1781FF"/>')
+        p.append(f'<circle cx="130" cy="{y}" r="13" fill="none" stroke="#1781FF" stroke-opacity="0.3" stroke-width="2"/>')
         p.append(f'<text x="108" y="{y+4}" fill="#888888" font-size="11" text-anchor="end">{ev.get("date","")}</text>')
         p.append(f'<text x="160" y="{y-2}" fill="#EEEEEE" font-size="14" font-weight="bold">{ev.get("title","")}</text>')
         desc = ev.get("desc", "")
@@ -1955,9 +1955,9 @@ def main(page: ft.Page):
             page.theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
-                    primary="#FF8A65",
-                    primary_container="#3A2A22",
-                    secondary="#FFB74D",
+                    primary="#1781FF",        # AstroBox 主色（iOS 蓝）
+                    primary_container="#17355C",
+                    secondary="#5BA3FF",
                     surface="#FAFAFA",
                     surface_variant="#F5F5F5",
                     background="#FAFAFA",
@@ -1970,12 +1970,12 @@ def main(page: ft.Page):
             page.dark_theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
-                    primary="#FF8A65",
-                    primary_container="#3A2A22",
-                    secondary="#FFB74D",
-                    surface="#1C1C22",
-                    surface_variant="#26262E",
-                    background="#131318",
+                    primary="#1781FF",        # AstroBox 主色
+                    primary_container="#14345C",
+                    secondary="#5BA3FF",
+                    surface="#1A1A1E",
+                    surface_variant="#24242A",
+                    background="#101014",     # 深色背景（AstroBox #0D0D0F 系）
                     on_surface="#FFFFFF",
                     on_background="#FFFFFF",
                 ),
@@ -1987,7 +1987,7 @@ def main(page: ft.Page):
 
             def show_toast(text, color="green", duration=1.6):
                 if color == "green":
-                    bg = "#33FF8A65"
+                    bg = "#331781FF"   # AstroBox 主色蓝（正向反馈）
                     icon = "✅"
                 elif color == "red":
                     bg = "#33EF5350"
@@ -2153,7 +2153,7 @@ def main(page: ft.Page):
                             content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER),
                             width=48, height=48,
                             border_radius=8,
-                            border=ft.border.all(2, "#FF8A65" if is_active else "#555555"),
+                            border=ft.border.all(2, "#1781FF" if is_active else "#555555"),
                             on_click=lambda e, idx=i: update_image(idx),
                             ink=True,
                         )
@@ -2345,19 +2345,19 @@ def main(page: ft.Page):
             )
             original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3,
                                            border_radius=14, filled=True, fill_color="#1F1F26",
-                                           border_color="#3A3A45", focused_border_color="#FF8A65")
+                                           border_color="#3A3A45", focused_border_color="#1781FF")
             mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2,
                                          border_radius=14, filled=True, fill_color="#1F1F26",
-                                         border_color="#3A3A45", focused_border_color="#FF8A65")
+                                         border_color="#3A3A45", focused_border_color="#1781FF")
             answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2,
                                         border_radius=14, filled=True, fill_color="#1F1F26",
-                                        border_color="#3A3A45", focused_border_color="#FF8A65")
+                                        border_color="#3A3A45", focused_border_color="#1781FF")
             idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2,
                                       border_radius=14, filled=True, fill_color="#1F1F26",
-                                      border_color="#3A3A45", focused_border_color="#FF8A65")
+                                      border_color="#3A3A45", focused_border_color="#1781FF")
             tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False,
                                       border_radius=14, filled=True, fill_color="#1F1F26",
-                                      border_color="#3A3A45", focused_border_color="#FF8A65")
+                                      border_color="#3A3A45", focused_border_color="#1781FF")
 
             progress_status = ft.Text("", size=14)
             progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
@@ -2499,7 +2499,7 @@ def main(page: ft.Page):
             )
             note_content_input = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=4,
                                                border_radius=14, filled=True, fill_color="#1F1F26",
-                                               border_color="#3A3A45", focused_border_color="#FF8A65")
+                                               border_color="#3A3A45", focused_border_color="#1781FF")
             note_picker_col, note_files, reset_note_picker = make_file_picker_button(
                 "📷 笔记图片（可多选）", "image", on_complete=None)
 
@@ -2535,7 +2535,7 @@ def main(page: ft.Page):
                                         offset=ft.Offset(0, 4)),
                 )
 
-            def u_primary_btn(text, on_click, icon=None, color="#FF8A65"):
+            def u_primary_btn(text, on_click, icon=None, color="#1781FF"):
                 """全宽圆角主按钮"""
                 return ft.ElevatedButton(
                     text, icon=icon, on_click=on_click,
@@ -2895,7 +2895,7 @@ def main(page: ft.Page):
                             content=ft.Text(text, size=14, selectable=True, color="#FFFFFF"),
                             padding=ft.Padding(left=14, right=14, top=10, bottom=10),
                             border_radius=ft.BorderRadius(16, 16, 4, 16),
-                            bgcolor="#FF8A65",
+                            bgcolor="#1781FF",
                             shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
                             width=280,
                         ),
@@ -2979,7 +2979,7 @@ def main(page: ft.Page):
                     avatar = ft.Container(
                         content=ft.Text("AI", size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
                         width=30, height=30, border_radius=15,
-                        bgcolor="#FF8A65", alignment=ft.alignment.center,
+                        bgcolor="#1781FF", alignment=ft.alignment.center,
                         shadow=ft.BoxShadow(blur_radius=6, color="#44FF8A65"),
                     )
                     row = ft.Row([avatar, bubble, ft.Container(expand=True)],
@@ -3014,7 +3014,7 @@ def main(page: ft.Page):
                                     ft.Text("📊", size=16),
                                     ft.Text("查看图表", size=13, color="#FFCCCC"),
                                 ], spacing=4, tight=True),
-                                bgcolor="#3A2A22",
+                                bgcolor="#17355C",
                                 border_radius=12,
                                 padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                                 border=ft.border.all(1, "#6B4A3A"),
@@ -3029,7 +3029,7 @@ def main(page: ft.Page):
                     multiline=True, min_lines=1, max_lines=8,
                     border_radius=20,
                     border_color="#3A3A45",
-                    focused_border_color="#FF8A65",
+                    focused_border_color="#1781FF",
                     filled=True,
                     fill_color="#1F1F26",
                     text_size=14,
@@ -3039,7 +3039,7 @@ def main(page: ft.Page):
                 send_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_UPWARD, size=20, color="#FFFFFF"),
                     width=40, height=40, border_radius=20,
-                    bgcolor="#FF8A65",
+                    bgcolor="#1781FF",
                     alignment=ft.alignment.center,
                     on_click=lambda e: handle_send(),
                     ink=True,
@@ -3215,7 +3215,7 @@ def main(page: ft.Page):
                                         ft.Text("📊", size=16),
                                         ft.Text("查看图表", size=13, color="#FFCCCC"),
                                     ], spacing=4, tight=True),
-                                    bgcolor="#3A2A22",
+                                    bgcolor="#17355C",
                                     border_radius=12,
                                     padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                                     border=ft.border.all(1, "#6B4A3A"),
@@ -3355,7 +3355,7 @@ def main(page: ft.Page):
                 content_children = []
                 content_children.append(ft.Text(f"📖 {word}", size=24, weight=ft.FontWeight.BOLD))
                 if phonetic:
-                    content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#FF8A65"))
+                    content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#5BA3FF"))
                 if meaning:
                     content_children.append(ft.Text(meaning, size=16, color="#81C784"))
                 if example:
@@ -3449,7 +3449,7 @@ def main(page: ft.Page):
                     ft.Container(
                         content=ft.Text("✅ 已在生词本" if is_in_nw else "➕ 加入生词本",
                                         size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
-                        bgcolor="#66BB6A" if is_in_nw else "#FF8A65",
+                        bgcolor="#66BB6A" if is_in_nw else "#1781FF",
                         border_radius=20,
                         padding=ft.Padding(left=16, right=16, top=8, bottom=8),
                         on_click=toggle_nw, ink=True))
@@ -3469,7 +3469,7 @@ def main(page: ft.Page):
                     ai_btn = ft.ElevatedButton(
                         "🤖 使用 AI 补齐缺失信息",
                         icon=ft.Icons.AUTO_AWESOME,
-                        bgcolor="#3A2A22",
+                        bgcolor="#17355C",
                         color="#FFB74D",
                         on_click=do_fill_ai
                     )
@@ -3495,7 +3495,7 @@ def main(page: ft.Page):
                 def set_tab(idx):
                     tab_index[0] = idx
                     for i, btn in enumerate(tab_buttons):
-                        btn.bgcolor = "#FF8A65" if i == idx else "#26262E"
+                        btn.bgcolor = "#1781FF" if i == idx else "#26262E"
                         for c in btn.content.controls:
                             if isinstance(c, ft.Text):
                                 c.color = "#FFFFFF" if i == idx else "#CCCCCC"
@@ -3805,13 +3805,13 @@ def main(page: ft.Page):
                             action_area.content = ft.Row([
                                 ft.ElevatedButton("显示答案", icon=ft.Icons.VISIBILITY,
                                                   on_click=lambda e: (state.update({"flipped": True}), render_card()),
-                                                  bgcolor="#FF8A65", color="#FFFFFF", expand=True)
+                                                  bgcolor="#1781FF", color="#FFFFFF", expand=True)
                             ], spacing=10)
                         else:
                             back = ft.Container(
                                 content=ft.Column([
                                     ft.Text(word, size=30, weight=ft.FontWeight.BOLD),
-                                    ft.Text(phonetic, size=16, color="#FF8A65") if phonetic else ft.Text(""),
+                                    ft.Text(phonetic, size=16, color="#1781FF") if phonetic else ft.Text(""),
                                     ft.Divider(),
                                     ft.Text(meaning, size=18, color="#81C784"),
                                     ft.Text(f"例句：{example}", size=13, italic=True,
@@ -3953,14 +3953,14 @@ def main(page: ft.Page):
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的中文释义", size=13, color=ft.Colors.GREY_500),
                                 ft.Text(word, size=36, weight=ft.FontWeight.BOLD),
-                                ft.Text(phonetic, size=14, color="#FF8A65") if phonetic else ft.Text(""),
+                                ft.Text(phonetic, size=14, color="#1781FF") if phonetic else ft.Text(""),
                                 ft.Container(height=20),
                                 ft.Column(opt_btns, spacing=8),
                                 ft.Container(height=10),
                                 result_text,
                                 ft.Container(height=10),
                                 ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                          bgcolor="#FF8A65", color="#FFFFFF")],
+                                                          bgcolor="#1781FF", color="#FFFFFF")],
                                        alignment=ft.MainAxisAlignment.CENTER),
                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
                         elif mode == "meaning2word":
@@ -4007,7 +4007,7 @@ def main(page: ft.Page):
                                 result_text,
                                 ft.Container(height=10),
                                 ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                          bgcolor="#FF8A65", color="#FFFFFF")],
+                                                          bgcolor="#1781FF", color="#FFFFFF")],
                                        alignment=ft.MainAxisAlignment.CENTER),
                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
                         else:
@@ -4041,7 +4041,7 @@ def main(page: ft.Page):
                                 input_field,
                                 ft.Container(height=10),
                                 ft.Row([
-                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#FF8A65", color="#FFFFFF"),
+                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#1781FF", color="#FFFFFF"),
                                     ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
                                                       bgcolor="#26262E", color="#FFFFFF"),
                                 ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
@@ -4119,10 +4119,10 @@ def main(page: ft.Page):
                 search_input = ft.TextField(
                     label="🔍 搜索错题",
                     hint_text="多个词用空格分隔，如：导数 单调性 易错",
-                    expand=True, border_color="#FF8A65", border_width=2)
+                    expand=True, border_color="#1781FF", border_width=2)
                 local_search_btn = ft.ElevatedButton(
                     "搜索", on_click=lambda e: do_local_search(), icon=ft.Icons.SEARCH,
-                    bgcolor="#FF8A65", color=ft.Colors.WHITE)
+                    bgcolor="#1781FF", color=ft.Colors.WHITE)
                 ai_search_btn = ft.TextButton(
                     "🤖 AI 深度搜索", on_click=lambda e: perform_search(e))
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
@@ -4241,7 +4241,7 @@ def main(page: ft.Page):
                                         for t in tags_now:
                                             tag_chips.controls.append(ft.Container(
                                                 content=ft.Text(t, size=12, color="#FFCCBC"),
-                                                bgcolor="#3A2A22", border_radius=10,
+                                                bgcolor="#17355C", border_radius=10,
                                                 padding=ft.Padding(left=8, right=8, top=3, bottom=3),
                                                 border=ft.border.all(1, "#6B4A3A")))
                                         detail_children.append(
@@ -4313,7 +4313,7 @@ def main(page: ft.Page):
 
                                     action_row = ft.Row([
                                         ft.ElevatedButton("🎓 问老师", on_click=open_ask_teacher,
-                                                          icon=ft.Icons.SCHOOL, bgcolor="#FF8A65",
+                                                          icon=ft.Icons.SCHOOL, bgcolor="#1781FF",
                                                           color=ft.Colors.WHITE),
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
                                         ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
@@ -4446,7 +4446,7 @@ def main(page: ft.Page):
                                 content=ft.Column(inner_children, spacing=4),
                                 padding=12, border_radius=14, bgcolor=bg_color,
                                 border=ft.border.all(2 if is_highlighted else 1,
-                                                    "#FF8A65" if is_highlighted else "#4A4A55"),
+                                                    "#1781FF" if is_highlighted else "#4A4A55"),
                                 on_click=make_show_detail_card(item), ink=True)
                             container.key = str(idx)
                             list_view.controls.append(container)
@@ -4491,7 +4491,7 @@ def main(page: ft.Page):
                         page.update()
                         return
                     search_status.value = f"⏳ AI 正在分析：{query}"
-                    search_status.color = "#FF8A65"
+                    search_status.color = "#1781FF"
                     page.update()
 
                     def do_search():
@@ -4553,7 +4553,7 @@ def main(page: ft.Page):
                 return ft.Column([
                     ft.Text("📋 错题本", size=20, weight=ft.FontWeight.BOLD),
                     ft.Text("🔍 本地加权搜索（多个词空格分隔）｜AI 深度搜索可选", size=13,
-                            color="#FF8A65"),
+                            color="#1781FF"),
                     search_row,
                     search_status,
                     ft.Divider(height=1),
@@ -4783,7 +4783,7 @@ def main(page: ft.Page):
                         count = max(1, min(count, 20))
                         page.close(dialog)
                         status_text.value = f"⏳ AI正在生成 {count} 个金句..."
-                        status_text.color = "#FF8A65"
+                        status_text.color = "#1781FF"
                         page.update()
 
                         def gen_thread():
@@ -4937,7 +4937,7 @@ def main(page: ft.Page):
 
             def build_function_card_grid(subject):
                 all_cards = [
-                    ("📋", "错题本", "#3A2A22"),
+                    ("📋", "错题本", "#17355C"),
                     ("📝", "笔记本", "#223A22"),
                     ("📖", "单词本", "#3A2F22"),
                     ("💬", "金句", "#3A2233"),
@@ -4999,7 +4999,7 @@ def main(page: ft.Page):
                                         color="white" if is_selected else "#CCCCCC"),
                         padding=ft.Padding(left=16, top=12, right=16, bottom=12),
                         border_radius=12,
-                        bgcolor="#FF8A65" if is_selected else "#26262E",
+                        bgcolor="#1781FF" if is_selected else "#26262E",
                         on_click=lambda e, ss=s: on_subject_selected(ss))
                     subj_buttons.append(btn)
                 return ft.Container(content=ft.Column(subj_buttons, spacing=6), width=100, padding=10)
@@ -5121,9 +5121,10 @@ def main(page: ft.Page):
                                               height=30)]),
                     ft.Divider(height=5), today_plan_text
                 ], spacing=8),
-                padding=15, border_radius=16, bgcolor="#2A2620",
-                border=ft.border.all(1, "#6B5838"),
-                shadow=ft.BoxShadow(blur_radius=12, color="#44000000"))
+                # AstroBox 风格：半透明毛玻璃卡片 + 大圆角 + 主色细边框
+                padding=15, border_radius=24, bgcolor="#CC1A1A1E", blur=12,
+                border=ft.border.all(1, "#401781FF"),
+                shadow=ft.BoxShadow(blur_radius=20, color="#44000000"))
 
             task_list = ft.Column(spacing=6)
             new_task_input = ft.TextField(label="新学习任务", expand=True)
@@ -5281,7 +5282,7 @@ def main(page: ft.Page):
                 total = len(todo)
                 retag_state["running"] = True
                 retag_status.value = f"⏳ 排队中：共 {total} 条待重打"
-                retag_status.color = "#FF8A65"
+                retag_status.color = "#1781FF"
                 page.update()
 
                 def do_retag():
