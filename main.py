@@ -132,13 +132,15 @@ def ensure_learning_field(word_data):
         word_data["learning"] = {
             "status": "new", "level": 0,
             "next_review": datetime.now().strftime("%Y-%m-%d"),
-            "review_count": 0, "correct_count": 0, "wrong_count": 0, "last_review": ""
+            "review_count": 0, "correct_count": 0, "wrong_count": 0, "last_review": "",
+            "synced": True   # 是否已推送到手环（新增词为 False，同步后置 True）
         }
     else:
         L = word_data["learning"]
         L.setdefault("status", "new")
         L.setdefault("level", 0)
         L.setdefault("next_review", datetime.now().strftime("%Y-%m-%d"))
+        L.setdefault("synced", True)
         L.setdefault("review_count", 0)
         L.setdefault("correct_count", 0)
         L.setdefault("wrong_count", 0)
@@ -228,9 +230,43 @@ def _str_to_ms(date_str):
         return 0
 
 
+def count_unsynced_words():
+    """统计新增后尚未推送到手环的单词数"""
+    n = 0
+    try:
+        for w in load_jsonl(VOCAB_FILE):
+            ensure_learning_field(w)
+            if not w["learning"].get("synced", True):
+                n += 1
+    except Exception:
+        pass
+    return n
+
+
+def export_wordbook(path):
+    """导出单词本：用户词库格式 JSONL（word/phonetic/meaning/example/forms/grammar/phrases）
+    不含学习状态字段，便于分享/更新词库"""
+    words = load_jsonl(VOCAB_FILE)
+    lines = []
+    for w in words:
+        entry = {
+            "word": w.get("word", ""),
+            "phonetic": w.get("phonetic", ""),
+            "meaning": w.get("meaning", ""),
+            "example": w.get("example", ""),
+            "forms": w.get("forms", ""),
+            "grammar": w.get("grammar", {}) if isinstance(w.get("grammar"), dict) else {},
+            "phrases": w.get("phrases", []) if isinstance(w.get("phrases"), list) else [],
+        }
+        lines.append(json.dumps(entry, ensure_ascii=False))
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + ("\n" if lines else ""))
+    return len(lines)
+
+
 def build_band_wordlist(scope="due", count=50):
     """按协议生成词表 JSON：{version, words:[{w,m,e,i,lvl,c,wc,next}]}
-    scope: due=今日到期优先 low=熟练度低优先 new=新词优先 all=全部按紧急度"""
+    scope: due=今日到期优先 low=熟练度低优先 new=新词优先 unsynced=未同步手环的词优先 all=全部按紧急度"""
     all_words = load_jsonl(VOCAB_FILE)
     today = datetime.now().strftime("%Y-%m-%d")
     now_ms = int(datetime.now().timestamp() * 1000)
@@ -252,9 +288,14 @@ def build_band_wordlist(scope="due", count=50):
             key = (lvl, -due, -wrong)
         elif scope == "new":
             key = (0 if status == "new" else 1, lvl, -due)
+        elif scope == "unsynced":
+            key = (0 if not L.get("synced", True) else 1, lvl, -due)   # 未同步的词排最前
         else:  # all
             key = (-due, lvl, -wrong, w.get("word", "").lower())
         scored.append((key, w, L, word))
+    if scope == "unsynced":
+        # 一键同步新词：只推未同步的词
+        scored = [x for x in scored if not x[2].get("synced", True)]
     scored.sort(key=lambda x: x[0])
     selected = scored[:max(1, min(count, len(scored)))]
     words_out = []
@@ -336,6 +377,7 @@ def start_band_http_server():
     """在 127.0.0.1:8765 起本地同步服务：
     GET  /api/wordlist?scope=due&count=50   → 词表 JSON（伴生App推送用）
     POST /api/records                       → 接收手环记录并智能合并
+    POST /api/sync_ack                      → 伴生App推送成功回执，标记对应词"已同步"
     GET  /health                            → 服务状态"""
     global band_http_server, band_http_running
     if band_http_running:
@@ -389,6 +431,31 @@ def start_band_http_server():
                         merged, updated, new_due, bad = merge_band_records(records)
                     self._send({"merged": merged, "updated": updated,
                                 "new_due": new_due, "bad": bad})
+                except Exception as ex:
+                    self._send({"error": str(ex)}, 500)
+            elif parsed.path == "/api/sync_ack":
+                # 伴生App 推送词表成功 → 标记这些词"已同步"
+                try:
+                    length = int(self.headers.get("Content-Length", 0))
+                    body = self.rfile.read(length).decode("utf-8") if length else "{}"
+                    payload = json.loads(body) if body else {}
+                    if isinstance(payload, dict):
+                        word_list = payload.get("words", [])
+                    else:
+                        word_list = []
+                    marked = 0
+                    with band_http_lock:
+                        existing = load_jsonl(VOCAB_FILE)
+                        wset = {str(x).lower() for x in word_list if str(x)}
+                        if wset:
+                            for w in existing:
+                                ensure_learning_field(w)
+                                if w.get("word", "").lower() in wset and not w["learning"].get("synced", True):
+                                    w["learning"]["synced"] = True
+                                    marked += 1
+                            if marked:
+                                save_jsonl(VOCAB_FILE, existing)
+                    self._send({"ok": True, "marked": marked})
                 except Exception as ex:
                     self._send({"error": str(ex)}, 500)
             else:
@@ -3513,6 +3580,7 @@ def main(page: ft.Page):
                         new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "",
                                      "forms": "", "grammar": {}, "phrases": []}
                         ensure_learning_field(new_entry)
+                        new_entry["learning"]["synced"] = False   # 新词未同步手环
                         existing.append(new_entry)
                         save_jsonl(VOCAB_FILE, existing)
                         show_toast(f"已添加 {word}，点开自动补齐", "green")
@@ -3545,6 +3613,7 @@ def main(page: ft.Page):
                                     if not wd or wd in existing_words:
                                         continue
                                     ensure_learning_field(w)
+                                    w["learning"]["synced"] = False   # 导入的新词未同步手环
                                     existing.append(w)
                                     existing_words.add(wd)
                                     added += 1
@@ -3561,8 +3630,27 @@ def main(page: ft.Page):
                         "📥 导入词汇文件", icon=ft.Icons.UPLOAD_FILE,
                         on_click=lambda e: import_picker.pick_files(
                             file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["jsonl"]))
+
+                    export_picker = ft.FilePicker(on_result=lambda e: on_export_result(e))
+                    page.overlay.append(export_picker)
+
+                    def on_export_result(e: ft.FilePickerResultEvent):
+                        if e.path:
+                            try:
+                                n = export_wordbook(e.path)
+                                show_toast(f"✅ 已导出 {n} 词", "green")
+                            except Exception as ex:
+                                show_toast(f"❌ 导出失败: {str(ex)[:50]}", "red")
+
+                    export_btn = ft.ElevatedButton(
+                        "📤 导出单词本", icon=ft.Icons.DOWNLOAD,
+                        on_click=lambda e: export_picker.save_file(
+                            dialog_title="导出单词本",
+                            file_name="vocabulary.jsonl",
+                            file_type=ft.FilePickerFileType.CUSTOM,
+                            allowed_extensions=["jsonl"]))
                     return ft.Column([
-                        import_btn,
+                        ft.Row([import_btn, export_btn], spacing=8),
                         ft.Text("点击单词查看详情，缺字段自动 AI 补齐", size=13, color=ft.Colors.GREY_500),
                         ft.Row([search_field, count_text], spacing=10),
                         ft.Divider(height=1),
@@ -5341,6 +5429,7 @@ def main(page: ft.Page):
 
             # ---------- 手环背单词 操控中心 ----------
             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+            band_sync_status = ft.Text("", size=13, color="#FFB74D")
             band_http_status = ft.Text("🔌 本地同步服务：未启动", size=13, color=ft.Colors.GREY_500)
             band_http_btn = ft.ElevatedButton(
                 "🔗 启动本地同步", icon=ft.Icons.SENSOR_DOOR,
@@ -5359,6 +5448,37 @@ def main(page: ft.Page):
             band_records_picker = ft.FilePicker(on_result=lambda e: on_band_records_result(e))
             page.overlay.append(band_export_picker)
             page.overlay.append(band_records_picker)
+
+            def refresh_band_sync_status():
+                """刷新"未同步新词"提醒：新增词推送成功后由 sync_ack 置 True"""
+                n = count_unsynced_words()
+                if n > 0:
+                    band_sync_status.value = f"⚠ 有 {n} 个新增单词尚未同步到手环"
+                    band_sync_status.color = "#FFB74D"
+                else:
+                    band_sync_status.value = "✅ 单词本与手环已同步"
+                    band_sync_status.color = "#81C784"
+                page.update()
+
+            def on_band_sync_new_words(e):
+                """一键同步新词：把新增未同步的词推到手环（scope=unsynced）"""
+                if app_state["busy"]:
+                    show_toast(f"⏳ 正在「{app_state['busy']}」，先等它跑完", "orange")
+                    return
+                n = count_unsynced_words()
+                if n == 0:
+                    show_toast("没有需要同步的新词", "info")
+                    return
+                if not band_http_running:
+                    if not start_band_http_server():
+                        show_toast("本地同步未启动，先点启动", "red")
+                        return
+                    refresh_band_http_ui()
+                try:
+                    page.launch_url(f"chiyu-sync://push?scope=unsynced&count={min(n, 500)}")
+                    show_toast(f"正在推送 {min(n, 500)} 个新词到手环…", "green")
+                except Exception as ex:
+                    show_toast(f"拉起失败（装了伴生App吗？）：{ex}", "red")
 
             def refresh_band_http_ui():
                 if band_http_running:
@@ -5631,10 +5751,13 @@ def main(page: ft.Page):
                 mine_msg,
                 ft.Divider(),
                 ft.Text("⌚ 手环背单词", size=20),
+                band_sync_status,
                 band_http_btn,
                 band_http_status,
                 ft.Row([band_scope, band_count_field]),
                 ft.Row([
+                    ft.ElevatedButton("🔄 一键同步新词", icon=ft.Icons.SYNC,
+                                      on_click=on_band_sync_new_words),
                     ft.ElevatedButton("🚀 一键推送", icon=ft.Icons.SEND,
                                       on_click=on_band_quick_push),
                     ft.ElevatedButton("📤 存为文件", icon=ft.Icons.UPLOAD_FILE,
@@ -5705,6 +5828,10 @@ def main(page: ft.Page):
                     current_page.content = subject_page
                 elif index == 2:
                     current_page.content = mine_page
+                    try:
+                        refresh_band_sync_status()
+                    except Exception:
+                        pass
                 current_page.opacity = 0
                 page.update()
                 current_page.opacity = 1
