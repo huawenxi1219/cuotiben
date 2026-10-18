@@ -69,6 +69,7 @@ SENTENCES_FILE = os.path.join(DATA_DIR, "sentences.jsonl")
 LEARNING_EVENTS_FILE = os.path.join(DATA_DIR, "learning_events.jsonl")
 VOCAB_SETTINGS_FILE = os.path.join(DATA_DIR, "vocab_settings.json")
 _jsonl_lock = threading.Lock()
+_vocab_rw_lock = threading.Lock()   # 词库"读→改→写"原子锁（AI 补齐/派生词生成用）
 def now_ms():
     """统一的毫秒级时间戳，以后所有事件时间线都用这个"""
     return int(time.time() * 1000)
@@ -808,6 +809,17 @@ def save_jsonl(filepath, data_list):
             for item in data_list:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
+_vocab_cache = {"data": None, "ts": 0.0}
+def load_vocab_cached(max_age=2.0):
+    """词库短缓存：详情页高频打开时避免每次都全量读文件"""
+    now = time.time()
+    if _vocab_cache["data"] is not None and now - _vocab_cache["ts"] < max_age:
+        return _vocab_cache["data"]
+    data = load_jsonl(VOCAB_FILE)
+    _vocab_cache["data"] = data
+    _vocab_cache["ts"] = now
+    return data
+
 def migrate_timestamps():
     """一次性迁移：给所有历史数据补 event_id 和毫秒级 timestamp"""
     marker = os.path.join(DATA_DIR, ".migrated_v2")
@@ -1455,7 +1467,7 @@ def generate_word_info(word):
             try:
                 new_data = json.loads(content)
             except BaseException:
-                match = re.search(r'\{[^}]+\}', content)
+                match = re.search(r'\{.*\}', content, re.S)
                 new_data = json.loads(match.group()) if match else None
             if new_data:
                 new_data.setdefault("phonetic", "")
@@ -3327,20 +3339,21 @@ def main(page: ft.Page):
                     return word_data
                 new_data = generate_word_info(word)
                 if not new_data:
-                    return word_data
-                existing = load_jsonl(VOCAB_FILE)
-                for i, w in enumerate(existing):
-                    if w.get("word", "").lower() == word.lower():
-                        for k, v in new_data.items():
-                            if k == "grammar":
-                                existing[i]["grammar"] = v if v else existing[i].get("grammar", {})
-                            elif k == "phrases":
-                                existing[i]["phrases"] = v if v else existing[i].get("phrases", [])
-                            elif v:
-                                existing[i][k] = v
-                        word_data = existing[i]
-                        break
-                save_jsonl(VOCAB_FILE, existing)
+                    return None   # 失败：调用处负责提示，避免假成功
+                with _vocab_rw_lock:
+                    existing = load_jsonl(VOCAB_FILE)
+                    for i, w in enumerate(existing):
+                        if w.get("word", "").lower() == word.lower():
+                            for k, v in new_data.items():
+                                if k == "grammar":
+                                    existing[i]["grammar"] = v if v else existing[i].get("grammar", {})
+                                elif k == "phrases":
+                                    existing[i]["phrases"] = v if v else existing[i].get("phrases", [])
+                                elif v:
+                                    existing[i][k] = v
+                            word_data = existing[i]
+                            break
+                    save_jsonl(VOCAB_FILE, existing)
                 return word_data
 
             def _open_word_detail(word_data, on_close=None):
@@ -3365,7 +3378,7 @@ def main(page: ft.Page):
                     if forms_words:
                         forms_row = ft.Row(spacing=8, wrap=True)
                         forms_row.controls.append(ft.Text("变形：", size=14, weight=ft.FontWeight.BOLD))
-                        all_vocab_now = load_jsonl(VOCAB_FILE)
+                        all_vocab_now = load_vocab_cached()
                         for fw in forms_words:
                             target_word_data = next((w for w in all_vocab_now if w.get("word", "").lower() == fw.lower()), None)
                             if target_word_data:
@@ -3376,17 +3389,44 @@ def main(page: ft.Page):
                                                          text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)))
                             else:
                                 def make_gen_click(fw_word):
+                                    _gen_state = {"running": False}
                                     def on_click(e):
-                                        show_toast(f"⏳ 正在生成 {fw_word}...", "info")
+                                        if _gen_state["running"]:
+                                            return   # 防抖：该词生成中不重复触发
+                                        _cfg_now = load_ai_config()
+                                        _info_now = PROVIDERS.get(_cfg_now.get("provider", "zhipu"), PROVIDERS["zhipu"])
+                                        if not _cfg_now.get(_info_now["key_field"], "").strip():
+                                            show_toast("⚠ 请先在 AI 设置中配置 API Key 再生成派生词", "red")
+                                            return
+                                        _gen_state["running"] = True
+                                        try:
+                                            e.control.disabled = True
+                                        except BaseException:
+                                            pass
+                                        page.update()
                                         def _bg():
-                                            new_d = generate_word_info(fw_word)
-                                            if new_d:
-                                                ev = load_jsonl(VOCAB_FILE)
-                                                ev.append(new_d)
-                                                save_jsonl(VOCAB_FILE, ev)
-                                                show_toast(f"✅ 已添加 {fw_word}", "green")
-                                            else:
-                                                show_toast(f"❌ 生成失败", "red")
+                                            try:
+                                                new_d = generate_word_info(fw_word)
+                                                if new_d:
+                                                    with _vocab_rw_lock:
+                                                        ev = load_jsonl(VOCAB_FILE)
+                                                        if any(w.get("word", "").lower() == fw_word.lower() for w in ev):
+                                                            show_toast(f"ℹ️ {fw_word} 已在词库中", "info")
+                                                        else:
+                                                            ev.append(new_d)
+                                                            save_jsonl(VOCAB_FILE, ev)
+                                                            show_toast(f"✅ 已生成并添加 {fw_word}", "green")
+                                                else:
+                                                    show_toast(f"❌ 生成 {fw_word} 失败：未返回有效信息（检查网络或 Key）", "red")
+                                            except Exception as ex:
+                                                show_toast(f"❌ 生成异常：{str(ex)[:40]}", "red")
+                                            finally:
+                                                _gen_state["running"] = False
+                                                try:
+                                                    e.control.disabled = False
+                                                    page.update()
+                                                except BaseException:
+                                                    pass
                                         threading.Thread(target=_bg, daemon=True).start()
                                     return on_click
                                 btn = ft.TextButton(
@@ -3456,14 +3496,38 @@ def main(page: ft.Page):
 
                 if _needs_completion(word_data):
                     def do_fill_ai(e):
+                        _cfg_now = load_ai_config()
+                        _info_now = PROVIDERS.get(_cfg_now.get("provider", "zhipu"), PROVIDERS["zhipu"])
+                        if not _cfg_now.get(_info_now["key_field"], "").strip():
+                            show_toast("⚠ 请先在 AI 设置中配置 API Key 再使用补齐", "red")
+                            return
+                        if getattr(ai_btn, "_running", False):
+                            return   # 防抖：生成中不再重复触发
+                        ai_btn._running = True
                         ai_btn.content.value = "⏳ 正在请求 AI..."
                         ai_btn.disabled = True
                         page.update()
                         def _bg():
-                            filled_data = _fill_word_with_ai(word_data)
-                            page.close(dialog)
-                            _open_word_detail(filled_data, on_close=on_close)
-                            show_toast("✅ 补齐成功", "green")
+                            try:
+                                filled_data = _fill_word_with_ai(word_data)
+                                if filled_data is None:
+                                    show_toast("❌ AI 补齐失败：未返回有效信息（检查网络或 Key）", "red")
+                                elif filled_data is word_data:
+                                    show_toast("ℹ️ 该单词信息已完整，无需补齐", "info")
+                                else:
+                                    page.close(dialog)
+                                    _open_word_detail(filled_data, on_close=on_close)
+                                    show_toast("✅ 补齐成功", "green")
+                            except Exception as ex:
+                                show_toast(f"❌ 补齐异常：{str(ex)[:40]}", "red")
+                            finally:
+                                try:
+                                    ai_btn._running = False
+                                    ai_btn.content.value = "🤖 使用 AI 补齐缺失信息"
+                                    ai_btn.disabled = False
+                                    page.update()
+                                except BaseException:
+                                    pass
                         threading.Thread(target=_bg, daemon=True).start()
 
                     ai_btn = ft.ElevatedButton(
