@@ -1212,6 +1212,28 @@ def get_api_endpoint():
     return key, info["url"], info["model"], info["vision_model"]
 
 
+def endpoint_for(task="smart"):
+    """DeepTutor 式任务分工：
+    cheap → 免费模型（打标签/错题自动分析/单词补齐/金句/诊断）
+    smart → 增强模型（AI 对话/深度分析/难度出题/今日计划）
+    增强 key 缺省时依次回退 DeepSeek、免费模型。"""
+    cfg = load_ai_config()
+    provider = cfg.get("provider", "zhipu")
+    info = PROVIDERS.get(provider, PROVIDERS["zhipu"])
+    if task == "cheap":
+        key = cfg.get(info["key_field"], "").strip()
+        return key, info["url"], info["model"], info.get("vision_model", "")
+    key_enh = cfg.get("api_key_enhanced", "").strip()
+    if key_enh:
+        zi = PROVIDERS["zhipu"]
+        return key_enh, zi["url"], "glm-4-air", zi.get("vision_model", "")
+    key_ds = cfg.get("api_key_deepseek", "").strip()
+    if key_ds:
+        dk = PROVIDERS["deepseek"]
+        return key_ds, dk["url"], dk["model"], dk.get("vision_model", "")
+    return endpoint_for("cheap")
+
+
 def provider_supports_vision():
     cfg = load_ai_config()
     provider = cfg.get("provider", "zhipu")
@@ -1345,10 +1367,7 @@ def auto_tag_error(timestamp):
     content_text = "\n".join(content_parts)
     if not content_text:
         return
-    _cfg = load_ai_config()
-    _provider = _cfg.get("provider", "zhipu")
-    _info = PROVIDERS.get(_provider, PROVIDERS["zhipu"])
-    api_key = _cfg.get(_info["key_field"], "").strip()
+    api_key, api_url, api_model, _v = endpoint_for("cheap")
     if not api_key:
         return
     prompt = f"""你是一个专业的高中老师。请给下面这道错题打尽量多且精准的标签。
@@ -1375,9 +1394,9 @@ def auto_tag_error(timestamp):
 {{"tags": ["标签1", "标签2", "标签3", "标签4", "标签5", "标签6", "标签7", "标签8"], "error_type": "计算错误/概念不清/审题偏差/公式遗忘/方法错误/其他", "difficulty": 1-5, "reason": "简短错误分析"}}
 只输出 JSON。"""
     try:
-        resp = requests.post(_info["url"],
+        resp = requests.post(api_url,
                              headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                             json={"model": _info["model"], "messages": [{"role": "user", "content": prompt}],
+                             json={"model": api_model, "messages": [{"role": "user", "content": prompt}],
                                    "temperature": 0.3, "max_tokens": 500}, timeout=30)
         if resp.status_code == 200:
             content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -1440,10 +1459,7 @@ def save_note(subject, content, media):
 
 @retry_request(max_retries=3, base_delay=2)
 def generate_word_info(word):
-    _cfg = load_ai_config()
-    _provider = _cfg.get("provider", "zhipu")
-    _info = PROVIDERS.get(_provider, PROVIDERS["zhipu"])
-    api_key = _cfg.get(_info["key_field"], "").strip()
+    api_key, api_url, api_model, _v = endpoint_for("cheap")
     if not api_key:
         return None
     prompt = f"""请为英语单词 "{word}" 生成词条信息，格式为 JSON：
@@ -1458,9 +1474,9 @@ def generate_word_info(word):
 }}
 只返回 JSON 对象。"""
     try:
-        resp = requests.post(_info["url"],
+        resp = requests.post(api_url,
                              headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                             json={"model": _info["model"], "messages": [{"role": "user", "content": prompt}],
+                             json={"model": api_model, "messages": [{"role": "user", "content": prompt}],
                                    "temperature": 0.3, "max_tokens": 600}, timeout=20)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"]
@@ -1639,15 +1655,15 @@ def _svg_bar(title, labels, values, unit=""):
     max_v = max(max_v, 1)
     bar_w = cw / n * 0.6
     gap = cw / n
-    colors = ["#1781FF", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
-              "#4DB6AC", "#F06292", "#FFD54F", "#9575CD"]
+    colors = ["#7AA2F7", "#BB9AF7", "#9ECE6A", "#E0AF68", "#73DACA",
+              "#DB9DF7", "#F7768E", "#E1C7FA", "#A9B1D6"]
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
-         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<rect width="{W}" height="{H}" fill="#1A1B26" rx="16"/>',
          f'<text x="{W/2}" y="34" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>']
     for i in range(5):
         y = pad_t + ch * i / 4
         v = max_v * (4 - i) / 4
-        p.append(f'<line x1="{pad_l}" y1="{y}" x2="{W-pad_r}" y2="{y}" stroke="#2F2F38" stroke-width="1"/>')
+        p.append(f'<line x1="{pad_l}" y1="{y}" x2="{W-pad_r}" y2="{y}" stroke="#2A2E44" stroke-width="1"/>')
         p.append(f'<text x="{pad_l-8}" y="{y+4}" fill="#777777" font-size="10" text-anchor="end">{v:.0f}{unit}</text>')
     for i, (lb, v) in enumerate(zip(labels, values)):
         x = pad_l + gap * i + (gap - bar_w) / 2
@@ -1669,10 +1685,10 @@ def _svg_pie(title, items):
     W, H = 660, 400
     cx, cy, r, r2 = 220, 220, 120, 72
     total = sum(it.get("value", 0) for it in items) or 1
-    colors = ["#1781FF", "#FFB74D", "#81C784", "#64B5F6", "#BA68C8",
-              "#4DB6AC", "#F06292", "#FFD54F", "#9575CD"]
+    colors = ["#7AA2F7", "#BB9AF7", "#9ECE6A", "#E0AF68", "#73DACA",
+              "#DB9DF7", "#F7768E", "#E1C7FA", "#A9B1D6"]
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
-         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<rect width="{W}" height="{H}" fill="#1A1B26" rx="16"/>',
          f'<text x="{W/2}" y="34" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>']
     angle = -math.pi / 2
     for i, it in enumerate(items):
@@ -1708,13 +1724,13 @@ def _svg_timeline(title, events):
     row_h = 88
     H = 100 + n * row_h
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
-         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<rect width="{W}" height="{H}" fill="#1A1B26" rx="16"/>',
          f'<text x="{W/2}" y="36" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>',
-         f'<line x1="130" y1="70" x2="130" y2="{H-30}" stroke="#3A3A45" stroke-width="2"/>']
+         f'<line x1="130" y1="70" x2="130" y2="{H-30}" stroke="#414868" stroke-width="2"/>']
     for i, ev in enumerate(events):
         y = 90 + i * row_h
-        p.append(f'<circle cx="130" cy="{y}" r="7" fill="#1781FF"/>')
-        p.append(f'<circle cx="130" cy="{y}" r="13" fill="none" stroke="#1781FF" stroke-opacity="0.3" stroke-width="2"/>')
+        p.append(f'<circle cx="130" cy="{y}" r="7" fill="#7AA2F7"/>')
+        p.append(f'<circle cx="130" cy="{y}" r="13" fill="none" stroke="#7AA2F7" stroke-opacity="0.3" stroke-width="2"/>')
         p.append(f'<text x="108" y="{y+4}" fill="#888888" font-size="11" text-anchor="end">{ev.get("date","")}</text>')
         p.append(f'<text x="160" y="{y-2}" fill="#EEEEEE" font-size="14" font-weight="bold">{ev.get("title","")}</text>')
         desc = ev.get("desc", "")
@@ -1733,10 +1749,10 @@ def _svg_flow(title, steps):
     W = 40 + n * card_w + (n - 1) * gap + 40
     H = 250
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif">',
-         f'<rect width="{W}" height="{H}" fill="#1C1C22" rx="16"/>',
+         f'<rect width="{W}" height="{H}" fill="#1A1B26" rx="16"/>',
          f'<text x="{W/2}" y="38" fill="#EEEEEE" font-size="17" font-weight="bold" text-anchor="middle">{title}</text>']
     sm = {"ok": ("#1E3A22", "#66BB6A", "✓"),
-          "warn": ("#3A3418", "#FFB74D", "!"),
+          "warn": ("#3A3418", "#E0AF68", "!"),
           "err": ("#3A1E1E", "#EF5350", "✗"),
           "none": ("#2A2A32", "#888888", "·")}
     for i, st in enumerate(steps):
@@ -1967,14 +1983,15 @@ def main(page: ft.Page):
             page.theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
-                    primary="#1781FF",        # AstroBox 主色（iOS 蓝）
-                    primary_container="#17355C",
-                    secondary="#5BA3FF",
-                    surface="#FAFAFA",
-                    surface_variant="#F5F5F5",
-                    background="#FAFAFA",
-                    on_surface="#1A1A1A",
-                    on_background="#1A1A1A",
+                    primary="#7AA2F7",        # Tokyo Night 蓝紫（主操作色）
+                    primary_container="#24283B",
+                    secondary="#BB9AF7",      # 紫（辅助强调）
+                    tertiary="#73DACA",
+                    surface="#1A1B26",
+                    surface_variant="#24283B",
+                    background="#16161E",
+                    on_surface="#C0CAF5",
+                    on_background="#C0CAF5",
                 ),
                 visual_density=ft.VisualDensity.STANDARD,
             )
@@ -1982,14 +1999,15 @@ def main(page: ft.Page):
             page.dark_theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                 color_scheme=ft.ColorScheme(
-                    primary="#1781FF",        # AstroBox 主色
-                    primary_container="#14345C",
-                    secondary="#5BA3FF",
-                    surface="#1A1A1E",
-                    surface_variant="#24242A",
-                    background="#101014",     # 深色背景（AstroBox #0D0D0F 系）
-                    on_surface="#FFFFFF",
-                    on_background="#FFFFFF",
+                    primary="#7AA2F7",        # Tokyo Night 蓝紫
+                    primary_container="#24283B",
+                    secondary="#BB9AF7",
+                    tertiary="#73DACA",
+                    surface="#1A1B26",
+                    surface_variant="#24283B",
+                    background="#16161E",     # 深蓝黑背景（PyDracula 系）
+                    on_surface="#C0CAF5",
+                    on_background="#C0CAF5",
                 ),
                 visual_density=ft.VisualDensity.STANDARD,
             )
@@ -2165,7 +2183,7 @@ def main(page: ft.Page):
                             content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER),
                             width=48, height=48,
                             border_radius=8,
-                            border=ft.border.all(2, "#1781FF" if is_active else "#555555"),
+                            border=ft.border.all(2, "#7AA2F7" if is_active else "#555555"),
                             on_click=lambda e, idx=i: update_image(idx),
                             ink=True,
                         )
@@ -2247,7 +2265,7 @@ def main(page: ft.Page):
                                 min_scale=1.0, max_scale=6.0,
                                 pan_enabled=True, scale_enabled=True, expand=True,
                             ),
-                            width=420, height=620, bgcolor="#1C1C22",
+                            width=420, height=620, bgcolor="#1A1B26",
                         ),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
                     )
@@ -2357,19 +2375,19 @@ def main(page: ft.Page):
             )
             original_input = ft.TextField(label="原题（题干）", multiline=True, min_lines=3,
                                            border_radius=14, filled=True, fill_color="#1F1F26",
-                                           border_color="#3A3A45", focused_border_color="#1781FF")
+                                           border_color="#414868", focused_border_color="#7AA2F7")
             mistake_input = ft.TextField(label="错因", multiline=True, min_lines=2,
                                          border_radius=14, filled=True, fill_color="#1F1F26",
-                                         border_color="#3A3A45", focused_border_color="#1781FF")
+                                         border_color="#414868", focused_border_color="#7AA2F7")
             answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2,
                                         border_radius=14, filled=True, fill_color="#1F1F26",
-                                        border_color="#3A3A45", focused_border_color="#1781FF")
+                                        border_color="#414868", focused_border_color="#7AA2F7")
             idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2,
                                       border_radius=14, filled=True, fill_color="#1F1F26",
-                                      border_color="#3A3A45", focused_border_color="#1781FF")
+                                      border_color="#414868", focused_border_color="#7AA2F7")
             tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False,
                                       border_radius=14, filled=True, fill_color="#1F1F26",
-                                      border_color="#3A3A45", focused_border_color="#1781FF")
+                                      border_color="#414868", focused_border_color="#7AA2F7")
 
             progress_status = ft.Text("", size=14)
             progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
@@ -2439,7 +2457,7 @@ def main(page: ft.Page):
                 if not provider_supports_vision():
                     show_toast("当前 API 不支持图像识别，请切换到智谱 GLM", "red")
                     return None
-                api_key, api_url, _m, vision_model = get_api_endpoint()
+                api_key, api_url, _m, vision_model = endpoint_for("cheap")
                 if not api_key:
                     return None
                 try:
@@ -2511,7 +2529,7 @@ def main(page: ft.Page):
             )
             note_content_input = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=4,
                                                border_radius=14, filled=True, fill_color="#1F1F26",
-                                               border_color="#3A3A45", focused_border_color="#1781FF")
+                                               border_color="#414868", focused_border_color="#7AA2F7")
             note_picker_col, note_files, reset_note_picker = make_file_picker_button(
                 "📷 笔记图片（可多选）", "image", on_complete=None)
 
@@ -2535,7 +2553,7 @@ def main(page: ft.Page):
                     ft.Container(expand=True, height=1, bgcolor="#2A2A32"),
                 ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
-            def u_card(content, padding=18, radius=20, bg="#1C1C22"):
+            def u_card(content, padding=18, radius=20, bg="#1A1B26"):
                 """苹果风卡片：圆角 + 细边框 + 柔和阴影"""
                 return ft.Container(
                     content=content,
@@ -2547,7 +2565,7 @@ def main(page: ft.Page):
                                         offset=ft.Offset(0, 4)),
                 )
 
-            def u_primary_btn(text, on_click, icon=None, color="#1781FF"):
+            def u_primary_btn(text, on_click, icon=None, color="#7AA2F7"):
                 """全宽圆角主按钮"""
                 return ft.ElevatedButton(
                     text, icon=icon, on_click=on_click,
@@ -2786,7 +2804,7 @@ def main(page: ft.Page):
                 page.update()
 
             def call_ai_stream(messages, model_name, on_chunk):
-                api_key, api_url, api_model, _v = get_api_endpoint()
+                api_key, api_url, api_model, _v = endpoint_for("smart")
                 if not api_key:
                     on_chunk("❌ 未配置API密钥")
                     return
@@ -2907,7 +2925,7 @@ def main(page: ft.Page):
                             content=ft.Text(text, size=14, selectable=True, color="#FFFFFF"),
                             padding=ft.Padding(left=14, right=14, top=10, bottom=10),
                             border_radius=ft.BorderRadius(16, 16, 4, 16),
-                            bgcolor="#1781FF",
+                            bgcolor="#7AA2F7",
                             shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
                             width=280,
                         ),
@@ -2983,16 +3001,16 @@ def main(page: ft.Page):
                         content=ft.Column([content_col, action_row], spacing=4),
                         padding=ft.Padding(left=14, right=8, top=10, bottom=6),
                         border_radius=ft.BorderRadius(16, 16, 16, 4),
-                        bgcolor="#26262E",
-                        border=ft.border.all(1, "#3A3A45"),
+                        bgcolor="#24283B",
+                        border=ft.border.all(1, "#414868"),
                         shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
                         width=300,
                     )
                     avatar = ft.Container(
                         content=ft.Text("AI", size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
                         width=30, height=30, border_radius=15,
-                        bgcolor="#1781FF", alignment=ft.alignment.center,
-                        shadow=ft.BoxShadow(blur_radius=6, color="#44FF8A65"),
+                        bgcolor="#7AA2F7", alignment=ft.alignment.center,
+                        shadow=ft.BoxShadow(blur_radius=6, color="#44BB9AF7"),
                     )
                     row = ft.Row([avatar, bubble, ft.Container(expand=True)],
                                  alignment=ft.MainAxisAlignment.START,
@@ -3018,7 +3036,7 @@ def main(page: ft.Page):
                                         content=ft.Image(src=_svg_path, fit=ft.ImageFit.CONTAIN,
                                                          width=250, border_radius=12),
                                         on_click=make_view(), ink=True,
-                                        border=ft.border.all(1, "#3A3A45"),
+                                        border=ft.border.all(1, "#414868"),
                                         border_radius=12,
                                     ))
                             chart_btn = ft.Container(
@@ -3026,7 +3044,7 @@ def main(page: ft.Page):
                                     ft.Text("📊", size=16),
                                     ft.Text("查看图表", size=13, color="#FFCCCC"),
                                 ], spacing=4, tight=True),
-                                bgcolor="#17355C",
+                                bgcolor="#24283B",
                                 border_radius=12,
                                 padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                                 border=ft.border.all(1, "#6B4A3A"),
@@ -3040,8 +3058,8 @@ def main(page: ft.Page):
                     hint_text=f"向{display_name}老师提问...",
                     multiline=True, min_lines=1, max_lines=8,
                     border_radius=20,
-                    border_color="#3A3A45",
-                    focused_border_color="#1781FF",
+                    border_color="#414868",
+                    focused_border_color="#7AA2F7",
                     filled=True,
                     fill_color="#1F1F26",
                     text_size=14,
@@ -3051,41 +3069,96 @@ def main(page: ft.Page):
                 send_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_UPWARD, size=20, color="#FFFFFF"),
                     width=40, height=40, border_radius=20,
-                    bgcolor="#1781FF",
+                    bgcolor="#7AA2F7",
                     alignment=ft.alignment.center,
                     on_click=lambda e: handle_send(),
                     ink=True,
-                    shadow=ft.BoxShadow(blur_radius=8, color="#44FF8A65"),
+                    shadow=ft.BoxShadow(blur_radius=8, color="#44BB9AF7"),
                 )
                 stop_btn = ft.TextButton("停止生成", visible=False)
+                continue_btn = ft.TextButton("继续生成", visible=False)
 
                 quick_row = ft.Row([
                     ft.Container(
                         content=ft.Text("再讲一遍", size=12, color="#CCCCCC"),
                         padding=ft.Padding(left=12, right=12, top=6, bottom=6),
-                        border_radius=14, bgcolor="#26262E",
-                        border=ft.border.all(1, "#3A3A45"),
+                        border_radius=14, bgcolor="#24283B",
+                        border=ft.border.all(1, "#414868"),
                         on_click=lambda e: handle_send("请再用更简单的方式讲一遍"),
                         ink=True),
                     ft.Container(
                         content=ft.Text("举个例子", size=12, color="#CCCCCC"),
                         padding=ft.Padding(left=12, right=12, top=6, bottom=6),
-                        border_radius=14, bgcolor="#26262E",
-                        border=ft.border.all(1, "#3A3A45"),
+                        border_radius=14, bgcolor="#24283B",
+                        border=ft.border.all(1, "#414868"),
                         on_click=lambda e: handle_send("请举一个具体例子"),
                         ink=True),
                     ft.Container(
                         content=ft.Text("出类似的题", size=12, color="#CCCCCC"),
                         padding=ft.Padding(left=12, right=12, top=6, bottom=6),
-                        border_radius=14, bgcolor="#26262E",
-                        border=ft.border.all(1, "#3A3A45"),
-                        on_click=lambda e: handle_send("出一道类似的题让我练练"),
+                        border_radius=14, bgcolor="#24283B",
+                        border=ft.border.all(1, "#414868"),
+                        on_click=lambda e: ask_similar_q(),
                         ink=True),
                 ], spacing=8, scroll=ft.ScrollMode.AUTO)
 
                 last_user_msg = {"text": ""}
                 last_ai_content_ref = {"col": None}
                 gen_token = {"id": 0}  # 代次令牌：防止旧生成线程串台/重复保存
+
+                def ask_similar_q(e=None):
+                    """DeepTutor 式难度校准出题：
+                    1) 免费模型快速学情诊断（结合画像薄弱点 → 水平/难度建议）
+                    2) 按诊断结果组装「难度匹配出题」指令，走增强对话
+                    3) 诊断失败自动降级为普通出题，不阻塞使用"""
+                    def _run():
+                        diag = None
+                        try:
+                            d_key, d_url, d_model, _v = endpoint_for("cheap")
+                            if d_key:
+                                weak = []
+                                try:
+                                    p_ = load_user_profile()
+                                    wk = p_.get("weak_knowledge", {}) or {}
+                                    for k, v in sorted(wk.items(), key=lambda x: x[1], reverse=True)[:4]:
+                                        weak.append(f"{k}(薄弱度{round(v,2)})")
+                                    if not weak:
+                                        km = p_.get("knowledge_memory", {}) or {}
+                                        weak = list(km.keys())[:4]
+                                except BaseException:
+                                    pass
+                                diag_prompt = (
+                                    "你是资深高中老师，负责给学生做学情诊断。请只输出 JSON，不要任何其他内容："
+                                    '{"weak_point":"一句话指出学生当前最需要练的知识点",'
+                                    '"level":"基础/中档/压轴",'
+                                    '"advice":"一句有针对性的学习建议"}。'
+                                    f"该学生最近的薄弱点：{json.dumps(weak, ensure_ascii=False)}。")
+                                r_ = requests.post(
+                                    d_url,
+                                    headers={"Authorization": f"Bearer {d_key}", "Content-Type": "application/json"},
+                                    json={"model": d_model, "messages": [{"role": "user", "content": diag_prompt}],
+                                          "temperature": 0.3, "max_tokens": 300},
+                                    timeout=15)
+                                if r_.status_code == 200:
+                                    c_ = r_.json()["choices"][0]["message"]["content"]
+                                    try:
+                                        diag = json.loads(c_)
+                                    except BaseException:
+                                        m_ = re.search(r'\{.*\}', c_, re.S)
+                                        diag = json.loads(m_.group()) if m_ else None
+                        except BaseException:
+                            diag = None
+                        if diag and diag.get("weak_point"):
+                            msg = (
+                                f"请结合我刚刚暴露出来的薄弱点【{diag.get('weak_point','')}】，"
+                                f"给我出一道难度匹配我当前水平（{diag.get('level','中档')}）的类似题让我练练："
+                                "先出题让我自己先想一下，不要直接给答案；"
+                                "等我说出答案后你再判对错并详细讲解；"
+                                f"最后告诉我下一步该练什么难度。{diag.get('advice','')}")
+                        else:
+                            msg = "出一道类似的题让我练练：先出题，等我给出答案后再讲解判对错。"
+                        handle_send(msg)
+                    threading.Thread(target=_run, daemon=True).start()
 
                 def regenerate_last():
                     if not last_user_msg["text"]:
@@ -3163,6 +3236,7 @@ def main(page: ft.Page):
                     content_ref = {"col": None, "md": None, "stream": None, "row": None, "actions": None}
                     bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref)
                     last_ai_content_ref["col"] = content_col
+                    last_ai_content_ref["ref"] = content_ref
                     chat_history_display.controls.append(bubble_row)
                     page.update()
 
@@ -3219,7 +3293,7 @@ def main(page: ft.Page):
                                             content=ft.Image(src=_svg_path, fit=ft.ImageFit.CONTAIN,
                                                              width=250, border_radius=12),
                                             on_click=make_view(), ink=True,
-                                            border=ft.border.all(1, "#3A3A45"),
+                                            border=ft.border.all(1, "#414868"),
                                             border_radius=12,
                                         ))
                                 chart_btn = ft.Container(
@@ -3227,7 +3301,7 @@ def main(page: ft.Page):
                                         ft.Text("📊", size=16),
                                         ft.Text("查看图表", size=13, color="#FFCCCC"),
                                     ], spacing=4, tight=True),
-                                    bgcolor="#17355C",
+                                    bgcolor="#24283B",
                                     border_radius=12,
                                     padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                                     border=ft.border.all(1, "#6B4A3A"),
@@ -3247,6 +3321,27 @@ def main(page: ft.Page):
                             save_chat_message(subject, "assistant", ai_response["text"])
                             update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
+                        # —— 断点续传闭环：续写完成后把「半截+续写」合并为一条历史 ——
+                        if continuing["v"]:
+                            continuing["v"] = False
+                            try:
+                                fp_c = get_chat_history_file(subject)
+                                hs_c = load_jsonl(fp_c)
+                                if len(hs_c) >= 3 and hs_c[-1].get("role") == "assistant" \
+                                        and hs_c[-2].get("role") == "user" and hs_c[-3].get("role") == "assistant":
+                                    half_c = hs_c[-3]["content"]
+                                    cont_c = hs_c[-1]["content"]
+                                    hs_c[-3]["content"] = (half_c.rstrip() + "\n\n" + cont_c).strip() if cont_c else half_c
+                                    hs_c = hs_c[:-2]
+                                    save_jsonl(fp_c, hs_c)
+                            except BaseException:
+                                pass
+                        try:
+                            _hs = load_chat_history(subject)
+                            continue_btn.visible = bool(_hs and _hs[-1].get("role") == "assistant"
+                                                        and "〔未完成，等待继续〕" in _hs[-1].get("content", ""))
+                        except BaseException:
+                            continue_btn.visible = False
                         page.update()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
@@ -3255,6 +3350,42 @@ def main(page: ft.Page):
                     nonlocal stop_flag
                     stop_flag = True
                 stop_btn.on_click = stop_generation
+
+                continuing = {"v": False}
+
+                def _continue_generation(e=None):
+                    """真断点续传：从历史最后一条带〔未完成〕标记的半截消息继续写，
+                    续写完成后自动与半截合并为一条完整记录。"""
+                    if generation_active:
+                        return
+                    hs = load_chat_history(subject)
+                    if not hs or hs[-1].get("role") != "assistant" or "〔未完成，等待继续〕" not in hs[-1].get("content", ""):
+                        continue_btn.visible = False
+                        page.update()
+                        return
+                    continuing["v"] = True
+                    hs[-1]["content"] = hs[-1]["content"].replace("〔未完成，等待继续〕", "").rstrip()
+                    try:
+                        save_jsonl(get_chat_history_file(subject), hs)
+                    except BaseException:
+                        pass
+                    # 原气泡更新为干净半截（去掉标记）
+                    try:
+                        _ref = last_ai_content_ref.get("ref")
+                        if _ref and _ref.get("col"):
+                            _half = hs[-1]["content"]
+                            _ref["col"].controls.clear()
+                            _md2 = ft.Markdown(value=_half, selectable=True,
+                                                extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+                                                code_theme="atom-one-dark",
+                                                on_tap_link=lambda ev: page.launch_url(ev.data))
+                            _ref["md"] = _md2
+                            _ref["raw"] = _half
+                            _ref["col"].controls.append(_md2)
+                    except BaseException:
+                        pass
+                    handle_send("（继续）请直接接着上面没写完的讲解继续写，不要重复已经写过的内容，从断点处最后一个字接着往下写。")
+                continue_btn.on_click = _continue_generation
 
                 def clear_history(e):
                     fp = get_chat_history_file(subject)
@@ -3277,7 +3408,7 @@ def main(page: ft.Page):
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                         padding=ft.Padding(left=4, right=4, top=8, bottom=8),
                     ),
-                    ft.Divider(height=1, color="#2F2F38"),
+                    ft.Divider(height=1, color="#2A2E44"),
                     ft.Container(content=chat_history_display, expand=True, padding=ft.Padding(left=4, right=4, top=8, bottom=8)),
                     quick_row,
                     ft.Container(
@@ -3285,6 +3416,7 @@ def main(page: ft.Page):
                             chat_input,
                             send_btn,
                             stop_btn,
+                            continue_btn,
                         ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.END),
                         padding=ft.Padding(left=0, right=0, top=6, bottom=4),
                     ),
@@ -3368,7 +3500,7 @@ def main(page: ft.Page):
                 content_children = []
                 content_children.append(ft.Text(f"📖 {word}", size=24, weight=ft.FontWeight.BOLD))
                 if phonetic:
-                    content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#5BA3FF"))
+                    content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#A9B1D6"))
                 if meaning:
                     content_children.append(ft.Text(meaning, size=16, color="#81C784"))
                 if example:
@@ -3385,7 +3517,7 @@ def main(page: ft.Page):
                                 btn = ft.TextButton(
                                     text=fw,
                                     on_click=lambda e, wd=target_word_data: _open_word_detail(wd),
-                                    style=ft.ButtonStyle(color="#64B5F6",
+                                    style=ft.ButtonStyle(color="#A9B1D6",
                                                          text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)))
                             else:
                                 def make_gen_click(fw_word):
@@ -3431,7 +3563,7 @@ def main(page: ft.Page):
                                     return on_click
                                 btn = ft.TextButton(
                                     text=fw, on_click=make_gen_click(fw),
-                                    style=ft.ButtonStyle(color="#FFB74D",
+                                    style=ft.ButtonStyle(color="#E0AF68",
                                                          text_style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)))
                             forms_row.controls.append(btn)
                         content_children.append(forms_row)
@@ -3446,7 +3578,7 @@ def main(page: ft.Page):
                     if gp_parts:
                         content_children.append(ft.Text("📚 语法", size=14, weight=ft.FontWeight.BOLD))
                         for gp in gp_parts:
-                            content_children.append(ft.Text(gp, size=13, color="#64B5F6"))
+                            content_children.append(ft.Text(gp, size=13, color="#A9B1D6"))
                 if phrases:
                     content_children.append(ft.Text("🔗 短语", size=14, weight=ft.FontWeight.BOLD))
                     for ph in phrases:
@@ -3468,7 +3600,7 @@ def main(page: ft.Page):
                                     size=12, color=ft.Colors.GREY_400))
                     content_children.append(
                         ft.Text(f"  难度系数 {_ease} · 下次复习 {_next_rev or '—'}",
-                                size=12, color="#FFB74D"))
+                                size=12, color="#E0AF68"))
                 
                 nw_set = set(_load_user_new_words())
                 is_in_nw = word in nw_set
@@ -3489,7 +3621,7 @@ def main(page: ft.Page):
                     ft.Container(
                         content=ft.Text("✅ 已在生词本" if is_in_nw else "➕ 加入生词本",
                                         size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
-                        bgcolor="#66BB6A" if is_in_nw else "#1781FF",
+                        bgcolor="#66BB6A" if is_in_nw else "#7AA2F7",
                         border_radius=20,
                         padding=ft.Padding(left=16, right=16, top=8, bottom=8),
                         on_click=toggle_nw, ink=True))
@@ -3533,8 +3665,8 @@ def main(page: ft.Page):
                     ai_btn = ft.ElevatedButton(
                         "🤖 使用 AI 补齐缺失信息",
                         icon=ft.Icons.AUTO_AWESOME,
-                        bgcolor="#17355C",
-                        color="#FFB74D",
+                        bgcolor="#24283B",
+                        color="#E0AF68",
                         on_click=do_fill_ai
                     )
                     content_children.append(ai_btn)
@@ -3559,7 +3691,7 @@ def main(page: ft.Page):
                 def set_tab(idx):
                     tab_index[0] = idx
                     for i, btn in enumerate(tab_buttons):
-                        btn.bgcolor = "#1781FF" if i == idx else "#26262E"
+                        btn.bgcolor = "#7AA2F7" if i == idx else "#24283B"
                         for c in btn.content.controls:
                             if isinstance(c, ft.Text):
                                 c.color = "#FFFFFF" if i == idx else "#CCCCCC"
@@ -3573,7 +3705,7 @@ def main(page: ft.Page):
                             ft.Text(label, size=13, weight=ft.FontWeight.BOLD, color="#CCCCCC"),
                         ], spacing=3, tight=True),
                         padding=ft.Padding(left=10, right=10, top=6, bottom=6),
-                        border_radius=10, bgcolor="#26262E",
+                        border_radius=10, bgcolor="#24283B",
                         on_click=lambda e, i=idx: set_tab(i), ink=True)
 
                 for i, (ic, lb) in enumerate(tab_defs):
@@ -3619,7 +3751,7 @@ def main(page: ft.Page):
 
                             tile = ft.ListTile(
                                 leading=ft.Icon(ft.Icons.BOOKMARK if is_new else ft.Icons.CIRCLE, size=16,
-                                                color="#FFB74D" if is_new else ft.Colors.GREY_500),
+                                                color="#E0AF68" if is_new else ft.Colors.GREY_500),
                                 title=ft.Text(f"{word}  {phonetic}", size=15),
                                 subtitle=ft.Text(meaning_short, size=12, color=ft.Colors.GREY_400),
                                 trailing=ft.IconButton(icon=ft.Icons.PLAY_ARROW, icon_size=20,
@@ -3740,7 +3872,7 @@ def main(page: ft.Page):
                             for w in nw2:
                                 word = w.get("word", "")
                                 tile = ft.ListTile(
-                                    leading=ft.Icon(ft.Icons.BOOKMARK, size=18, color="#FFB74D"),
+                                    leading=ft.Icon(ft.Icons.BOOKMARK, size=18, color="#E0AF68"),
                                     title=ft.Text(f"{word}  {w.get('phonetic', '')}", size=15),
                                     subtitle=ft.Text(w.get("meaning", "")[:50], size=12, color=ft.Colors.GREY_400),
                                     trailing=ft.IconButton(
@@ -3861,7 +3993,7 @@ def main(page: ft.Page):
                                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                                     alignment=ft.MainAxisAlignment.CENTER, spacing=10),
                                 alignment=ft.alignment.center, expand=True,
-                                bgcolor="#26262E", border_radius=20,
+                                bgcolor="#24283B", border_radius=20,
                                 border=ft.border.all(1, ft.Colors.WHITE10),
                                 padding=30, ink=True,
                                 on_click=lambda e: (state.update({"flipped": True}), render_card()))
@@ -3869,13 +4001,13 @@ def main(page: ft.Page):
                             action_area.content = ft.Row([
                                 ft.ElevatedButton("显示答案", icon=ft.Icons.VISIBILITY,
                                                   on_click=lambda e: (state.update({"flipped": True}), render_card()),
-                                                  bgcolor="#1781FF", color="#FFFFFF", expand=True)
+                                                  bgcolor="#7AA2F7", color="#FFFFFF", expand=True)
                             ], spacing=10)
                         else:
                             back = ft.Container(
                                 content=ft.Column([
                                     ft.Text(word, size=30, weight=ft.FontWeight.BOLD),
-                                    ft.Text(phonetic, size=16, color="#1781FF") if phonetic else ft.Text(""),
+                                    ft.Text(phonetic, size=16, color="#7AA2F7") if phonetic else ft.Text(""),
                                     ft.Divider(),
                                     ft.Text(meaning, size=18, color="#81C784"),
                                     ft.Text(f"例句：{example}", size=13, italic=True,
@@ -3884,7 +4016,7 @@ def main(page: ft.Page):
                                             color=ft.Colors.GREY_400) if forms else ft.Text(""),
                                 ], spacing=8, scroll=ft.ScrollMode.AUTO),
                                 alignment=ft.alignment.top_left,
-                                bgcolor="#26262E", border_radius=20,
+                                bgcolor="#24283B", border_radius=20,
                                 border=ft.border.all(1, ft.Colors.WHITE10),
                                 padding=20, expand=True)
                             card_area.content = back
@@ -3892,7 +4024,7 @@ def main(page: ft.Page):
                                 ft.ElevatedButton("❌ 不认识", on_click=lambda e: mark("forget"),
                                                   bgcolor="#EF5350", color="#FFFFFF", expand=True),
                                 ft.ElevatedButton("🤔 模糊", on_click=lambda e: mark("fuzzy"),
-                                                  bgcolor="#FFB74D", color="#FFFFFF", expand=True),
+                                                  bgcolor="#E0AF68", color="#FFFFFF", expand=True),
                                 ft.ElevatedButton("✅ 认识", on_click=lambda e: mark("know"),
                                                   bgcolor="#66BB6A", color="#FFFFFF", expand=True),
                             ], spacing=10)
@@ -4012,19 +4144,19 @@ def main(page: ft.Page):
 
                             for opt in options:
                                 b = ft.ElevatedButton(opt, on_click=make_click(opt, opt == correct),
-                                                      expand=True, bgcolor="#26262E", color="#FFFFFF")
+                                                      expand=True, bgcolor="#24283B", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的中文释义", size=13, color=ft.Colors.GREY_500),
                                 ft.Text(word, size=36, weight=ft.FontWeight.BOLD),
-                                ft.Text(phonetic, size=14, color="#1781FF") if phonetic else ft.Text(""),
+                                ft.Text(phonetic, size=14, color="#7AA2F7") if phonetic else ft.Text(""),
                                 ft.Container(height=20),
                                 ft.Column(opt_btns, spacing=8),
                                 ft.Container(height=10),
                                 result_text,
                                 ft.Container(height=10),
                                 ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                          bgcolor="#1781FF", color="#FFFFFF")],
+                                                          bgcolor="#7AA2F7", color="#FFFFFF")],
                                        alignment=ft.MainAxisAlignment.CENTER),
                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
                         elif mode == "meaning2word":
@@ -4060,7 +4192,7 @@ def main(page: ft.Page):
 
                             for opt in options:
                                 b = ft.ElevatedButton(opt, on_click=make_click2(opt, opt == correct),
-                                                      expand=True, bgcolor="#26262E", color="#FFFFFF")
+                                                      expand=True, bgcolor="#24283B", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
                                 ft.Text("选择正确的英文单词", size=13, color=ft.Colors.GREY_500),
@@ -4071,7 +4203,7 @@ def main(page: ft.Page):
                                 result_text,
                                 ft.Container(height=10),
                                 ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                          bgcolor="#1781FF", color="#FFFFFF")],
+                                                          bgcolor="#7AA2F7", color="#FFFFFF")],
                                        alignment=ft.MainAxisAlignment.CENTER),
                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
                         else:
@@ -4105,9 +4237,9 @@ def main(page: ft.Page):
                                 input_field,
                                 ft.Container(height=10),
                                 ft.Row([
-                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#1781FF", color="#FFFFFF"),
+                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#7AA2F7", color="#FFFFFF"),
                                     ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                      bgcolor="#26262E", color="#FFFFFF"),
+                                                      bgcolor="#24283B", color="#FFFFFF"),
                                 ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
                                 ft.Container(height=10),
                                 result_text,
@@ -4183,10 +4315,10 @@ def main(page: ft.Page):
                 search_input = ft.TextField(
                     label="🔍 搜索错题",
                     hint_text="多个词用空格分隔，如：导数 单调性 易错",
-                    expand=True, border_color="#1781FF", border_width=2)
+                    expand=True, border_color="#7AA2F7", border_width=2)
                 local_search_btn = ft.ElevatedButton(
                     "搜索", on_click=lambda e: do_local_search(), icon=ft.Icons.SEARCH,
-                    bgcolor="#1781FF", color=ft.Colors.WHITE)
+                    bgcolor="#7AA2F7", color=ft.Colors.WHITE)
                 ai_search_btn = ft.TextButton(
                     "🤖 AI 深度搜索", on_click=lambda e: perform_search(e))
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
@@ -4253,7 +4385,7 @@ def main(page: ft.Page):
                                 else:
                                     thumb_container = ft.Container(
                                         width=80, height=80, border_radius=10,
-                                        bgcolor="#2F2F38", alignment=ft.alignment.center,
+                                        bgcolor="#2A2E44", alignment=ft.alignment.center,
                                         content=ft.Text("🖼️", size=28, opacity=0.4))
                             detail_lines = []
                             if original:
@@ -4272,7 +4404,7 @@ def main(page: ft.Page):
                             tag_display = ft.Container(
                                 content=ft.Text(f"🏷️ {tag_text}", size=11, color=ft.Colors.GREY_400),
                                 padding=ft.Padding(left=6, right=6, top=2, bottom=2),
-                                bgcolor="#2F2F38", border_radius=8)
+                                bgcolor="#2A2E44", border_radius=8)
 
                             def make_show_detail_card(item_data=item):
                                 def show(e):
@@ -4305,7 +4437,7 @@ def main(page: ft.Page):
                                         for t in tags_now:
                                             tag_chips.controls.append(ft.Container(
                                                 content=ft.Text(t, size=12, color="#FFCCBC"),
-                                                bgcolor="#17355C", border_radius=10,
+                                                bgcolor="#24283B", border_radius=10,
                                                 padding=ft.Padding(left=8, right=8, top=3, bottom=3),
                                                 border=ft.border.all(1, "#6B4A3A")))
                                         detail_children.append(
@@ -4377,7 +4509,7 @@ def main(page: ft.Page):
 
                                     action_row = ft.Row([
                                         ft.ElevatedButton("🎓 问老师", on_click=open_ask_teacher,
-                                                          icon=ft.Icons.SCHOOL, bgcolor="#1781FF",
+                                                          icon=ft.Icons.SCHOOL, bgcolor="#7AA2F7",
                                                           color=ft.Colors.WHITE),
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
                                         ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
@@ -4510,7 +4642,7 @@ def main(page: ft.Page):
                                 content=ft.Column(inner_children, spacing=4),
                                 padding=12, border_radius=14, bgcolor=bg_color,
                                 border=ft.border.all(2 if is_highlighted else 1,
-                                                    "#1781FF" if is_highlighted else "#4A4A55"),
+                                                    "#7AA2F7" if is_highlighted else "#4A4A55"),
                                 on_click=make_show_detail_card(item), ink=True)
                             container.key = str(idx)
                             list_view.controls.append(container)
@@ -4534,7 +4666,7 @@ def main(page: ft.Page):
                     _, score_map = weighted_search_errors(subject_items, q)
                     if not score_map:
                         search_status.value = f"❌ 本地没有匹配「{q}」的错题（下方显示全部）"
-                        search_status.color = "#FFB74D"
+                        search_status.color = "#E0AF68"
                         render_list(None)
                         page.update()
                         return
@@ -4551,15 +4683,15 @@ def main(page: ft.Page):
                     query = search_input.value.strip()
                     if not query:
                         search_status.value = "请输入搜索内容"
-                        search_status.color = "#FFB74D"
+                        search_status.color = "#E0AF68"
                         page.update()
                         return
                     search_status.value = f"⏳ AI 正在分析：{query}"
-                    search_status.color = "#1781FF"
+                    search_status.color = "#7AA2F7"
                     page.update()
 
                     def do_search():
-                        api_key, api_url, api_model, _v = get_api_endpoint()
+                        api_key, api_url, api_model, _v = endpoint_for("smart")
                         if not api_key:
                             search_status.value = "❌ 未配置API密钥"
                             search_status.color = "#EF5350"
@@ -4598,7 +4730,7 @@ def main(page: ft.Page):
                                         search_status.color = "#81C784"
                                     else:
                                         search_status.value = "❌ 未找到匹配的错题"
-                                        search_status.color = "#FFB74D"
+                                        search_status.color = "#E0AF68"
                                 else:
                                     search_status.value = "❌ AI未返回有效结果"
                                     search_status.color = "#EF5350"
@@ -4617,7 +4749,7 @@ def main(page: ft.Page):
                 return ft.Column([
                     ft.Text("📋 错题本", size=20, weight=ft.FontWeight.BOLD),
                     ft.Text("🔍 本地加权搜索（多个词空格分隔）｜AI 深度搜索可选", size=13,
-                            color="#1781FF"),
+                            color="#7AA2F7"),
                     search_row,
                     search_status,
                     ft.Divider(height=1),
@@ -4777,7 +4909,7 @@ def main(page: ft.Page):
                 CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
                 category_colors = {"开头": "#1A2840", "转折": "#3A2A18", "结尾": "#1A2E1A",
                                    "观点": "#3A1A28", "举例": "#2E1A3A", "读后续写": "#1A2E3A",
-                                   "其他": "#26262E"}
+                                   "其他": "#24283B"}
                 search_input = ft.TextField(label="🔍 搜索句子", hint_text="输入关键词...", expand=True)
                 category_dropdown = ft.Dropdown(
                     label="分类", options=[ft.dropdown.Option(c) for c in CATEGORIES],
@@ -4847,11 +4979,11 @@ def main(page: ft.Page):
                         count = max(1, min(count, 20))
                         page.close(dialog)
                         status_text.value = f"⏳ AI正在生成 {count} 个金句..."
-                        status_text.color = "#1781FF"
+                        status_text.color = "#7AA2F7"
                         page.update()
 
                         def gen_thread():
-                            api_key, api_url, api_model, _v = get_api_endpoint()
+                            api_key, api_url, api_model, _v = endpoint_for("cheap")
                             if not api_key:
                                 status_text.value = "❌ 未配置API密钥"
                                 status_text.color = "#EF5350"
@@ -4936,7 +5068,7 @@ def main(page: ft.Page):
                         translation = s.get("translation", "")
                         favorite = s.get("favorite", False)
                         updated = s.get("updated", s.get("created", ""))
-                        bg_color = category_colors.get(cat, "#26262E")
+                        bg_color = category_colors.get(cat, "#24283B")
                         card = ft.Container(
                             content=ft.Column([
                                 ft.Row([
@@ -4948,7 +5080,7 @@ def main(page: ft.Page):
                                     ft.Row([
                                         ft.IconButton(
                                             icon=ft.Icons.STAR if favorite else ft.Icons.STAR_BORDER,
-                                            icon_color="#FFB74D" if favorite else ft.Colors.GREY_500,
+                                            icon_color="#E0AF68" if favorite else ft.Colors.GREY_500,
                                             icon_size=20,
                                             on_click=lambda e, sid=sid: (toggle_favorite(sid), refresh_list())),
                                         ft.IconButton(
@@ -4969,7 +5101,7 @@ def main(page: ft.Page):
                             ], spacing=4),
                             padding=10, border_radius=12, bgcolor=bg_color,
                             margin=ft.margin.only(bottom=4),
-                            border=ft.border.all(1, "#FFB74D" if favorite else "#2F2F38"))
+                            border=ft.border.all(1, "#E0AF68" if favorite else "#2A2E44"))
                         sentence_list.controls.append(card)
                     page.update()
 
@@ -5001,7 +5133,7 @@ def main(page: ft.Page):
 
             def build_function_card_grid(subject):
                 all_cards = [
-                    ("📋", "错题本", "#17355C"),
+                    ("📋", "错题本", "#24283B"),
                     ("📝", "笔记本", "#223A22"),
                     ("📖", "单词本", "#3A2F22"),
                     ("💬", "金句", "#3A2233"),
@@ -5063,7 +5195,7 @@ def main(page: ft.Page):
                                         color="white" if is_selected else "#CCCCCC"),
                         padding=ft.Padding(left=16, top=12, right=16, bottom=12),
                         border_radius=12,
-                        bgcolor="#1781FF" if is_selected else "#26262E",
+                        bgcolor="#7AA2F7" if is_selected else "#24283B",
                         on_click=lambda e, ss=s: on_subject_selected(ss))
                     subj_buttons.append(btn)
                 return ft.Container(content=ft.Column(subj_buttons, spacing=6), width=100, padding=10)
@@ -5074,7 +5206,7 @@ def main(page: ft.Page):
                 right_panel = build_function_card_grid(selected_subject_for_page)
                 return ft.Row([
                     left_panel,
-                    ft.VerticalDivider(width=1, color="#2F2F38"),
+                    ft.VerticalDivider(width=1, color="#2A2E44"),
                     ft.Container(content=right_panel, expand=True,
                                  padding=ft.Padding(left=20, right=20, top=20, bottom=20)),
                 ], expand=True)
@@ -5099,7 +5231,7 @@ def main(page: ft.Page):
                 if target is None:
                     return
                 target.value = "⏳ AI 正在分析你的学习数据..."
-                target.color = "#64B5F6"
+                target.color = "#A9B1D6"
                 page.update()
 
                 def do_generate():
@@ -5149,7 +5281,7 @@ def main(page: ft.Page):
 【系统统计的薄弱知识点】
 {json.dumps(weak_know, ensure_ascii=False)}
 """
-                    api_key, api_url, api_model, _v = get_api_endpoint()
+                    api_key, api_url, api_model, _v = endpoint_for("smart")
                     if not api_key:
                         target.value = "❌ 未配置 API 密钥"
                         target.color = "#EF5350"
@@ -5186,7 +5318,7 @@ def main(page: ft.Page):
                     ft.Divider(height=5), today_plan_text
                 ], spacing=8),
                 # AstroBox 风格：半透明毛玻璃卡片 + 大圆角 + 主色细边框
-                padding=15, border_radius=24, bgcolor="#CC1A1A1E", blur=12,
+                padding=15, border_radius=24, bgcolor="#CC16161E", blur=12,
                 border=ft.border.all(1, "#401781FF"),
                 shadow=ft.BoxShadow(blur_radius=20, color="#44000000"))
 
@@ -5283,7 +5415,7 @@ def main(page: ft.Page):
 
             def test_ai_connection(e):
                 test_conn_result.value = "⏳ 测试中..."
-                test_conn_result.color = "#64B5F6"
+                test_conn_result.color = "#A9B1D6"
                 page.update()
 
                 def _test():
@@ -5308,7 +5440,7 @@ def main(page: ft.Page):
                                 test_conn_result.color = "#81C784"
                             else:
                                 test_conn_result.value = "⚠️ 连接成功但返回为空"
-                                test_conn_result.color = "#FFB74D"
+                                test_conn_result.color = "#E0AF68"
                         else:
                             test_conn_result.value = f"❌ 连接失败 (HTTP {resp.status_code})"
                             test_conn_result.color = "#EF5350"
@@ -5346,7 +5478,7 @@ def main(page: ft.Page):
                 total = len(todo)
                 retag_state["running"] = True
                 retag_status.value = f"⏳ 排队中：共 {total} 条待重打"
-                retag_status.color = "#1781FF"
+                retag_status.color = "#7AA2F7"
                 page.update()
 
                 def do_retag():
@@ -5400,7 +5532,7 @@ def main(page: ft.Page):
                         pct = count / max_count
                         bar = ft.ProgressBar(value=pct, width=200, height=8,
                                              color=color_map.get(et, "#78909C"),
-                                             bgcolor="#2F2F38", border_radius=4)
+                                             bgcolor="#2A2E44", border_radius=4)
                         content_children.append(ft.Row([
                             ft.Text(f"{et}：{count}", size=13, width=110), bar,
                         ], spacing=8))
@@ -5420,7 +5552,7 @@ def main(page: ft.Page):
                             ft.Text(f"{kp}（{events_count}次，掌握 {level:.0%}）", size=13))
                         content_children.append(
                             ft.ProgressBar(value=level, width=300, height=6,
-                                           color=bar_color, bgcolor="#2F2F38"))
+                                           color=bar_color, bgcolor="#2A2E44"))
                         if summary:
                             content_children.append(
                                 ft.Text(f"  → {summary}", size=11, color="#888888"))
@@ -5458,14 +5590,14 @@ def main(page: ft.Page):
                     ft.Divider(height=1, color=ft.Colors.GREY_700),
                 ]
                 max_count = max([c for _, c in error_counts.items()]) if error_counts else 1
-                color_map = {"语文": "#64B5F6", "数学": "#EF5350", "英语": "#81C784",
+                color_map = {"语文": "#A9B1D6", "数学": "#EF5350", "英语": "#81C784",
                              "物理": "#BA68C8", "化学": "#FFA726", "生物": "#4DB6AC",
                              "历史": "#FFD54F", "政治": "#F06292", "地理": "#4DD0E1"}
                 for subject, count in sorted_subjects:
                     percentage = min((count / max_count) * 100, 100) if max_count > 0 else 0
                     color = color_map.get(subject, "#78909C")
                     progress_bar = ft.ProgressBar(value=percentage / 100, width=200,
-                                                  height=8, color=color, bgcolor="#2F2F38",
+                                                  height=8, color=color, bgcolor="#2A2E44",
                                                   border_radius=4)
                     content_children.append(ft.Row([
                         ft.Text(f"{subject}：{count} 题", size=14, width=80),
@@ -5494,7 +5626,7 @@ def main(page: ft.Page):
 
             # ---------- 手环背单词 操控中心 ----------
             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
-            band_sync_status = ft.Text("", size=13, color="#FFB74D")
+            band_sync_status = ft.Text("", size=13, color="#E0AF68")
             band_http_status = ft.Text("🔌 本地同步服务：未启动", size=13, color=ft.Colors.GREY_500)
             band_http_btn = ft.ElevatedButton(
                 "🔗 启动本地同步", icon=ft.Icons.SENSOR_DOOR,
@@ -5519,7 +5651,7 @@ def main(page: ft.Page):
                 n = count_unsynced_words()
                 if n > 0:
                     band_sync_status.value = f"⚠ 有 {n} 个新增单词尚未同步到手环"
-                    band_sync_status.color = "#FFB74D"
+                    band_sync_status.color = "#E0AF68"
                 else:
                     band_sync_status.value = "✅ 单词本与手环已同步"
                     band_sync_status.color = "#81C784"
@@ -5680,7 +5812,7 @@ def main(page: ft.Page):
                     return
                 dest_dir = e.path
                 backup_status.value = "⏳ 正在打包..."
-                backup_status.color = "#64B5F6"
+                backup_status.color = "#A9B1D6"
                 page.update()
 
                 def do_backup():
@@ -5711,7 +5843,7 @@ def main(page: ft.Page):
                     return
                 zip_path = e.files[0].path
                 backup_status.value = "⏳ 正在恢复..."
-                backup_status.color = "#64B5F6"
+                backup_status.color = "#A9B1D6"
                 page.update()
 
                 def do_restore():
@@ -5733,13 +5865,13 @@ def main(page: ft.Page):
                     return
                 if app_state["busy"]:
                     backup_status.value = f"⏳ 正在「{app_state['busy']}」，先等它跑完"
-                    backup_status.color = "#FFB74D"
+                    backup_status.color = "#E0AF68"
                     page.update()
                     return
                 zip_path = e.files[0].path
                 app_state["busy"] = "合并恢复"
                 backup_status.value = "⏳ 正在合并恢复..."
-                backup_status.color = "#64B5F6"
+                backup_status.color = "#A9B1D6"
                 page.update()
 
                 def do_merge():
