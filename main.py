@@ -2017,13 +2017,13 @@ def main(page: ft.Page):
 
             def show_toast(text, color="green", duration=1.6):
                 if color == "green":
-                    bg = "#331781FF"   # AstroBox 主色蓝（正向反馈）
+                    bg = "#337AA2F7"   # Tokyo Night 蓝紫（正向反馈）
                     icon = "✅"
                 elif color == "red":
                     bg = "#33EF5350"
                     icon = "❌"
                 else:
-                    bg = "#33FFB74D"
+                    bg = "#33E0AF68"
                     icon = "ℹ️"
 
                 toast = ft.Container(
@@ -2869,6 +2869,22 @@ def main(page: ft.Page):
                 if strategy:
                     system_prompt += f"\n\n{strategy}"
 
+                # —— DeepTutor 混合个性化：实时学情注入（薄弱点 + 上次遗留问题）——
+                try:
+                    _p_now = load_user_profile()
+                    _wk_now = sorted(_p_now.get("weak_knowledge", {}).items(), key=lambda x: x[1], reverse=True)[:5]
+                    _lq_now = (_p_now.get("last_question") or "").strip()
+                    _live_parts = []
+                    if _lq_now:
+                        _live_parts.append(f"上次没完全搞懂的问题：{_lq_now[:150]}")
+                    if _wk_now:
+                        _live_parts.append("最新薄弱知识点：" + "、".join(f"{k}" for k, _v in _wk_now))
+                    if _live_parts:
+                        system_prompt += ("\n\n【实时学情】\n" + "\n".join(_live_parts) +
+                                          "\n- 优先讲解这些薄弱点；若用户问题与薄弱点相关，主动串联旧知识，让学生感到你在持续跟进。")
+                except BaseException:
+                    pass
+
                 system_prompt += """
 
 【继续生成规则】
@@ -3342,6 +3358,19 @@ def main(page: ft.Page):
                                                         and "〔未完成，等待继续〕" in _hs[-1].get("content", ""))
                         except BaseException:
                             continue_btn.visible = False
+                        # —— DeepTutor 闭环：识别"未掌握"信号 → 记录遗留问题 + 回写科目薄弱度 ——
+                        try:
+                            _p_ = load_user_profile()
+                            _q_ = content or ""
+                            if any(_s in _q_ for _s in ("不会", "不懂", "不明白", "错了", "做错", "选错", "蒙的", "忘了", "没懂", "卡住", "太难", "不理解", "没听懂", "怎么解", "为什么")):
+                                _p_["last_question"] = _q_[-200:]
+                                _sub_ = subject if subject != "总AI" else ""
+                                if _sub_:
+                                    _ws_ = _p_.setdefault("weak_subjects", {})
+                                    _ws_[_sub_] = min(1.0, _ws_.get(_sub_, 0.2) + 0.15)
+                                save_user_profile(_p_)
+                        except BaseException:
+                            pass
                         page.update()
 
                     threading.Thread(target=ai_thread, daemon=True).start()
@@ -3531,8 +3560,10 @@ def main(page: ft.Page):
                                             show_toast("⚠ 请先在 AI 设置中配置 API Key 再生成派生词", "red")
                                             return
                                         _gen_state["running"] = True
+                                        _orig_text = e.control.text
                                         try:
                                             e.control.disabled = True
+                                            e.control.text = "⏳ 生成中..."
                                         except BaseException:
                                             pass
                                         page.update()
@@ -3556,6 +3587,7 @@ def main(page: ft.Page):
                                                 _gen_state["running"] = False
                                                 try:
                                                     e.control.disabled = False
+                                                    e.control.text = _orig_text
                                                     page.update()
                                                 except BaseException:
                                                     pass
@@ -3627,30 +3659,40 @@ def main(page: ft.Page):
                         on_click=toggle_nw, ink=True))
 
                 if _needs_completion(word_data):
+                    ai_status = ft.Text("", size=13, color="#A9B1D6", italic=True)
+
                     def do_fill_ai(e):
                         _cfg_now = load_ai_config()
                         _info_now = PROVIDERS.get(_cfg_now.get("provider", "zhipu"), PROVIDERS["zhipu"])
                         if not _cfg_now.get(_info_now["key_field"], "").strip():
+                            ai_status.value = "⚠ 请先在「AI 设置」中配置 API Key 再使用补齐"
                             show_toast("⚠ 请先在 AI 设置中配置 API Key 再使用补齐", "red")
+                            page.update()
                             return
                         if getattr(ai_btn, "_running", False):
-                            return   # 防抖：生成中不再重复触发
+                            ai_status.value = "⏳ 正在生成中，请稍候（勿重复点击）..."
+                            page.update()
+                            return
                         ai_btn._running = True
-                        ai_btn.content.value = "⏳ 正在请求 AI..."
+                        ai_status.value = "⏳ 正在调用 AI 生成词条信息，请稍候..."
+                        ai_btn.content.value = "⏳ 请求中..."
                         ai_btn.disabled = True
                         page.update()
                         def _bg():
                             try:
                                 filled_data = _fill_word_with_ai(word_data)
                                 if filled_data is None:
+                                    ai_status.value = "❌ 补齐失败：未返回有效信息（检查网络或 Key）"
                                     show_toast("❌ AI 补齐失败：未返回有效信息（检查网络或 Key）", "red")
                                 elif filled_data is word_data:
+                                    ai_status.value = "ℹ️ 该单词信息已完整，无需补齐"
                                     show_toast("ℹ️ 该单词信息已完整，无需补齐", "info")
                                 else:
                                     page.close(dialog)
                                     _open_word_detail(filled_data, on_close=on_close)
                                     show_toast("✅ 补齐成功", "green")
                             except Exception as ex:
+                                ai_status.value = f"❌ 补齐异常：{str(ex)[:40]}"
                                 show_toast(f"❌ 补齐异常：{str(ex)[:40]}", "red")
                             finally:
                                 try:
@@ -3670,6 +3712,7 @@ def main(page: ft.Page):
                         on_click=do_fill_ai
                     )
                     content_children.append(ai_btn)
+                    content_children.append(ai_status)
 
                 dialog = ft.AlertDialog(
                     title=ft.Text(""),
