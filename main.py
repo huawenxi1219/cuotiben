@@ -2852,12 +2852,22 @@ def main(page: ft.Page):
                 memory_context = get_memory_context(subject if subject != "总AI" else None)
                 profile_summary = get_profile_summary()
                 strategy = get_teaching_strategy(subject if subject != "总AI" else None)
-                system_prompt = f"""你是{display_name}老师，请用结构化方式回答。
-- 对于知识类问题，请分点列出要点。
-- 对于解题类问题，请先给出思路，再给出步骤。
-- 对于作文类问题，请提供框架和例句。
-- 回答要简洁、准确、有条理。
-- 请主动引用你对这个学生的记忆，让学生感到你了解他。"""
+                system_prompt = f"""你是「池鱼」里的{display_name}老师——一位真正了解{display_name}的私教。请像真人老师一样自然地和学生对话，别端着、别啰嗦、别用"作为AI"这类开头。
+
+回答风格（像豆包 / DeepSeek 手机版那样好聊）：
+- 自然口语化，但保持专业；句子短一点，多用"你/咱们"，少用机械的"第一、第二"模板。
+- 知识类问题：讲清原理与关键点，能串上他学过的内容就主动提一句。
+- 解题类问题：先讲思路（为什么这么做），再给步骤，最后点出易错点；不要一上来甩答案。
+- 学生卡壳时：主动降难度、换个角度、举个生活化的例子再讲一遍。
+- 讲解完随手问一句"这步明白吗？"，让学生能接话。
+
+你真正了解这个学生：下方附有他的学习画像、薄弱点、错题、历史对话等真实记忆。回答时自然引用这些记忆（比如"上次你在这个知识点错过""你最近在练XX"），让他感到你真的记得他——但不要生硬复述标签和数据。
+
+【教学法（借鉴港大 DeepTutor 深度辅导思路）】
+- 先诊断后讲解：回答前先想学生当前水平，讲解按"他听得懂"的难度来。
+- 引导式：题目类问题先让他自己想/说，再判对错讲解；不要直接给答案。
+- 主动关联：他问的东西如果和你记得的薄弱点/错题有关，主动串联旧知识。
+- 学情闭环：讲完给他一句"下一步建议练什么"，让他能持续进步。"""
                 
                 custom_skill = load_custom_skill()
                 if custom_skill:
@@ -2881,7 +2891,8 @@ def main(page: ft.Page):
                         _live_parts.append("最新薄弱知识点：" + "、".join(f"{k}" for k, _v in _wk_now))
                     if _live_parts:
                         system_prompt += ("\n\n【实时学情】\n" + "\n".join(_live_parts) +
-                                          "\n- 优先讲解这些薄弱点；若用户问题与薄弱点相关，主动串联旧知识，让学生感到你在持续跟进。")
+                                          "\n- 优先讲解这些薄弱点；若用户问题与薄弱点相关，主动串联旧知识，让学生感到你在持续跟进。"
+                                          "- 引用时用自然的说法，比如\"我看你最近在这个点上栽过跟头\"，别念数据。")
                 except BaseException:
                     pass
 
@@ -3023,7 +3034,8 @@ def main(page: ft.Page):
                         width=300,
                     )
                     avatar = ft.Container(
-                        content=ft.Text("AI", size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
+                        content=ft.Text(display_name[:1] if display_name != "总AI" else "AI",
+                                        size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
                         width=30, height=30, border_radius=15,
                         bgcolor="#7AA2F7", alignment=ft.alignment.center,
                         shadow=ft.BoxShadow(blur_radius=6, color="#44BB9AF7"),
@@ -3071,7 +3083,7 @@ def main(page: ft.Page):
                         chat_history_display.controls.append(bubble_row)
 
                 chat_input = ft.TextField(
-                    hint_text=f"向{display_name}老师提问...",
+                    hint_text="和" + display_name + "老师聊点什么...",
                     multiline=True, min_lines=1, max_lines=8,
                     border_radius=20,
                     border_color="#414868",
@@ -3096,21 +3108,21 @@ def main(page: ft.Page):
 
                 quick_row = ft.Row([
                     ft.Container(
-                        content=ft.Text("再讲一遍", size=12, color="#CCCCCC"),
+                        content=ft.Text("讲简单点", size=12, color="#CCCCCC"),
                         padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                         border_radius=14, bgcolor="#24283B",
                         border=ft.border.all(1, "#414868"),
                         on_click=lambda e: handle_send("请再用更简单的方式讲一遍"),
                         ink=True),
                     ft.Container(
-                        content=ft.Text("举个例子", size=12, color="#CCCCCC"),
+                        content=ft.Text("举个栗子", size=12, color="#CCCCCC"),
                         padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                         border_radius=14, bgcolor="#24283B",
                         border=ft.border.all(1, "#414868"),
                         on_click=lambda e: handle_send("请举一个具体例子"),
                         ink=True),
                     ft.Container(
-                        content=ft.Text("出类似的题", size=12, color="#CCCCCC"),
+                        content=ft.Text("考考我", size=12, color="#CCCCCC"),
                         padding=ft.Padding(left=12, right=12, top=6, bottom=6),
                         border_radius=14, bgcolor="#24283B",
                         border=ft.border.all(1, "#414868"),
