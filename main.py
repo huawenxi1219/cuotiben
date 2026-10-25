@@ -2765,19 +2765,17 @@ def main(page: ft.Page):
 
             chat_dialog = ft.Container(
                 visible=False,
-                left=20,
-                top=20,
-                right=20,
-                bottom=20,
-                bgcolor="#F0242424",
-                blur=20,
-                border_radius=20,
-                padding=20,
-                border=ft.border.all(1, ft.Colors.WHITE24),
-                shadow=ft.BoxShadow(blur_radius=30, color="#88000000"),
-                offset=ft.Offset(0, 0.04),
-                animate_offset=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
-                animate_opacity=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
+                left=0,
+                top=0,
+                right=0,
+                bottom=0,
+                bgcolor="#F616161E",
+                border_radius=0,
+                padding=0,
+                border=None,
+                offset=ft.Offset(0, 0.02),
+                animate_offset=ft.Animation(180, ft.AnimationCurve.EASE_OUT),
+                animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_OUT),
                 opacity=0,
             )
             current_chat_subject = "总AI"
@@ -2803,11 +2801,22 @@ def main(page: ft.Page):
                 chat_dialog.opacity = 1
                 page.update()
 
-            def call_ai_stream(messages, model_name, on_chunk):
-                api_key, api_url, api_model, _v = endpoint_for("smart")
-                if not api_key:
-                    on_chunk("❌ 未配置API密钥")
-                    return
+            def call_ai_stream(messages, model_name, on_chunk, need_vision=False):
+                # 多模态（含图片）→ 自动走视觉模型；否则走 smart 增强对话
+                if need_vision:
+                    if not provider_supports_vision():
+                        on_chunk("❌ 当前模型不支持图片识别，请在设置中切换智谱 GLM（视觉模型）")
+                        return None
+                    api_key, api_url, _m, vision_model = endpoint_for("cheap")
+                    if not api_key:
+                        on_chunk("❌ 未配置API密钥")
+                        return None
+                    api_model = vision_model or "glm-4v"
+                else:
+                    api_key, api_url, api_model, _v = endpoint_for("smart")
+                    if not api_key:
+                        on_chunk("❌ 未配置API密钥")
+                        return None
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 payload = {"model": api_model, "messages": messages,
                            "temperature": 0.7, "max_tokens": 2048, "stream": True}
@@ -2938,7 +2947,8 @@ def main(page: ft.Page):
                     system_prompt += "\n\n以下是最近的对话历史（仅作上下文参考，不要重复历史内容）：\n"
                     for msg in context_messages[-6:]:
                         role_label = "学生" if msg["role"] == "user" else "老师"
-                        system_prompt += f"[{role_label}]: {msg['content'][:300]}\n"
+                        _c = re.sub(r"(\n)?【图】\S+", "[图片]", str(msg["content"]))[:300]
+                        system_prompt += f"[{role_label}]: {_c}\n"
                 all_messages = [{"role": "system", "content": system_prompt}]
                 for msg in context_messages:
                     all_messages.append(msg)
@@ -2946,15 +2956,28 @@ def main(page: ft.Page):
                 chat_history_display = ft.ListView(spacing=12, expand=True, auto_scroll=True)
 
                 def make_user_bubble(text):
+                    # 支持多模态图片：消息里以【图】标记携带本地图片路径，拆出文本+图片渲染
+                    txt = re.sub(r"(\n)?【图】\S+", "", text).strip()
+                    img_paths = re.findall(r"【图】(\S+)", text)
+                    inner = []
+                    if txt:
+                        inner.append(ft.Text(txt, size=14, selectable=True, color="#FFFFFF"))
+                    for p in img_paths:
+                        full = p if os.path.isabs(p) else os.path.join(DATA_DIR, p)
+                        if os.path.exists(full):
+                            inner.append(ft.Image(src=full, width=170,
+                                                  border_radius=8, fit=ft.ImageFit.CONTAIN))
+                    if not inner:
+                        inner.append(ft.Text(text, size=14, selectable=True, color="#FFFFFF"))
                     return ft.Row([
                         ft.Container(expand=True),
                         ft.Container(
-                            content=ft.Text(text, size=14, selectable=True, color="#FFFFFF"),
+                            content=ft.Column(inner, spacing=4),
                             padding=ft.Padding(left=14, right=14, top=10, bottom=10),
                             border_radius=ft.BorderRadius(16, 16, 4, 16),
                             bgcolor="#7AA2F7",
                             shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
-                            width=280,
+                            width=300,
                         ),
                     ], alignment=ft.MainAxisAlignment.END)
 
@@ -3258,7 +3281,44 @@ def main(page: ft.Page):
                                           "content": rebuilt[0]["content"] + "\n\n" + "\n".join(lines)}
                     except BaseException:
                         pass
-                    current_messages = rebuilt
+                    # 多模态转换：历史/当前消息里带【图】标记的 user 消息 → OpenAI 多模态 content 数组
+                    def _to_modal(m):
+                        if m.get("role") != "user" or not isinstance(m.get("content"), str):
+                            return m
+                        if "【图】" not in m["content"]:
+                            return m
+                        txt = re.sub(r"(\n)?【图】\S+", "", m["content"]).strip() or "请看这张图片"
+                        imgs = []
+                        for p in re.findall(r"【图】(\S+)", m["content"]):
+                            full = p if os.path.isabs(p) else os.path.join(DATA_DIR, p)
+                            if not os.path.exists(full):
+                                continue
+                            try:
+                                import PIL.Image as _PIL_IMG  # 可选压缩，失败则原图
+                                _im = _PIL_IMG.open(full)
+                                if _im.mode == "RGBA":
+                                    _im = _im.convert("RGB")
+                                _w, _h = _im.size
+                                _max = 1280
+                                if max(_w, _h) > _max:
+                                    _r = _max / max(_w, _h)
+                                    _im = _im.resize((int(_w * _r), int(_h * _r)))
+                                import io
+                                _buf = io.BytesIO()
+                                _im.save(_buf, format="JPEG", quality=85)
+                                _raw = _buf.getvalue()
+                            except BaseException:
+                                with open(full, "rb") as _f:
+                                    _raw = _f.read()
+                            imgs.append({"type": "image_url",
+                                         "image_url": {"url": "data:image/jpeg;base64," +
+                                                          base64.b64encode(_raw).decode("utf-8")}})
+                        if not imgs:
+                            return m
+                        return {"role": "user", "content": [{"type": "text", "text": txt}] + imgs}
+
+                    current_messages = [_to_modal(m) for m in rebuilt]
+                    _need_vision = any(isinstance(m.get("content"), list) for m in current_messages)
                     ai_response = {"text": ""}
 
                     content_ref = {"col": None, "md": None, "stream": None, "row": None, "actions": None}
@@ -3290,7 +3350,7 @@ def main(page: ft.Page):
                         stop_flag = False
                         was_stopped = {"v": False}
                         try:
-                            final_accum = call_ai_stream(current_messages, "auto", on_chunk)
+                            final_accum = call_ai_stream(current_messages, "auto", on_chunk, need_vision=_need_vision)
                             was_stopped["v"] = bool(stop_flag)
                             if final_accum is not None:
                                 ai_response["text"] = final_accum
@@ -3435,9 +3495,50 @@ def main(page: ft.Page):
                     page.update()
                     show_toast("✅ 对话历史已清除", "green")
 
+                # —— 图片按钮：选图插入对话（多模态发送，走视觉模型）——
+                chat_img_btn = ft.Container(
+                    content=ft.Icon(ft.Icons.IMAGE_OUTLINED, size=20, color="#BBBBBB"),
+                    width=38, height=38, border_radius=19,
+                    bgcolor="#24283B", border=ft.border.all(1, "#414868"),
+                    alignment=ft.alignment.center,
+                    on_click=lambda e: pick_chat_image(),
+                    ink=True, tooltip="发图片（需要视觉模型）",
+                )
+
+                def on_chat_img_picked(e: ft.FilePickerResultEvent):
+                    if not e.files:
+                        return
+                    saved = []
+                    try:
+                        _chat_dir = os.path.join(IMAGES_DIR, "chat")
+                        os.makedirs(_chat_dir, exist_ok=True)
+                        for _f in e.files:
+                            _dest = os.path.join(_chat_dir, os.path.basename(_f.name))
+                            shutil.copy2(_f.path, _dest)
+                            saved.append(os.path.relpath(_dest, DATA_DIR))
+                    except BaseException as _ex:
+                        show_toast(f"图片保存失败：{str(_ex)[:30]}", "red")
+                        return
+                    if not saved:
+                        return
+                    cur = chat_input.value or ""
+                    marks = "".join(f"\n【图】{p}" for p in saved)
+                    chat_input.value = (cur + marks) if cur else marks.lstrip("\n")
+                    page.update()
+                    show_toast(f"已添加 {len(saved)} 张图片，按发送即可", "green")
+
+                def pick_chat_image():
+                    _pkr = ft.FilePicker(on_result=on_chat_img_picked)
+                    page.overlay.append(_pkr)
+                    page.update()
+                    _pkr.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+
                 result_col = ft.Column([
                     ft.Container(
                         content=ft.Row([
+                            ft.IconButton(icon=ft.Icons.ARROW_BACK, icon_size=22,
+                                          tooltip="返回",
+                                          on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
                             ft.Column([
                                 ft.Text(f"💬 {display_name}", size=18, weight=ft.FontWeight.BOLD),
                                 ft.Text(f"{_provider_name} · {_model_name}", size=11, color="#888888"),
@@ -3447,19 +3548,20 @@ def main(page: ft.Page):
                             ft.IconButton(icon=ft.Icons.CLOSE, icon_size=22,
                                           on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                        padding=ft.Padding(left=4, right=4, top=8, bottom=8),
+                        padding=ft.Padding(left=4, right=4, top=10, bottom=8),
                     ),
                     ft.Divider(height=1, color="#2A2E44"),
-                    ft.Container(content=chat_history_display, expand=True, padding=ft.Padding(left=4, right=4, top=8, bottom=8)),
+                    ft.Container(content=chat_history_display, expand=True, padding=ft.Padding(left=6, right=6, top=10, bottom=8)),
                     quick_row,
                     ft.Container(
                         content=ft.Row([
+                            chat_img_btn,
                             chat_input,
                             send_btn,
                             stop_btn,
                             continue_btn,
                         ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.END),
-                        padding=ft.Padding(left=0, right=0, top=6, bottom=4),
+                        padding=ft.Padding(left=6, right=6, top=8, bottom=10),
                     ),
                 ], spacing=6, expand=True)
 
