@@ -1216,17 +1216,17 @@ def add_recent_focus(kp):
 def load_ai_config():
     _defaults = {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
                  "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
-                 "deepseek_model": "deepseek-v4-flash"}
+                 "deepseek_model": "deepseek-flash", "deepseek_thinking": True}
     if not os.path.exists(AI_CONFIG_FILE):
         return _defaults
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
         cfg = json.load(f)
     for _k, _v in _defaults.items():
         cfg.setdefault(_k, _v)
-    # 旧模型名自动迁移：deepseek-chat / deepseek-reasoner 已弃用，统一到 V4-Flash
+    # 旧模型名自动迁移 → deepseek-flash（DeepSeek-V4.1-Flash-1017）
     _dm = cfg.get("deepseek_model", "")
-    if _dm in ("", "deepseek-v4-flash", "deepseek-reasoner"):
-        cfg["deepseek_model"] = "deepseek-v4-flash"
+    if _dm in ("", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
+        cfg["deepseek_model"] = "deepseek-flash"
     return cfg
 
 
@@ -1246,11 +1246,12 @@ PROVIDERS = {
     },
     "deepseek": {
         "name": "DeepSeek",
-        "url": "https://api.deepseek.com/v1/chat/completions",
-        "model": "deepseek-v4-flash",
-        "vision_model": "",
+        "url": "https://api.deepseek.com/chat/completions",
+        # deepseek-flash = DeepSeek-V4.1-Flash-1017（官方最新），原生支持图片理解
+        "model": "deepseek-flash",
+        "vision_model": "deepseek-flash",
         "key_field": "api_key_deepseek",
-        "supports_vision": False,
+        "supports_vision": True,
     },
 }
 
@@ -1294,6 +1295,72 @@ def provider_supports_vision():
     cfg = load_ai_config()
     provider = cfg.get("provider", "zhipu")
     return PROVIDERS.get(provider, PROVIDERS["zhipu"]).get("supports_vision", False)
+
+
+# —— DeepSeek 自研网络搜索 / 网页抓取（Search & Fetch API，官方文档 guides/search）——
+def deepseek_search(query, count=5):
+    """DeepSeek Search：自研搜索引擎，返回结构化结果。失败返回 None。"""
+    cfg = load_ai_config()
+    key = cfg.get("api_key_deepseek", "").strip()
+    if not key:
+        return None
+    try:
+        r = requests.post(
+            "https://api.deepseek.com/v1/tools/search",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"query": (query or "")[:128], "count": count, "need_content": False},
+            timeout=15)
+        if r.status_code != 200:
+            return None
+        results = r.json().get("results", [])
+        lines = []
+        for it in results[:count]:
+            title = it.get("title", "")
+            url = it.get("url", "")
+            summary = it.get("summary", "") or it.get("snippet", "")
+            if not title and not summary:
+                continue
+            lines.append(f"- {title}\n  {summary[:200]}\n  来源: {url}")
+        return "\n".join(lines) if lines else None
+    except BaseException:
+        return None
+
+
+def deepseek_fetch(url):
+    """DeepSeek Fetch：抓取单个网页为 Markdown。失败返回 None。"""
+    cfg = load_ai_config()
+    key = cfg.get("api_key_deepseek", "").strip()
+    if not key:
+        return None
+    try:
+        r = requests.post(
+            "https://api.deepseek.com/v1/tools/fetch",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"url": url[:8192]},
+            timeout=15)
+        if r.status_code != 200:
+            return None
+        return r.json().get("content", "")[:3000]
+    except BaseException:
+        return None
+
+
+def deepseek_enrich(query):
+    """按用户消息做联网增强：含 URL → 抓取网页；否则 → 网络搜索。返回注入文本或空串。"""
+    urls = re.findall(r"https?://[^\s]+", query)
+    if urls:
+        content = deepseek_fetch(urls[0])
+        if content:
+            return f"【用户提到的网页内容（已自动抓取，请优先参考）】\n{content}"
+        return ""
+    # 联网意图检测：显式词或时效性问题
+    _intent = re.search(r"(联网|搜索一下|查一下|最新|今天|本周|今年|新闻|实时|天气|比赛|发布|上市)", query)
+    if not _intent:
+        return ""
+    res = deepseek_search(query)
+    if res:
+        return f"【DeepSeek 实时联网结果（请基于这些信息回答，并注明来源链接）】\n{res}"
+    return ""
 
 
 def get_chat_history_file(subject):
@@ -2876,6 +2943,12 @@ def main(page: ft.Page):
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 payload = {"model": api_model, "messages": messages,
                            "temperature": 0.7, "max_tokens": 2048, "stream": True}
+                # DeepSeek：按设置开关思考模式（V4.1 默认思考，含 reasoning_content）
+                if api_model.startswith("deepseek"):
+                    _cfg = load_ai_config()
+                    if _cfg.get("deepseek_thinking", True):
+                        payload["thinking"] = {"type": "enabled"}
+                        payload["reasoning_effort"] = "high"
                 try:
                     resp = requests.post(
                         api_url,
@@ -3352,6 +3425,15 @@ def main(page: ft.Page):
                                     lines.append(f"  正确答案：{ans}")
                             rebuilt[0] = {"role": "system",
                                           "content": rebuilt[0]["content"] + "\n\n" + "\n".join(lines)}
+                    except BaseException:
+                        pass
+                    # DeepSeek 联网增强：消息含 URL 或联网意图时，自动搜索/抓取并注入
+                    try:
+                        if load_ai_config().get("provider") == "deepseek":
+                            _enrich = deepseek_enrich(content)
+                            if _enrich:
+                                rebuilt[0] = {"role": "system",
+                                              "content": rebuilt[0]["content"] + "\n\n" + _enrich}
                     except BaseException:
                         pass
                     # 多模态转换：历史/当前消息里带【图】标记的 user 消息 → OpenAI 多模态 content 数组
@@ -5633,17 +5715,22 @@ def main(page: ft.Page):
                                               value=ai_config.get("api_key_deepseek", ""),
                                               password=True)
             deepseek_model_input = ft.TextField(
-                label="DeepSeek 模型（deepseek-v4-flash / deepseek-v4-pro）",
-                value=ai_config.get("deepseek_model", "deepseek-v4-flash"),
-                hint_text="默认 deepseek-v4-flash（便宜通用）；更强选 deepseek-v4-pro",
+                label="DeepSeek 模型（deepseek-flash / deepseek-v4-pro）",
+                value=ai_config.get("deepseek_model", "deepseek-flash"),
+                hint_text="deepseek-flash = V4.1-Flash-1017（默认，含图片理解）；更强选 deepseek-v4-pro",
                 width=280)
+            deepseek_thinking_switch = ft.Switch(
+                label="DeepSeek 思考模式",
+                value=ai_config.get("deepseek_thinking", True),
+                tooltip="开启后模型先深度思考再回答（更强但稍慢）")
 
             def save_keys(e):
                 cfg = load_ai_config()
                 cfg["provider"] = provider_dropdown.value
                 cfg["api_key_free"] = free_key_input.value.strip()
                 cfg["api_key_deepseek"] = deepseek_key_input.value.strip()
-                cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-v4-flash").strip()
+                cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
+                cfg["deepseek_thinking"] = deepseek_thinking_switch.value
                 save_ai_config(cfg)
                 show_toast("API 配置已保存", "green")
 
@@ -6213,6 +6300,7 @@ def main(page: ft.Page):
                 free_key_input,
                 deepseek_key_input,
                 deepseek_model_input,
+                deepseek_thinking_switch,
                 ft.ElevatedButton("保存密钥", on_click=save_keys),
                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
                         test_conn_result]),
