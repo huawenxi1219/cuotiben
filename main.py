@@ -1214,12 +1214,20 @@ def add_recent_focus(kp):
 
 
 def load_ai_config():
+    _defaults = {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
+                 "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
+                 "deepseek_model": "deepseek-v4-flash"}
     if not os.path.exists(AI_CONFIG_FILE):
-        return {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
-                "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
-                "deepseek_model": "deepseek-chat"}
+        return _defaults
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        cfg = json.load(f)
+    for _k, _v in _defaults.items():
+        cfg.setdefault(_k, _v)
+    # 旧模型名自动迁移：deepseek-chat / deepseek-reasoner 已弃用，统一到 V4-Flash
+    _dm = cfg.get("deepseek_model", "")
+    if _dm in ("", "deepseek-v4-flash", "deepseek-reasoner"):
+        cfg["deepseek_model"] = "deepseek-v4-flash"
+    return cfg
 
 
 def save_ai_config(config):
@@ -1239,7 +1247,7 @@ PROVIDERS = {
     "deepseek": {
         "name": "DeepSeek",
         "url": "https://api.deepseek.com/v1/chat/completions",
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "vision_model": "",
         "key_field": "api_key_deepseek",
         "supports_vision": False,
@@ -1255,7 +1263,7 @@ def get_api_endpoint():
     model = info["model"]
     if provider == "deepseek":
         # DeepSeek 支持自定义模型：deepseek-chat / deepseek-reasoner / 新版模型 ID
-        model = (cfg.get("deepseek_model") or "deepseek-chat").strip() or "deepseek-chat"
+        model = (cfg.get("deepseek_model") or "deepseek-v4-flash").strip() or "deepseek-v4-flash"
     return key, info["url"], model, info["vision_model"]
 
 
@@ -1277,7 +1285,7 @@ def endpoint_for(task="smart"):
     key_ds = cfg.get("api_key_deepseek", "").strip()
     if key_ds:
         dk = PROVIDERS["deepseek"]
-        model = (cfg.get("deepseek_model") or "deepseek-chat").strip() or "deepseek-chat"
+        model = (cfg.get("deepseek_model") or "deepseek-v4-flash").strip() or "deepseek-v4-flash"
         return key_ds, dk["url"], model, dk.get("vision_model", "")
     return endpoint_for("cheap")
 
@@ -5625,9 +5633,9 @@ def main(page: ft.Page):
                                               value=ai_config.get("api_key_deepseek", ""),
                                               password=True)
             deepseek_model_input = ft.TextField(
-                label="DeepSeek 模型（deepseek-chat / deepseek-reasoner / 新版模型ID）",
-                value=ai_config.get("deepseek_model", "deepseek-chat"),
-                hint_text="可填你注册到的最新版模型 ID，如 V4.1-1017 对应的 API 模型名",
+                label="DeepSeek 模型（deepseek-v4-flash / deepseek-v4-pro）",
+                value=ai_config.get("deepseek_model", "deepseek-v4-flash"),
+                hint_text="默认 deepseek-v4-flash（便宜通用）；更强选 deepseek-v4-pro",
                 width=280)
 
             def save_keys(e):
@@ -5635,7 +5643,7 @@ def main(page: ft.Page):
                 cfg["provider"] = provider_dropdown.value
                 cfg["api_key_free"] = free_key_input.value.strip()
                 cfg["api_key_deepseek"] = deepseek_key_input.value.strip()
-                cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-chat").strip()
+                cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-v4-flash").strip()
                 save_ai_config(cfg)
                 show_toast("API 配置已保存", "green")
 
