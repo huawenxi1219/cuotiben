@@ -1059,6 +1059,48 @@ def get_memory_context(subject=None):
     return "\n\n".join(parts) if parts else ""
 
 
+_TEXTBOOK_CACHE = {}
+
+def load_textbook_index(subject):
+    if subject in _TEXTBOOK_CACHE:
+        return _TEXTBOOK_CACHE[subject]
+    fp = os.path.join(DATA_DIR, "textbook_index", f"{subject}.json")
+    if not os.path.exists(fp):
+        return None
+    try:
+        with open(fp, "r", encoding="utf-8") as f:
+            idx = json.load(f)
+        _TEXTBOOK_CACHE[subject] = idx
+        return idx
+    except BaseException:
+        return None
+
+
+def search_textbook(subject, query, top=3):
+    """教材知识库检索：TF 关键词打分，返回最相关的教材章节块"""
+    idx = load_textbook_index(subject)
+    if not idx:
+        return ""
+    blocks = idx.get("blocks", [])
+    if not blocks or not query:
+        return ""
+    q_words = [w for w in re.split(r"[\s，。；、：？！,.!?;:（）()\"\"''《》<>\[\]【】+-]", query)
+               if len(w) >= 2]
+    scored = []
+    for b in blocks:
+        t = b.get("text", "")
+        s = 0
+        for w in q_words:
+            s += t.count(w)
+        if s > 0:
+            scored.append((s, b))
+    scored.sort(key=lambda x: -x[0])
+    parts = []
+    for s, b in scored[:top]:
+        parts.append(f"[{b.get('book', '')} P{b.get('pages', '')}]\n{b.get('text', '')[:1200]}")
+    return "\n\n".join(parts)
+
+
 def get_teaching_strategy(subject):
     profile = load_user_profile()
     error_types = profile.get("error_types", {})
@@ -1174,7 +1216,8 @@ def add_recent_focus(kp):
 def load_ai_config():
     if not os.path.exists(AI_CONFIG_FILE):
         return {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
-                "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {}}
+                "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
+                "deepseek_model": "deepseek-chat"}
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -1209,7 +1252,11 @@ def get_api_endpoint():
     provider = cfg.get("provider", "zhipu")
     info = PROVIDERS.get(provider, PROVIDERS["zhipu"])
     key = cfg.get(info["key_field"], "").strip()
-    return key, info["url"], info["model"], info["vision_model"]
+    model = info["model"]
+    if provider == "deepseek":
+        # DeepSeek 支持自定义模型：deepseek-chat / deepseek-reasoner / 新版模型 ID
+        model = (cfg.get("deepseek_model") or "deepseek-chat").strip() or "deepseek-chat"
+    return key, info["url"], model, info["vision_model"]
 
 
 def endpoint_for(task="smart"):
@@ -1230,7 +1277,8 @@ def endpoint_for(task="smart"):
     key_ds = cfg.get("api_key_deepseek", "").strip()
     if key_ds:
         dk = PROVIDERS["deepseek"]
-        return key_ds, dk["url"], dk["model"], dk.get("vision_model", "")
+        model = (cfg.get("deepseek_model") or "deepseek-chat").strip() or "deepseek-chat"
+        return key_ds, dk["url"], model, dk.get("vision_model", "")
     return endpoint_for("cheap")
 
 
@@ -2887,6 +2935,23 @@ def main(page: ft.Page):
                     system_prompt += f"\n\n{profile_summary}"
                 if strategy:
                     system_prompt += f"\n\n{strategy}"
+
+                # —— 教材知识库：按科目检索最近提问相关的教材章节，优先引用原文 ——
+                try:
+                    if subject != "总AI":
+                        _tq = ""
+                        for _m in history[-3:]:
+                            if _m.get("role") == "user":
+                                _tq = str(_m.get("content", ""))[:80]
+                                break
+                        if _tq:
+                            _tb = search_textbook(subject, _tq)
+                            if _tb:
+                                system_prompt += (f"\n\n【教材参考（人教版{subject}）】\n"
+                                                  "以下为教材原文摘录（含页码），回答时优先遵循教材定义与表述：\n"
+                                                  + _tb)
+                except BaseException:
+                    pass
 
                 # —— DeepTutor 混合个性化：实时学情注入（薄弱点 + 上次遗留问题）——
                 try:
@@ -5559,12 +5624,18 @@ def main(page: ft.Page):
             deepseek_key_input = ft.TextField(label="DeepSeek API 密钥",
                                               value=ai_config.get("api_key_deepseek", ""),
                                               password=True)
+            deepseek_model_input = ft.TextField(
+                label="DeepSeek 模型（deepseek-chat / deepseek-reasoner / 新版模型ID）",
+                value=ai_config.get("deepseek_model", "deepseek-chat"),
+                hint_text="可填你注册到的最新版模型 ID，如 V4.1-1017 对应的 API 模型名",
+                width=280)
 
             def save_keys(e):
                 cfg = load_ai_config()
                 cfg["provider"] = provider_dropdown.value
                 cfg["api_key_free"] = free_key_input.value.strip()
                 cfg["api_key_deepseek"] = deepseek_key_input.value.strip()
+                cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-chat").strip()
                 save_ai_config(cfg)
                 show_toast("API 配置已保存", "green")
 
@@ -6133,6 +6204,7 @@ def main(page: ft.Page):
                 provider_dropdown,
                 free_key_input,
                 deepseek_key_input,
+                deepseek_model_input,
                 ft.ElevatedButton("保存密钥", on_click=save_keys),
                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
                         test_conn_result]),
