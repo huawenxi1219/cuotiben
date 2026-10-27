@@ -1283,7 +1283,8 @@ def add_recent_focus(kp):
 def load_ai_config():
     _defaults = {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
                  "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
-                 "deepseek_model": "deepseek-flash", "deepseek_thinking": True}
+                 "deepseek_model": "deepseek-flash", "deepseek_thinking": True,
+                 "ctx_chars": 50000}
     if not os.path.exists(AI_CONFIG_FILE):
         return _defaults
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -2110,7 +2111,7 @@ def extract_chart_block(text):
     return text, None
 
 
-def build_ctx(history, max_chars=20000, per_msg_cap=800):
+def build_ctx(history, max_chars=50000, per_msg_cap=1500):
     """按字符预算从历史中取最近的对话，尽量多带上下文。
     返回按时间正序的消息列表（每条截断到 per_msg_cap 字符）。"""
     ctx = []
@@ -2126,6 +2127,82 @@ def build_ctx(history, max_chars=20000, per_msg_cap=800):
         ctx.append({"role": msg["role"], "content": c})
     ctx.reverse()
     return ctx
+
+
+# ============ 长记忆：滚动摘要（早期对话自动压缩，长期保存） ============
+def memory_file():
+    return os.path.join(DATA_DIR, "ai_memory.json")
+
+
+def load_ai_memory():
+    if os.path.exists(memory_file()):
+        try:
+            with open(memory_file(), "r", encoding="utf-8") as f:
+                return json.load(f)
+        except BaseException:
+            pass
+    return {}
+
+
+def save_ai_memory(mem):
+    try:
+        with open(memory_file(), "w", encoding="utf-8") as f:
+            json.dump(mem, f, ensure_ascii=False, indent=2)
+    except BaseException:
+        pass
+
+
+def get_subject_summary(subject):
+    """返回该科已压缩的早期对话摘要（用于注入 system prompt）。"""
+    mem = load_ai_memory()
+    rec = mem.get(subject) or {}
+    return rec.get("summary", "")
+
+
+def compress_old_history(subject, hist):
+    """历史过长时，把早期对话交给 AI 压缩成摘要，长期保存（异步调用方自行处理）。
+    返回压缩条数；无需压缩返回 0。"""
+    try:
+        total = sum(len(m.get("content", "") or "") for m in hist)
+        if total < 40000:
+            return 0
+        mem = load_ai_memory()
+        rec = mem.setdefault(subject, {"summary": "", "count": 0})
+        compressed = rec.get("count", 0)
+        remain = hist[compressed:]
+        # 至少积累 8 条新消息才压缩一次，且每次只压新增的一半
+        if len(remain) < 8:
+            return 0
+        batch = remain[: max(8, len(remain) // 2)]
+        text = "\n".join(
+            ("学生说：" if m.get("role") == "user" else "老师答：") + str(m.get("content", ""))[:600]
+            for m in batch)
+        key, url, model, _v = endpoint_for("cheap")
+        if not key:
+            return 0
+        prompt = ("你是学习助手的记忆压缩器。把下面这段师生对话压缩成不超过500字的中文摘要，"
+                  "必须保留：①学生问过的具体知识点/题型/题目关键词 ②AI给出的关键方法、结论、公式或思路 "
+                  "③学生暴露的薄弱点/常错点。只输出摘要正文，不要任何前缀。\n\n" + text[:12000])
+        r = requests.post(url, headers={"Authorization": f"Bearer {key}",
+                                        "Content-Type": "application/json"},
+                          json={"model": model, "messages": [{"role": "user", "content": prompt}],
+                                "temperature": 0.3, "max_tokens": 800}, timeout=30)
+        if r.status_code != 200:
+            return 0
+        c = r.json()["choices"][0]["message"]["content"].strip()
+        if not c:
+            return 0
+        # 合并：旧摘要 + 新摘要（旧的在前面），控制总长
+        old = rec.get("summary", "")
+        if old:
+            rec["summary"] = (old + "\n" + c)[-3000:]
+        else:
+            rec["summary"] = c[:3000]
+        rec["count"] = compressed + len(batch)
+        save_ai_memory(mem)
+        return len(batch)
+    except BaseException:
+        return 0
 
 
 def save_svg_chart(svg_text):
@@ -3609,6 +3686,8 @@ def main(page: ft.Page):
                     if insert_user_bubble:
                         save_chat_message(subject, "user", content)
                     hist_now = load_chat_history(subject)
+                    # 长记忆：上下文预算跟随设置（短/中/长），早期对话用滚动摘要补齐
+                    _ctx_chars = int(load_ai_config().get("ctx_chars", 50000) or 50000)
                     rebuilt = [{"role": "system", "content": system_prompt}]
                     # 个人画像注入：让 AI 基于学生画像个性化教学（按当前学科优先）
                     try:
@@ -3618,12 +3697,20 @@ def main(page: ft.Page):
                             rebuilt[0]["content"] = rebuilt[0]["content"] + "\n\n" + _pt
                     except BaseException:
                         pass
+                    # 早期对话摘要注入（滚动记忆）
+                    try:
+                        _sum = get_subject_summary(subject)
+                        if _sum:
+                            rebuilt[0]["content"] = (rebuilt[0]["content"] +
+                                                     "\n\n【更早的对话摘要（AI 自动压缩的长期记忆，仍有效）】\n" + _sum)
+                    except BaseException:
+                        pass
                     # 发送后异步完善画像（问过计数/最近问题/主题词）
                     try:
                         update_subject_profile(subject, content)
                     except BaseException:
                         pass
-                    for _m in build_ctx(hist_now, max_chars=20000):
+                    for _m in build_ctx(hist_now, max_chars=_ctx_chars):
                         rebuilt.append({"role": _m["role"], "content": _m["content"]})
                     if (not rebuilt) or rebuilt[-1].get("role") != "user" or rebuilt[-1].get("content") != content:
                         rebuilt.append({"role": "user", "content": content})
@@ -3795,6 +3882,13 @@ def main(page: ft.Page):
                             save_chat_message(subject, "assistant", ai_response["text"])
                             update_chat_memory(subject, content, ai_response["text"])
                         update_chat_stats(subject)
+                        # —— 长记忆：历史过长时后台压缩早期对话为摘要（不阻塞，失败静默）——
+                        try:
+                            _hh = load_chat_history(subject)
+                            if sum(len(m.get("content", "") or "") for m in _hh) > 40000:
+                                compress_old_history(subject, _hh)
+                        except BaseException:
+                            pass
                         # —— 断点续传闭环：续写完成后把「半截+续写」合并为一条历史 ——
                         if continuing["v"]:
                             continuing["v"] = False
@@ -6326,6 +6420,10 @@ def main(page: ft.Page):
                 cfg["api_key_deepseek"] = deepseek_key_input.value.strip()
                 cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
                 cfg["deepseek_thinking"] = deepseek_thinking_switch.value
+                try:
+                    cfg["ctx_chars"] = int(memory_dropdown.value)
+                except BaseException:
+                    cfg["ctx_chars"] = 50000
                 save_ai_config(cfg)
                 show_toast("API 配置已保存", "green")
 
@@ -6932,6 +7030,15 @@ def main(page: ft.Page):
                 ft.Text("🧠 AI 引擎设置", size=20),
                 ft.ElevatedButton("👤 查看我的 AI 画像", on_click=lambda e: show_learning_profile(e),
                                   icon=ft.Icons.PERSON_OUTLINE),
+                memory_dropdown := ft.Dropdown(
+                    label="对话记忆长度",
+                    options=[
+                        ft.dropdown.Option("20000", "短（约1万词）·省额度"),
+                        ft.dropdown.Option("50000", "中（约2.5万词）·推荐"),
+                        ft.dropdown.Option("80000", "长（约4万词）·记忆更强"),
+                    ],
+                    value=str(ai_config.get("ctx_chars", 50000)),
+                    width=280),
                 provider_dropdown,
                 free_key_input,
                 deepseek_key_input,
