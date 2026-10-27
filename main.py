@@ -1155,7 +1155,8 @@ def load_user_profile():
             "total_errors": 0, "total_chats": 0,
             "chat_memory": {"last_update": "", "recent_topics": [], "weak_points": [],
                             "discussed_errors": [], "last_question_summary": ""},
-            "knowledge_memory": {}, "error_memory": []
+            "knowledge_memory": {}, "error_memory": [],
+            "subject_profile": {}
         }
     with open(USER_PROFILE_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -1169,6 +1170,7 @@ def load_user_profile():
         data.setdefault("total_chats", 0)
         data.setdefault("knowledge_memory", {})
         data.setdefault("error_memory", [])
+        data.setdefault("subject_profile", {})
         if "chat_memory" not in data:
             data["chat_memory"] = {"last_update": "", "recent_topics": [], "weak_points": [],
                                    "discussed_errors": [], "last_question_summary": ""}
@@ -1203,6 +1205,71 @@ def update_chat_stats(subject):
     p = load_user_profile()
     p["total_chats"] += 1
     save_user_profile(p)
+
+
+def update_subject_profile(subject, question="", is_question=True):
+    """对话后完善个人画像：学科问答计数 + 最近问题摘要 + 知识点关注提取。"""
+    if not subject or subject == "总AI":
+        return
+    p = load_user_profile()
+    sp = p.setdefault("subject_profile", {})
+    rec = sp.setdefault(subject, {"asked": 0, "recent_questions": [],
+                                  "topics": [], "mistake_themes": []})
+    rec["asked"] = rec.get("asked", 0) + 1
+    q = (question or "").strip()
+    if q:
+        rec["recent_questions"].insert(0, q[:80])
+        rec["recent_questions"] = rec["recent_questions"][:8]
+        # 从问题/错题文本里抓学科主题词（2-4字连续中文片段，取高频）
+        frags = re.findall(r"[\u4e00-\u9fa5]{2,4}", q)
+        topics = [f for f in frags if not f.endswith(("什么", "怎么", "为什么", "多少", "一下", "这个", "那个"))]
+        for t in topics[:4]:
+            if t not in rec["topics"]:
+                rec["topics"].append(t)
+        rec["topics"] = rec["topics"][:20]
+    p["chat_memory"]["last_question_summary"] = q[:100] if q else p["chat_memory"].get("last_question_summary", "")
+    p["chat_memory"]["last_update"] = time.strftime("%Y-%m-%d %H:%M")
+    save_user_profile(p)
+
+
+def profile_to_prompt_text(profile, subject=None):
+    """把个人画像转成给 AI 的自然语言摘要（具体、可执行）。"""
+    parts = []
+    # 学科画像
+    sp = profile.get("subject_profile", {})
+    if sp:
+        if subject and subject != "总AI" and subject in sp:
+            rec = sp[subject]
+            parts.append(f"【你在{subject}上的画像】累计问过{rec.get('asked', 0)}个问题")
+            if rec.get("recent_questions"):
+                parts.append("最近问过：" + "；".join(rec["recent_questions"][:5]))
+            if rec.get("topics"):
+                parts.append("常涉及知识点/题型：" + "、".join(rec["topics"][:12]))
+        else:
+            parts.append("【跨学科画像】" + "；".join(
+                f"{k}（问过{v.get('asked', 0)}题，关注：{'、'.join(v.get('topics', [])[:6]) or '无'}"
+                for k, v in list(sp.items())[:6]))
+    # 薄弱知识点
+    wk = profile.get("weak_knowledge", {})
+    if wk:
+        weak_items = sorted(wk.items(), key=lambda x: -x[1])[:8]
+        parts.append("薄弱知识点（按强度）：" + "、".join(f"{k}({v:.0%})" for k, v in weak_items))
+    # 错误类型
+    et = profile.get("error_types", {})
+    if et:
+        top_et = sorted(et.items(), key=lambda x: -x[1])[:5]
+        parts.append("高频错误类型：" + "、".join(f"{k}×{v}" for k, v in top_et))
+    # 最近关注
+    rf = profile.get("recent_focus", [])
+    if rf:
+        parts.append("最近在攻克：" + "、".join(rf[:5]))
+    if profile.get("total_errors"):
+        parts.append(f"错题本累计 {profile['total_errors']} 道")
+    if profile.get("total_chats"):
+        parts.append(f"累计 AI 对话 {profile['total_chats']} 次")
+    if not parts:
+        return ""
+    return "【学生个人画像（基于历史对话与错题自动完善，请据此个性化教学）】\n" + "\n".join(parts)
 
 
 def add_recent_focus(kp):
@@ -1345,22 +1412,28 @@ def deepseek_fetch(url):
         return None
 
 
-def deepseek_enrich(query):
-    """按用户消息做联网增强：含 URL → 抓取网页；否则 → 网络搜索。返回注入文本或空串。"""
+def deepseek_enrich(query, force=False):
+    """按用户消息做联网增强：含 URL → 抓取网页；否则 → 网络搜索。返回注入文本或空串。
+    force=True（对话页联网开关开启）时无条件搜索。"""
     urls = re.findall(r"https?://[^\s]+", query)
     if urls:
         content = deepseek_fetch(urls[0])
         if content:
             return f"【用户提到的网页内容（已自动抓取，请优先参考）】\n{content}"
         return ""
-    # 联网意图检测：显式词或时效性问题
-    _intent = re.search(r"(联网|搜索一下|查一下|最新|今天|本周|今年|新闻|实时|天气|比赛|发布|上市)", query)
-    if not _intent:
-        return ""
+    if not force:
+        # 联网意图检测：显式词或时效性问题
+        _intent = re.search(r"(联网|搜索一下|查一下|最新|今天|本周|今年|新闻|实时|天气|比赛|发布|上市)", query)
+        if not _intent:
+            return ""
     res = deepseek_search(query)
     if res:
         return f"【DeepSeek 实时联网结果（请基于这些信息回答，并注明来源链接）】\n{res}"
     return ""
+
+
+# 对话页"联网搜索"开关状态
+_WEB_SEARCH_ON = {"on": False}
 
 
 def get_chat_history_file(subject):
@@ -1578,6 +1651,100 @@ def save_note(subject, content, media):
                  "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
     save_jsonl(NOTES_FILE, data)
     log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
+
+
+def _note_sort_key(x):
+    """笔记排序键：timestamp 可能缺失/字符串/旧格式，统一转 float，兜底解析 time。"""
+    ts = x.get("timestamp", 0)
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, str) and ts.strip().isdigit():
+        return float(ts)
+    t = x.get("time", "") or x.get("created_at", "")
+    if isinstance(t, str) and t.strip():
+        try:
+            return time.mktime(time.strptime(t[:19], "%Y-%m-%d %H:%M:%S"))
+        except (ValueError, TypeError):
+            pass
+    return 0.0
+
+
+def pick_relevant_notes(query, subject=None, limit=4):
+    """按关键词检索相关笔记，供 AI 对话引用（类似错题检索）。"""
+    notes = load_jsonl(NOTES_FILE)
+    if subject and subject != "总AI":
+        notes = [n for n in notes if n.get("subject") == subject]
+    if not notes:
+        return []
+    kws = [k.lower() for k in re.findall(r"[\u4e00-\u9fa5]{2,}|[a-zA-Z]{3,}", query or "")]
+    scored = []
+    for n in notes:
+        s = 0.0
+        text = (str(n.get("content", "")) + " " + " ".join(str(t) for t in n.get("tags", []))).lower()
+        for kw in kws:
+            if kw and kw in text:
+                s += 3
+        if s > 0:
+            scored.append((s, n))
+    scored.sort(key=lambda x: -x[0])
+    return [n for _, n in scored[:limit]]
+
+
+# ============ 学科思维导图（XMind 式 + 结合错题本） ============
+def mindmap_file(subject):
+    return os.path.join(DATA_DIR, "mindmaps", f"{subject}.json")
+
+
+def load_mindmap(subject):
+    p = mindmap_file(subject)
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except BaseException:
+            pass
+    return None
+
+
+def save_mindmap(subject, tree):
+    d = os.path.join(DATA_DIR, "mindmaps")
+    os.makedirs(d, exist_ok=True)
+    with open(mindmap_file(subject), "w", encoding="utf-8") as f:
+        json.dump(tree, f, ensure_ascii=False, indent=2)
+
+
+def build_mindmap(subject):
+    """从错题自动聚类生成学科知识树；已有人工编辑的树则增量合并新知识点。"""
+    errors = load_jsonl(ERRORS_FILE)
+    subj_errors = [e for e in errors if e.get("subject") == subject]
+    # 按知识点标签聚类（每个错题的主要标签）
+    clusters = {}
+    for e in subj_errors:
+        tags = [str(t) for t in e.get("tags", []) if str(t).strip()] or ["未分类"]
+        main_tag = tags[0]
+        kp = (e.get("kp") or main_tag).strip()
+        clusters.setdefault(kp, {"title": kp, "children": [], "kp": kp, "count": 0})
+        clusters[kp]["count"] += 1
+    # 一级主题：优先用学科常见模块名兜底
+    root_children = []
+    for kp in sorted(clusters.keys()):
+        root_children.append(clusters[kp])
+    tree = {"title": subject, "children": root_children}
+    # 与已有手动树合并：保留已有结构，补充新聚类出来的知识点
+    old = load_mindmap(subject)
+    if old and old.get("children"):
+        old_titles = {c.get("title") for c in old["children"]}
+        for c in root_children:
+            if c["title"] not in old_titles:
+                old["children"].append(c)
+        # 已有节点也补充新错题计数
+        old_by_title = {c.get("title"): c for c in old["children"]}
+        for c in root_children:
+            if c["title"] in old_by_title:
+                old_by_title[c["title"]]["count"] = c.get("count", 0)
+        tree = old
+    save_mindmap(subject, tree)
+    return tree
 
 
 @retry_request(max_retries=3, base_delay=2)
@@ -2102,6 +2269,12 @@ def main(page: ft.Page):
             page.title = "池鱼Study"
             page.responsive = True
             page.theme_mode = ft.ThemeMode.DARK
+            # 全局毛玻璃底色：深紫蓝渐变，配合各处的半透明 blur 卡片
+            page.bgcolor = ft.Colors.TRANSPARENT
+            try:
+                page.window.title_bar_hidden = False
+            except BaseException:
+                pass
 
             page.theme = ft.Theme(
                 font_family="Segoe UI, -apple-system, Roboto, sans-serif",
@@ -3121,8 +3294,10 @@ def main(page: ft.Page):
                             content=ft.Column(inner, spacing=4),
                             padding=ft.Padding(left=14, right=14, top=10, bottom=10),
                             border_radius=ft.BorderRadius(16, 16, 4, 16),
-                            bgcolor="#7AA2F7",
-                            shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
+                            bgcolor="#B07AA2F7",
+                            blur=ft.Blur(8, 8, ft.BlurTileMode.CLAMP),
+                            border=ft.border.all(1, "#557AA2F7"),
+                            shadow=ft.BoxShadow(blur_radius=10, color="#44000000"),
                             width=300,
                         ),
                     ], alignment=ft.MainAxisAlignment.END)
@@ -3197,9 +3372,10 @@ def main(page: ft.Page):
                         content=ft.Column([content_col, action_row], spacing=4),
                         padding=ft.Padding(left=14, right=8, top=10, bottom=6),
                         border_radius=ft.BorderRadius(16, 16, 16, 4),
-                        bgcolor="#24283B",
-                        border=ft.border.all(1, "#414868"),
-                        shadow=ft.BoxShadow(blur_radius=8, color="#33000000"),
+                        bgcolor="#8F24283B",
+                        blur=ft.Blur(8, 8, ft.BlurTileMode.CLAMP),
+                        border=ft.border.all(1, "#55414868"),
+                        shadow=ft.BoxShadow(blur_radius=10, color="#33000000"),
                         width=300,
                     )
                     avatar = ft.Container(
@@ -3263,6 +3439,36 @@ def main(page: ft.Page):
                     content_padding=ft.Padding(left=14, right=14, top=10, bottom=10),
                     expand=True,
                 )
+                web_btn = ft.Container(
+                    content=ft.Column([
+                        ft.Icon(ft.Icons.PUBLIC, size=18, color="#9AA5CE"),
+                        ft.Text("联网", size=9, color="#9AA5CE"),
+                    ], spacing=0, alignment=ft.MainAxisAlignment.CENTER,
+                       horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    width=44, height=40, border_radius=12,
+                    bgcolor="#24283B",
+                    border=ft.border.all(1, "#414868"),
+                    alignment=ft.alignment.center,
+                    on_click=lambda e: toggle_web_search(),
+                    ink=True,
+                    tooltip="联网搜索：开启后每轮自动联网检索（DeepSeek）",
+                )
+
+                def toggle_web_search(e=None):
+                    _WEB_SEARCH_ON["on"] = not _WEB_SEARCH_ON["on"]
+                    if _WEB_SEARCH_ON["on"]:
+                        web_btn.bgcolor = "#7AA2F7"
+                        web_btn.border = ft.border.all(1, "#7AA2F7")
+                        web_btn.content.controls[0].color = "#FFFFFF"
+                        web_btn.content.controls[1].color = "#FFFFFF"
+                        show_toast("🌐 联网搜索已开启", "green")
+                    else:
+                        web_btn.bgcolor = "#24283B"
+                        web_btn.border = ft.border.all(1, "#414868")
+                        web_btn.content.controls[0].color = "#9AA5CE"
+                        web_btn.content.controls[1].color = "#9AA5CE"
+                        show_toast("联网搜索已关闭", "grey")
+                    page.update()
                 send_btn = ft.Container(
                     content=ft.Icon(ft.Icons.ARROW_UPWARD, size=20, color="#FFFFFF"),
                     width=40, height=40, border_radius=20,
@@ -3404,6 +3610,19 @@ def main(page: ft.Page):
                         save_chat_message(subject, "user", content)
                     hist_now = load_chat_history(subject)
                     rebuilt = [{"role": "system", "content": system_prompt}]
+                    # 个人画像注入：让 AI 基于学生画像个性化教学（按当前学科优先）
+                    try:
+                        _prof = load_user_profile()
+                        _pt = profile_to_prompt_text(_prof, subject)
+                        if _pt:
+                            rebuilt[0]["content"] = rebuilt[0]["content"] + "\n\n" + _pt
+                    except BaseException:
+                        pass
+                    # 发送后异步完善画像（问过计数/最近问题/主题词）
+                    try:
+                        update_subject_profile(subject, content)
+                    except BaseException:
+                        pass
                     for _m in build_ctx(hist_now, max_chars=20000):
                         rebuilt.append({"role": _m["role"], "content": _m["content"]})
                     if (not rebuilt) or rebuilt[-1].get("role") != "user" or rebuilt[-1].get("content") != content:
@@ -3427,10 +3646,22 @@ def main(page: ft.Page):
                                           "content": rebuilt[0]["content"] + "\n\n" + "\n".join(lines)}
                     except BaseException:
                         pass
-                    # DeepSeek 联网增强：消息含 URL 或联网意图时，自动搜索/抓取并注入
+                    # 笔记检索注入：让 AI 能读取学生自己的笔记内容
+                    try:
+                        rel_notes = pick_relevant_notes(content, subject if subject != "总AI" else None, limit=3)
+                        if rel_notes:
+                            nlines = ["【学生笔记本中的相关笔记（回答时优先呼应笔记里的知识要点与写法）】"]
+                            for i, n in enumerate(rel_notes):
+                                ntext = str(n.get("content", ""))[:300]
+                                nlines.append(f"[{i+1}] {n.get('time','')}：{ntext}")
+                            rebuilt[0] = {"role": "system",
+                                          "content": rebuilt[0]["content"] + "\n\n" + "\n".join(nlines)}
+                    except BaseException:
+                        pass
+                    # DeepSeek 联网增强：联网开关开启时每轮强制检索；否则按 URL/意图自动触发
                     try:
                         if load_ai_config().get("provider") == "deepseek":
-                            _enrich = deepseek_enrich(content)
+                            _enrich = deepseek_enrich(content, force=_WEB_SEARCH_ON.get("on", False))
                             if _enrich:
                                 rebuilt[0] = {"role": "system",
                                               "content": rebuilt[0]["content"] + "\n\n" + _enrich}
@@ -3710,6 +3941,7 @@ def main(page: ft.Page):
                     quick_row,
                     ft.Container(
                         content=ft.Row([
+                            web_btn,
                             chat_img_btn,
                             chat_input,
                             send_btn,
@@ -5071,7 +5303,8 @@ def main(page: ft.Page):
             def build_note_list_page(subject):
                 items = load_jsonl(NOTES_FILE)
                 subject_items = [i for i in items if i.get("subject") == subject]
-                subject_items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+                # 新笔记置顶：统一按真实时间倒序（兼容 timestamp 缺失/字符串的旧数据）
+                subject_items.sort(key=_note_sort_key, reverse=True)
                 list_view = ft.ListView(spacing=10, expand=True)
                 if not subject_items:
                     list_view.controls.append(ft.Container(
@@ -5215,7 +5448,367 @@ def main(page: ft.Page):
                         except Exception as e:
                             print(f"⚠️ 加载笔记条目失败，已跳过: {e}")
                             continue
-                return list_view
+
+                def make_upload_note():
+                    """笔记本页上传入口：文字/图片均可，保存后即时刷新列表（新笔记置顶）"""
+                    up_subject = subject
+                    up_content = ft.TextField(label="笔记内容（可选）", multiline=True, min_lines=3,
+                                              border_radius=12, filled=True)
+                    up_files = []
+                    up_picker_col, up_files, reset_picker = make_file_picker_button(
+                        "📷 图片（可多选）", "image", on_complete=None)
+
+                    def do_upload(e):
+                        nonlocal up_files
+                        content = up_content.value.strip()
+                        if not content and not up_files:
+                            show_toast("请输入内容或选图片", "red")
+                            return
+                        save_note(up_subject, content, list(up_files))
+                        page.close(up_dlg)
+                        show_toast(f"✅ {up_subject} 笔记已保存（已置顶）", "green")
+                        open_function_page(up_subject, "笔记本")
+                        page.update()
+
+                    up_dlg = ft.AlertDialog(
+                        title=ft.Text("📝 上传笔记"),
+                        content=ft.Column([
+                            ft.Text(f"学科：{up_subject}", size=14, color=ft.Colors.GREY_400),
+                            up_content, up_picker_col,
+                        ], width=420, spacing=8, scroll=ft.ScrollMode.AUTO),
+                        actions=[
+                            ft.TextButton("取消", on_click=lambda e: page.close(up_dlg)),
+                            ft.ElevatedButton("💾 保存", on_click=do_upload),
+                        ])
+                    page.open(up_dlg)
+                    page.update()
+
+                upload_bar = ft.Row([
+                    ft.ElevatedButton("➕ 上传笔记", on_click=lambda e: make_upload_note(),
+                                      icon=ft.Icons.ADD),
+                    ft.Text(f"共 {len(subject_items)} 条", size=13, color=ft.Colors.GREY_500),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                return ft.Column([upload_bar, ft.Divider(height=1), list_view], spacing=8, expand=True)
+
+            def build_mindmap_page(subject):
+                """学科思维导图：XMind 式横向展开 + 缩放/平移 + 知识点挂错题可点开详情"""
+                tree = build_mindmap(subject)
+                view_state = {"scale": 1.0, "dx": 0.0, "dy": 0.0,
+                              "base_scale": 1.0, "base_dx": 0.0, "base_dy": 0.0,
+                              "layout": {}, "open": set()}
+                # 深度优先布局：返回该节点子树的垂直范围 (top, bottom)，节点置于自身子树垂直中心
+                NODE_W, NODE_H, DX, DY = 180, 46, 210, 24
+
+                def layout_node(node, x, y, depth=0):
+                    if not node.get("children") or node["title"] in view_state["open"]:
+                        node["_x"], node["_y"] = x, y
+                        view_state["layout"][node["title"]] = (x, y, depth)
+                        return y, y + NODE_H
+                    node["_x"], node["_y"] = x, y
+                    cy = y
+                    y = y + NODE_H + 12
+                    sub_tops, sub_bots = [], []
+                    for ch in node.get("children", []):
+                        t, b = layout_node(ch, x + DX, y, depth + 1)
+                        sub_tops.append(t)
+                        sub_bots.append(b)
+                        y = b + DY
+                    top = min(sub_tops) - 12
+                    bottom = max(sub_bots) + 12
+                    center = (top + bottom) / 2
+                    node["_y"] = center - NODE_H / 2
+                    view_state["layout"][node["title"]] = (x, center - NODE_H / 2, depth)
+                    return top, bottom
+
+                layout_node(tree, 24, 40)
+                max_x = max(v[0] for v in view_state["layout"].values()) + NODE_W + 60
+                max_y = max(v[1] for v in view_state["layout"].values()) + NODE_H + 60
+                LAYOUT_W, LAYOUT_H = max(700, int(max_x)), max(600, int(max_y))
+                _mm_root_ref = {"v": None}
+
+                def mm_error_detail(kp_title):
+                    errors = [e for e in load_jsonl(ERRORS_FILE)
+                              if e.get("subject") == subject and
+                              ((e.get("kp") or "").strip() == kp_title or
+                               (str(e.get("tags", [])[0]) if e.get("tags") else "") == kp_title)]
+                    if not errors:
+                        show_toast("该知识点暂无错题", "grey")
+                        return
+                    children = [ft.Text(f"{kp_title} · 共{len(errors)}道错题", size=17,
+                                        weight=ft.FontWeight.BOLD)]
+                    for i, e in enumerate(errors[:20]):
+                        orig = (e.get("original", "") or e.get("question", ""))[:90]
+                        mis = str(e.get("mistake", ""))[:60]
+                        ans = str(e.get("answer", ""))[:60]
+                        card = ft.Container(
+                            content=ft.Column([
+                                ft.Text(f"[{i+1}] {orig}", size=13),
+                                ft.Text(f"❌ 错因：{mis}", size=12, color="#EF5350") if mis else ft.Text(""),
+                                ft.Text(f"✅ 正解：{ans}", size=12, color="#81C784") if ans else ft.Text(""),
+                            ], spacing=3),
+                            padding=10, border_radius=10, bgcolor="#1F1F26",
+                            border=ft.border.all(1, "#414868"),
+                            on_click=lambda ev, idx=i: show_error_detail_dialog(subject, kp_title, idx),
+                            ink=True)
+                        children.append(card)
+                    dlg = ft.AlertDialog(
+                        title=ft.Text("🧩 知识点错题"),
+                        content=ft.Container(
+                            content=ft.Column(children, spacing=8, scroll=ft.ScrollMode.AUTO),
+                            width=460, height=500, padding=10),
+                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
+                    page.open(dlg)
+                    page.update()
+
+                def show_error_detail_dialog(subject2, kp2, idx2):
+                    errors = [e for e in load_jsonl(ERRORS_FILE)
+                              if e.get("subject") == subject2 and
+                              ((e.get("kp") or "").strip() == kp2 or
+                               (str(e.get("tags", [])[0]) if e.get("tags") else "") == kp2)]
+                    if not (0 <= idx2 < len(errors)):
+                        return
+                    e = errors[idx2]
+                    body = [
+                        ft.Text("📄 题目", size=15, weight=ft.FontWeight.BOLD),
+                        ft.Text(str(e.get("original", "") or e.get("question", "")), size=14,
+                                selectable=True),
+                    ]
+                    if e.get("mistake"):
+                        body += [ft.Divider(height=1, color="#33364D"),
+                                 ft.Text("❌ 我的错误", size=15, weight=ft.FontWeight.BOLD),
+                                 ft.Text(str(e["mistake"]), size=14, selectable=True)]
+                    if e.get("answer"):
+                        body += [ft.Divider(height=1, color="#33364D"),
+                                 ft.Text("✅ 正确答案", size=15, weight=ft.FontWeight.BOLD),
+                                 ft.Text(str(e["answer"]), size=14, selectable=True)]
+                    if e.get("analysis") or e.get("note"):
+                        body += [ft.Divider(height=1, color="#33364D"),
+                                 ft.Text("💡 解析", size=15, weight=ft.FontWeight.BOLD),
+                                 ft.Text(str(e.get("analysis", "") or e.get("note", "")), size=13,
+                                         selectable=True)]
+                    dlg = ft.AlertDialog(
+                        title=ft.Text(f"错题 {idx2+1}"),
+                        content=ft.Container(
+                            content=ft.Column(body, spacing=6, scroll=ft.ScrollMode.AUTO),
+                            width=480, height=520, padding=10),
+                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
+                    page.open(dlg)
+                    page.update()
+
+                def add_kp_dialog(parent_title):
+                    kp_input = ft.TextField(label="知识点名称", hint_text="例如：离子共存的条件判断",
+                                            autofocus=True)
+                    def do_add(e):
+                        name = kp_input.value.strip()
+                        if not name:
+                            return
+                        t2 = load_mindmap(subject) or {"title": subject, "children": []}
+                        if parent_title == subject:
+                            t2.setdefault("children", []).append(
+                                {"title": name, "children": [], "kp": name, "count": 0})
+                        else:
+                            for nd in t2.get("children", []):
+                                if nd.get("title") == parent_title:
+                                    nd.setdefault("children", []).append(
+                                        {"title": name, "children": [], "kp": name, "count": 0})
+                                    break
+                        save_mindmap(subject, t2)
+                        page.close(dlg)
+                        show_toast("✅ 已添加知识点", "green")
+                        open_function_page(subject, "思维导图")
+                        page.update()
+                    dlg = ft.AlertDialog(
+                        title=ft.Text("➕ 添加知识点（挂到「" + parent_title + "」）"),
+                        content=ft.Column([kp_input], width=360),
+                        actions=[
+                            ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                            ft.ElevatedButton("添加", on_click=do_add)])
+                    page.open(dlg)
+                    page.update()
+
+                def make_node_widget(title, depth, count, is_root=False, is_leaf_parent=True):
+                    box_w, box_h = NODE_W, NODE_H
+                    colors = ["#7AA2F7", "#BB9AF7", "#7DCFFF", "#9ECE6A", "#FF9E64", "#F7768E"]
+                    if is_root:
+                        bg, border, fg = "#414868", "#7AA2F7", "#FFFFFF"
+                    else:
+                        bg, border, fg = "#1A1B26", colors[min(depth, len(colors) - 1)], "#E0E3F0"
+                    badge = f"  ·{count}题" if count else ""
+                    return ft.Container(
+                        content=ft.Row([
+                            ft.Text(f"{title}{badge}", size=13 if not is_root else 15,
+                                    weight=ft.FontWeight.BOLD if is_root else ft.FontWeight.W_600,
+                                    color=fg, max_lines=2, width=box_w - 24),
+                        ], spacing=4),
+                        width=box_w, height=box_h, padding=ft.Padding(left=12, top=6, right=12, bottom=6),
+                        border_radius=12, bgcolor=bg, border=ft.border.all(1, border),
+                        shadow=ft.BoxShadow(blur_radius=10, color="#33000000"),
+                        ink=True,
+                        on_click=lambda e, t=title, c=count, rt=is_root: ((
+                            _toggle_node(t) if rt or not _node_has_children(t) else mm_error_detail(t)
+                        ) if not rt else _toggle_node(t)),
+                    )
+
+                def _node_has_children(t):
+                    t2 = load_mindmap(subject)
+                    for nd in (t2 or {}).get("children", []):
+                        if nd.get("title") == t and nd.get("children"):
+                            return True
+                    return False
+
+                def _toggle_node(t):
+                    if t in view_state["open"]:
+                        view_state["open"].discard(t)
+                    else:
+                        view_state["open"].add(t)
+                    # 重建视图（保持当前缩放/平移），刷新折叠状态
+                    viewport.content = ft.Transform(
+                        scale=view_state["scale"],
+                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                        content=rebuild_mindmap_view())
+                    viewport.update()
+
+                def rebuild_mindmap_view():
+                    layout_node(tree, 24, 40)
+                    shapes = []
+                    # 连线：父 → 每个直接子节点
+                    for nd in tree.get("children", []):
+                        p = view_state["layout"].get(tree["title"])
+                        c = view_state["layout"].get(nd["title"])
+                        if p and c:
+                            shapes.append(ft.canvas.Line(
+                                p[0] + NODE_W, p[1] + NODE_H / 2,
+                                c[0] - 8, c[1] + NODE_H / 2,
+                                paint=ft.canvas.Paint(stroke_width=2, color="#414868")))
+                        for ch in nd.get("children", []):
+                            cp = view_state["layout"].get(nd["title"])
+                            cc = view_state["layout"].get(ch["title"])
+                            if cp and cc:
+                                shapes.append(ft.canvas.Line(
+                                    cp[0] + NODE_W, cp[1] + NODE_H / 2,
+                                    cc[0] - 8, cc[1] + NODE_H / 2,
+                                    paint=ft.canvas.Paint(stroke_width=2, color="#33364D")))
+                    canvas = ft.canvas.Canvas(width=LAYOUT_W, height=LAYOUT_H, shapes=shapes)
+                    nodes = []
+                    root_pos = view_state["layout"].get(tree["title"])
+                    if root_pos:
+                        nodes.append(ft.Stack([
+                            ft.Container(width=1, height=1),
+                            ft.Container(
+                                content=make_node_widget(tree["title"], 0, 0, is_root=True),
+                                left=root_pos[0], top=root_pos[1]),
+                        ]))
+                    for nd in tree.get("children", []):
+                        pos = view_state["layout"].get(nd["title"])
+                        if not pos:
+                            continue
+                        has_children = bool(nd.get("children"))
+                        nodes.append(ft.Stack([
+                            ft.Container(width=1, height=1),
+                            ft.Container(
+                                content=make_node_widget(nd["title"], pos[2], nd.get("count", 0),
+                                                         is_root=False),
+                                left=pos[0], top=pos[1]),
+                        ]))
+                        for ch in nd.get("children", []):
+                            chp = view_state["layout"].get(ch["title"])
+                            if not chp:
+                                continue
+                            nodes.append(ft.Stack([
+                                ft.Container(width=1, height=1),
+                                ft.Container(
+                                    content=make_node_widget(ch["title"], chp[2], ch.get("count", 0),
+                                                             is_root=False),
+                                    left=chp[0], top=chp[1]),
+                            ]))
+                    return ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
+
+                content_holder = ft.Container(content=rebuild_mindmap_view())
+
+                def on_scale_start(e):
+                    view_state["base_scale"] = view_state["scale"]
+                    view_state["base_dx"] = view_state["dx"]
+                    view_state["base_dy"] = view_state["dy"]
+                    if e.contact_count == 2:
+                        view_state["_pinch_x"] = e.focal_point.x
+                        view_state["_pinch_y"] = e.focal_point.y
+
+                def on_scale_update(e):
+                    if e.contact_count >= 2:
+                        view_state["scale"] = min(2.6, max(0.4, view_state["base_scale"] * e.scale))
+                        fx, fy = e.focal_point.x, e.focal_point.y
+                        pfx, pfy = view_state.get("_pinch_x", fx), view_state.get("_pinch_y", fy)
+                        view_state["dx"] += (fx - pfx)
+                        view_state["dy"] += (fy - pfy)
+                        view_state["_pinch_x"], view_state["_pinch_y"] = fx, fy
+                    else:
+                        view_state["scale"] = min(2.6, max(0.4, view_state["base_scale"] * e.scale))
+                    _apply_transform()
+
+                def on_pan_start(e):
+                    view_state["base_dx"] = view_state["dx"]
+                    view_state["base_dy"] = view_state["dy"]
+
+                def on_pan_update(e):
+                    view_state["dx"] = view_state["base_dx"] + e.delta.x * 2
+                    view_state["dy"] = view_state["base_dy"] + e.delta.y * 2
+                    _apply_transform()
+
+                def _apply_transform():
+                    content_holder.content = ft.Transform(
+                        scale=view_state["scale"],
+                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                        content=rebuild_mindmap_view())
+                    page.update()
+
+                def zoom_by(delta):
+                    view_state["scale"] = min(2.6, max(0.4, view_state["scale"] + delta))
+                    viewport.content = ft.Transform(
+                        scale=view_state["scale"],
+                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                        content=rebuild_mindmap_view())
+                    viewport.update()
+
+                def reset_view():
+                    view_state.update({"scale": 1.0, "dx": 0.0, "dy": 0.0})
+                    viewport.content = ft.Transform(scale=1.0, translate=ft.Offset(0, 0),
+                                                    content=rebuild_mindmap_view())
+                    viewport.update()
+
+                top_bar = ft.Row([
+                    ft.ElevatedButton("➕ 添加知识点", icon=ft.Icons.ADD,
+                                      on_click=lambda e: add_kp_dialog(subject)),
+                    ft.ElevatedButton("🔁 重建（按错题聚类）", icon=ft.Icons.REFRESH,
+                                      on_click=lambda e: (build_mindmap(subject),
+                                                          open_function_page(subject, "思维导图"))),
+                    ft.IconButton(icon=ft.Icons.ZOOM_IN, on_click=lambda e: zoom_by(0.2)),
+                    ft.IconButton(icon=ft.Icons.ZOOM_OUT, on_click=lambda e: zoom_by(-0.2)),
+                    ft.IconButton(icon=ft.Icons.CENTER_FOCUS_STRONG, on_click=lambda e: reset_view()),
+                    ft.Text(f"{subject} 思维导图 · 双指缩放/按钮缩放 · 拖动平移 · 点知识点看错题",
+                            size=12, color=ft.Colors.GREY_500),
+                ], spacing=10, alignment=ft.MainAxisAlignment.START)
+                viewport = ft.Container(
+                    content=ft.Transform(
+                        scale=1.0, translate=ft.Offset(0, 0),
+                        content=rebuild_mindmap_view()),
+                    expand=True,
+                    bgcolor="#12121A",
+                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                    border_radius=12,
+                    border=ft.border.all(1, "#2A2E44"))
+                viewport.content = ft.Transform(
+                    scale=view_state["scale"], translate=ft.Offset(0, 0),
+                    content=rebuild_mindmap_view())
+                _mm_root_ref["v"] = viewport
+                vd = ft.GestureDetector(
+                    content=viewport, expand=True,
+                    on_scale_start=on_scale_start, on_scale_update=on_scale_update,
+                    on_pan_start=on_pan_start, on_pan_update=on_pan_update)
+                return ft.Column([
+                    top_bar,
+                    ft.Divider(height=1),
+                    ft.Container(content=vd, expand=True),
+                ], spacing=8, expand=True)
 
             def build_sentence_page(subject):
                 CATEGORIES = ["全部", "开头", "转折", "结尾", "观点", "举例", "读后续写", "其他"]
@@ -5447,10 +6040,11 @@ def main(page: ft.Page):
                 all_cards = [
                     ("📋", "错题本", "#24283B"),
                     ("📝", "笔记本", "#223A22"),
+                    ("🧠", "思维导图", "#1F2A44"),
                     ("📖", "单词本", "#3A2F22"),
                     ("💬", "金句", "#3A2233"),
                 ]
-                cards_config = all_cards if subject == "英语" else all_cards[:2]
+                cards_config = all_cards if subject == "英语" else all_cards[:3]
                 grid = ft.ResponsiveRow(spacing=20, run_spacing=20, expand=True)
                 for icon, name, bg in cards_config:
                     card = ft.Container(
@@ -5480,6 +6074,7 @@ def main(page: ft.Page):
                 func_pages = {
                     "错题本": build_error_list_page(subject),
                     "笔记本": build_note_list_page(subject),
+                    "思维导图": build_mindmap_page(subject),
                     "单词本": build_vocab_page(subject),
                     "金句": build_sentence_page(subject),
                 }
@@ -5882,6 +6477,45 @@ def main(page: ft.Page):
                 else:
                     content_children.append(ft.Text("暂无知识点数据", size=13, color="#888888"))
                 content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
+                # —— AI 对话画像：各学科问过多少题、最近问什么、常涉及知识点 ——
+                sp = profile.get("subject_profile", {})
+                if sp:
+                    content_children.append(ft.Text("💬 AI 对话画像（按学科）", size=15,
+                                                    weight=ft.FontWeight.BOLD))
+                    for subj, rec in sorted(sp.items(), key=lambda x: x[1].get("asked", 0), reverse=True):
+                        asked = rec.get("asked", 0)
+                        rqs = rec.get("recent_questions", [])
+                        tops = rec.get("topics", [])
+                        head = f"{subj}：问过 {asked} 题"
+                        if tops:
+                            head += f"，常涉及：{'、'.join(tops[:8])}"
+                        content_children.append(ft.Text(head, size=13,
+                                                        weight=ft.FontWeight.W_600))
+                        if rqs:
+                            for rq in rqs[:3]:
+                                content_children.append(ft.Text(f"  · {rq}", size=12,
+                                                                color="#B8C0E0"))
+                else:
+                    content_children.append(ft.Text("💬 暂无对话画像（多和 AI 聊题目会自动建立）",
+                                                    size=13, color="#888888"))
+                content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
+                wk2 = profile.get("weak_knowledge", {})
+                if wk2:
+                    content_children.append(ft.Text("⚠️ 薄弱知识点 TOP5", size=15,
+                                                    weight=ft.FontWeight.BOLD))
+                    for k, v in sorted(wk2.items(), key=lambda x: -x[1])[:5]:
+                        content_children.append(ft.Text(f"· {k}（薄弱度 {v:.0%}）", size=13,
+                                                        color="#FFA726"))
+                    content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
+                rf2 = profile.get("recent_focus", [])
+                if rf2:
+                    content_children.append(ft.Text("🎓 最近在攻克", size=15,
+                                                    weight=ft.FontWeight.BOLD))
+                    content_children.append(ft.Text(" · ".join(rf2[:6]), size=13, color="#CCCCCC"))
+                    content_children.append(ft.Divider(height=1, color=ft.Colors.GREY_700))
+                content_children.append(ft.Text(
+                    f"📈 累计：错题 {profile.get('total_errors', 0)} 道 · AI 对话 {profile.get('total_chats', 0)} 次",
+                    size=13, color="#9AA5CE"))
                 if events:
                     content_children.append(ft.Text("🕒 最近学习事件", size=15,
                                                     weight=ft.FontWeight.BOLD))
@@ -6296,6 +6930,8 @@ def main(page: ft.Page):
                     empty_recycle(), refresh_recycle(), show_toast("已清空", "green"))),
                 ft.Divider(),
                 ft.Text("🧠 AI 引擎设置", size=20),
+                ft.ElevatedButton("👤 查看我的 AI 画像", on_click=lambda e: show_learning_profile(e),
+                                  icon=ft.Icons.PERSON_OUTLINE),
                 provider_dropdown,
                 free_key_input,
                 deepseek_key_input,
@@ -6367,7 +7003,17 @@ def main(page: ft.Page):
                     ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="我的"),
                 ])
             switch_page(0)
-            page.add(ft.Stack([current_page, chat_dialog, contact_panel, ball_container], expand=True))
+            _gradient_bg = ft.Container(
+                expand=True,
+                gradient=ft.LinearGradient(
+                    begin=ft.alignment.top_left,
+                    end=ft.alignment.bottom_right,
+                    colors=["#1A1B2E", "#16161E", "#101020"]),
+                border_radius=0)
+            page.add(ft.Stack([
+                _gradient_bg,
+                ft.Stack([current_page, chat_dialog, contact_panel, ball_container], expand=True),
+            ], expand=True))
             print("步骤7: UI 加载完成")
 
         load_ui()
