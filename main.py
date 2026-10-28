@@ -1284,7 +1284,7 @@ def load_ai_config():
     _defaults = {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
                  "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
                  "deepseek_model": "deepseek-flash", "deepseek_thinking": True,
-                 "ctx_chars": 50000}
+                 "ctx_chars": "auto"}
     if not os.path.exists(AI_CONFIG_FILE):
         return _defaults
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -1433,8 +1433,8 @@ def deepseek_enrich(query, force=False):
     return ""
 
 
-# 对话页"联网搜索"开关状态
-_WEB_SEARCH_ON = {"on": False}
+# 对话页"联网搜索"开关状态（默认开启，像官方 App 一样）
+_WEB_SEARCH_ON = {"on": True}
 
 
 def get_chat_history_file(subject):
@@ -1652,6 +1652,27 @@ def save_note(subject, content, media):
                  "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
     save_jsonl(NOTES_FILE, data)
     log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
+    # 带图笔记：后台让 AI 自动理解图片内容，写回 ai_text（不阻塞上传）
+    if media:
+        try:
+            import threading as _th
+
+            def _understand(note_ts):
+                try:
+                    notes2 = load_jsonl(NOTES_FILE)
+                    for n in notes2:
+                        if n.get("timestamp") == note_ts and not n.get("ai_text"):
+                            txt = vision_describe_image(n.get("media", [])[0])
+                            if txt:
+                                n["ai_text"] = txt
+                                save_jsonl(NOTES_FILE, notes2)
+                                break
+                except BaseException:
+                    pass
+
+            _th.Thread(target=_understand, args=(data[-1].get("timestamp"),), daemon=True).start()
+        except BaseException:
+            pass
 
 
 def _note_sort_key(x):
@@ -1726,6 +1747,10 @@ def build_mindmap(subject):
         kp = (e.get("kp") or main_tag).strip()
         clusters.setdefault(kp, {"title": kp, "children": [], "kp": kp, "count": 0})
         clusters[kp]["count"] += 1
+    # 分层：每个知识点节点下自动挂「笔记层 / 错题层」两个子层（像导航分层）
+    for kp, nd in clusters.items():
+        nd.setdefault("children", []).insert(0, {"title": "📓 笔记", "kind": "notes", "kp": kp})
+        nd.setdefault("children", []).append({"title": "📕 错题", "kind": "errors", "kp": kp})
     # 一级主题：优先用学科常见模块名兜底
     root_children = []
     for kp in sorted(clusters.keys()):
@@ -1738,11 +1763,17 @@ def build_mindmap(subject):
         for c in root_children:
             if c["title"] not in old_titles:
                 old["children"].append(c)
-        # 已有节点也补充新错题计数
+        # 已有节点也补充新错题计数 + 补齐分层子节点
         old_by_title = {c.get("title"): c for c in old["children"]}
         for c in root_children:
             if c["title"] in old_by_title:
-                old_by_title[c["title"]]["count"] = c.get("count", 0)
+                nd0 = old_by_title[c["title"]]
+                nd0["count"] = c.get("count", 0)
+                kinds = {x.get("kind") for x in nd0.get("children", [])}
+                if "notes" not in kinds:
+                    nd0.setdefault("children", []).insert(0, {"title": "📓 笔记", "kind": "notes", "kp": c["title"]})
+                if "errors" not in kinds:
+                    nd0.setdefault("children", []).append({"title": "📕 错题", "kind": "errors", "kp": c["title"]})
         tree = old
     save_mindmap(subject, tree)
     return tree
@@ -2203,6 +2234,92 @@ def compress_old_history(subject, hist):
         return len(batch)
     except BaseException:
         return 0
+
+
+# ============ AI 读图理解：笔记/错题照片自动识别并融入知识体系 ============
+def vision_describe_image(img_path):
+    """让视觉模型概括一张图片（笔记/题目），返回 ≤90 字理解文本；失败返回空串。"""
+    try:
+        key, url, model, vision_model = endpoint_for("cheap")
+        if not key or not vision_model:
+            return ""
+        full = img_path if os.path.isabs(img_path) else os.path.join(DATA_DIR, img_path)
+        if not os.path.exists(full):
+            return ""
+        with open(full, "rb") as f:
+            raw = f.read()
+        # 压缩到长边 1280 以内，控制请求体大小
+        try:
+            import PIL.Image as _PI
+            import io as _io
+            im = _PI.open(_io.BytesIO(raw))
+            im.thumbnail((1280, 1280))
+            buf = _io.BytesIO()
+            im.convert("RGB").save(buf, format="JPEG", quality=82)
+            raw = buf.getvalue()
+        except BaseException:
+            pass
+        b64 = base64.b64encode(raw).decode("utf-8")
+        payload = {"model": vision_model, "temperature": 0.3, "max_tokens": 200,
+                   "messages": [{"role": "user", "content": [
+                       {"type": "text",
+                        "text": "请用不超过90字概括这张图片：①是笔记还是题目？②关键知识点/考点是什么？③如果是题目，核心思路一句话。只输出概括，不要前缀。"},
+                       {"type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]}]}
+        r = requests.post(url, headers={"Authorization": f"Bearer {key}",
+                                        "Content-Type": "application/json"},
+                          json=payload, timeout=30)
+        if r.status_code != 200:
+            return ""
+        c = r.json()["choices"][0]["message"]["content"].strip()
+        return c[:200]
+    except BaseException:
+        return ""
+
+
+def auto_understand_media(subject, limit=12):
+    """批量让 AI 理解该科所有笔记/错题里的图片，结果写入 ai_text 字段。
+    返回本次理解条数；无新图片或失败返回 0。"""
+    done = 0
+    # 笔记图片
+    notes = load_jsonl(NOTES_FILE)
+    for n in notes:
+        if done >= limit:
+            break
+        if n.get("subject") != subject:
+            continue
+        if n.get("ai_text"):
+            continue
+        imgs = n.get("media", []) or n.get("images", [])
+        if not imgs:
+            continue
+        txt = vision_describe_image(imgs[0])
+        if txt:
+            n["ai_text"] = txt
+            done += 1
+    if done:
+        save_jsonl(NOTES_FILE, notes)
+    # 错题图片
+    errors = load_jsonl(ERRORS_FILE)
+    e_done = 0
+    for e in errors:
+        if done >= limit:
+            break
+        if e.get("subject") != subject:
+            continue
+        if e.get("ai_text"):
+            continue
+        imgs = e.get("images", []) or e.get("media", [])
+        if not imgs:
+            continue
+        txt = vision_describe_image(imgs[0])
+        if txt:
+            e["ai_text"] = txt
+            done += 1
+            e_done += 1
+    if e_done:
+        save_jsonl(ERRORS_FILE, errors)
+    return done
 
 
 def save_svg_chart(svg_text):
@@ -3244,6 +3361,8 @@ def main(page: ft.Page):
 
 回答风格（像豆包 / DeepSeek 手机版那样好聊）：
 - 自然口语化，但保持专业；句子短一点，多用"你/咱们"，少用机械的"第一、第二"模板。
+- 简洁优先：先直接给结论/答案，再展开解释；能一句话说清就别写三段；别堆砌"首先/其次/最后"。
+- 下方注入的记忆（画像/错题/笔记/摘要/联网）是让你更懂他的背景，不是任务清单——自然融入回答即可，不要逐条复述。
 - 知识类问题：讲清原理与关键点，能串上他学过的内容就主动提一句。
 - 解题类问题：先讲思路（为什么这么做），再给步骤，最后点出易错点；不要一上来甩答案。
 - 学生卡壳时：主动降难度、换个角度、举个生活化的例子再讲一遍。
@@ -3686,8 +3805,16 @@ def main(page: ft.Page):
                     if insert_user_bubble:
                         save_chat_message(subject, "user", content)
                     hist_now = load_chat_history(subject)
-                    # 长记忆：上下文预算跟随设置（短/中/长），早期对话用滚动摘要补齐
-                    _ctx_chars = int(load_ai_config().get("ctx_chars", 50000) or 50000)
+                    # 长记忆：auto 模式按历史长度动态给预算（自动，像官方 App 一样越聊记得越多）
+                    _ctx_cfg = load_ai_config().get("ctx_chars", "auto")
+                    if _ctx_cfg == "auto":
+                        _hist_len = sum(len(m.get("content", "") or "") for m in hist_now)
+                        _ctx_chars = int(min(max(_hist_len, 20000), 80000))
+                    else:
+                        try:
+                            _ctx_chars = int(_ctx_cfg)
+                        except BaseException:
+                            _ctx_chars = 50000
                     rebuilt = [{"role": "system", "content": system_prompt}]
                     # 个人画像注入：让 AI 基于学生画像个性化教学（按当前学科优先）
                     try:
@@ -5720,14 +5847,31 @@ def main(page: ft.Page):
                     page.open(dlg)
                     page.update()
 
-                def make_node_widget(title, depth, count, is_root=False, is_leaf_parent=True):
+                def make_node_widget(title, depth, count, is_root=False, kind=None, kp=""):
                     box_w, box_h = NODE_W, NODE_H
                     colors = ["#7AA2F7", "#BB9AF7", "#7DCFFF", "#9ECE6A", "#FF9E64", "#F7768E"]
                     if is_root:
                         bg, border, fg = "#414868", "#7AA2F7", "#FFFFFF"
+                    elif kind == "notes":
+                        bg, border, fg = "#1F2A22", "#4DB6AC", "#A7E8DC"   # 笔记层：绿色
+                    elif kind == "errors":
+                        bg, border, fg = "#2A1F22", "#F7768E", "#FFB3C1"  # 错题层：玫红
                     else:
                         bg, border, fg = "#1A1B26", colors[min(depth, len(colors) - 1)], "#E0E3F0"
                     badge = f"  ·{count}题" if count else ""
+
+                    def _on_click(e):
+                        if is_root:
+                            _toggle_node(title)
+                        elif kind == "notes":
+                            mm_note_list(kp or title)
+                        elif kind == "errors":
+                            mm_error_detail(kp or title)
+                        elif _node_has_children(title):
+                            _toggle_node(title)
+                        else:
+                            mm_error_detail(title)
+
                     return ft.Container(
                         content=ft.Row([
                             ft.Text(f"{title}{badge}", size=13 if not is_root else 15,
@@ -5738,10 +5882,80 @@ def main(page: ft.Page):
                         border_radius=12, bgcolor=bg, border=ft.border.all(1, border),
                         shadow=ft.BoxShadow(blur_radius=10, color="#33000000"),
                         ink=True,
-                        on_click=lambda e, t=title, c=count, rt=is_root: ((
-                            _toggle_node(t) if rt or not _node_has_children(t) else mm_error_detail(t)
-                        ) if not rt else _toggle_node(t)),
+                        on_click=_on_click,
                     )
+
+                def mm_note_list(kp):
+                    """笔记层：展示该知识点下的相关笔记（含 AI 理解的图片内容）"""
+                    notes = load_jsonl(NOTES_FILE)
+                    rel = [n for n in notes if n.get("subject") == subject and
+                           (kp in str(n.get("content", "")) or kp in str(n.get("tags", [])) or
+                            (n.get("ai_text") and kp in n.get("ai_text", "")))]
+                    if not rel:
+                        # 该科所有笔记兜底
+                        rel = [n for n in notes if n.get("subject") == subject]
+                    if not rel:
+                        show_toast("该知识点暂无笔记", "grey")
+                        return
+                    children = [ft.Text(f"📓 {kp} · 相关笔记 {len(rel)} 条", size=17,
+                                        weight=ft.FontWeight.BOLD)]
+                    for i, n in enumerate(rel[:15]):
+                        content = str(n.get("content", ""))
+                        ai_text = str(n.get("ai_text", ""))
+                        ntime = n.get("time", "")
+                        imgs = n.get("media", []) or n.get("images", [])
+                        card_lines = []
+                        if content:
+                            card_lines.append(ft.Text(f"[{i+1}] {content[:120]}", size=13))
+                        if ai_text:
+                            card_lines.append(ft.Text(f"🔍 AI 理解：{ai_text[:160]}", size=12,
+                                                      color="#4DB6AC"))
+                        if not content and not ai_text:
+                            card_lines.append(ft.Text(f"[{i+1}]（图片笔记 {len(imgs)}张）", size=13))
+                        card_lines.append(ft.Text(ntime, size=11, color="#888888"))
+                        children.append(ft.Container(
+                            content=ft.Column(card_lines, spacing=2),
+                            padding=10, border_radius=10, bgcolor="#1F1F26",
+                            border=ft.border.all(1, "#414868"),
+                            on_click=lambda ev, nn=n: show_note_media_dialog(nn), ink=True))
+                    dlg = ft.AlertDialog(
+                        title=ft.Text("📓 笔记层"),
+                        content=ft.Container(
+                            content=ft.Column(children, spacing=8, scroll=ft.ScrollMode.AUTO),
+                            width=480, height=500, padding=10),
+                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
+                    page.open(dlg)
+                    page.update()
+
+                def show_note_media_dialog(n):
+                    """展示笔记条目（含图片缩略图）"""
+                    imgs = n.get("media", []) or n.get("images", [])
+                    body = []
+                    if n.get("content"):
+                        body.append(ft.Text(str(n["content"]), size=14, selectable=True))
+                    if n.get("ai_text"):
+                        body.append(ft.Text(f"🔍 AI 理解：{n['ai_text']}", size=13, color="#4DB6AC"))
+                    img_row = ft.Row(spacing=8, wrap=True)
+                    for p in imgs:
+                        full = p if os.path.isabs(p) else os.path.join(DATA_DIR, p)
+                        if os.path.exists(full):
+                            img_row.controls.append(ft.Container(
+                                content=ft.Image(src=full, width=120, height=120,
+                                                 fit=ft.ImageFit.COVER, border_radius=8),
+                                on_click=lambda e, paths=imgs: show_image_gallery(paths, 0),
+                                ink=True, border_radius=8))
+                    if img_row.controls:
+                        body.append(img_row)
+                    if not body:
+                        body.append(ft.Text("（空笔记）", size=13, color="#888888"))
+                    dlg = ft.AlertDialog(
+                        title=ft.Text("📝 笔记详情"),
+                        content=ft.Container(
+                            content=ft.Column(body, spacing=8, scroll=ft.ScrollMode.AUTO),
+                            width=480, height=460, padding=10),
+                        actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
+                    page.open(dlg)
+                    page.update()
 
                 def _node_has_children(t):
                     t2 = load_mindmap(subject)
@@ -5812,7 +6026,8 @@ def main(page: ft.Page):
                                 ft.Container(width=1, height=1),
                                 ft.Container(
                                     content=make_node_widget(ch["title"], chp[2], ch.get("count", 0),
-                                                             is_root=False),
+                                                             is_root=False, kind=ch.get("kind"),
+                                                             kp=ch.get("kp", "")),
                                     left=chp[0], top=chp[1]),
                             ]))
                     return ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
@@ -5875,12 +6090,31 @@ def main(page: ft.Page):
                     ft.ElevatedButton("🔁 重建（按错题聚类）", icon=ft.Icons.REFRESH,
                                       on_click=lambda e: (build_mindmap(subject),
                                                           open_function_page(subject, "思维导图"))),
+                    ft.ElevatedButton("🔍 AI 理解图片", icon=ft.Icons.VISIBILITY,
+                                      on_click=lambda e: _run_understand()),
                     ft.IconButton(icon=ft.Icons.ZOOM_IN, on_click=lambda e: zoom_by(0.2)),
                     ft.IconButton(icon=ft.Icons.ZOOM_OUT, on_click=lambda e: zoom_by(-0.2)),
                     ft.IconButton(icon=ft.Icons.CENTER_FOCUS_STRONG, on_click=lambda e: reset_view()),
-                    ft.Text(f"{subject} 思维导图 · 双指缩放/按钮缩放 · 拖动平移 · 点知识点看错题",
+                    ft.Text(f"{subject} 思维导图 · 双指/按钮缩放 · 拖动平移 · 点知识分层看内容",
                             size=12, color=ft.Colors.GREY_500),
                 ], spacing=10, alignment=ft.MainAxisAlignment.START)
+
+                def _run_understand():
+                    def _job():
+                        n = auto_understand_media(subject, limit=12)
+                        try:
+                            build_mindmap(subject)
+                            open_function_page(subject, "思维导图")
+                            page.update()
+                        except BaseException:
+                            pass
+                        if n:
+                            show_toast(f"✅ AI 已理解 {n} 张图片，已加入知识树", "green")
+                        else:
+                            show_toast("没有待理解的图片（或已全部理解）", "grey")
+                    import threading as _th
+                    _th.Thread(target=_job, daemon=True).start()
+                    show_toast("🔍 正在让 AI 理解图片（每张约几秒）...", "orange")
                 viewport = ft.Container(
                     content=ft.Transform(
                         scale=1.0, translate=ft.Offset(0, 0),
@@ -6421,9 +6655,9 @@ def main(page: ft.Page):
                 cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
                 cfg["deepseek_thinking"] = deepseek_thinking_switch.value
                 try:
-                    cfg["ctx_chars"] = int(memory_dropdown.value)
+                    cfg["ctx_chars"] = memory_dropdown.value or "auto"
                 except BaseException:
-                    cfg["ctx_chars"] = 50000
+                    cfg["ctx_chars"] = "auto"
                 save_ai_config(cfg)
                 show_toast("API 配置已保存", "green")
 
@@ -7033,11 +7267,12 @@ def main(page: ft.Page):
                 memory_dropdown := ft.Dropdown(
                     label="对话记忆长度",
                     options=[
+                        ft.dropdown.Option("auto", "自动（动态，推荐）·像官方App"),
                         ft.dropdown.Option("20000", "短（约1万词）·省额度"),
-                        ft.dropdown.Option("50000", "中（约2.5万词）·推荐"),
-                        ft.dropdown.Option("80000", "长（约4万词）·记忆更强"),
+                        ft.dropdown.Option("50000", "中（约2.5万词）"),
+                        ft.dropdown.Option("80000", "长（约4万词）·记忆最强"),
                     ],
-                    value=str(ai_config.get("ctx_chars", 50000)),
+                    value=str(ai_config.get("ctx_chars", "auto")),
                     width=280),
                 provider_dropdown,
                 free_key_input,
