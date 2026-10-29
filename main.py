@@ -3341,6 +3341,8 @@ def main(page: ft.Page):
                     on_chunk(f"❌ 异常: {str(e)}")
                     return None
 
+            _MM_HIGHLIGHT = {"kp": None}  # 错题/笔记本 → 思维导图 高亮通道
+
             def build_chat_window(subject, initial_message=None, auto_send=False):
                 nonlocal stop_flag, generation_active
                 display_name = subject if subject != "总AI" else "总AI"
@@ -3561,8 +3563,13 @@ def main(page: ft.Page):
                         icon_color="#888888",
                         on_click=_delete_self,
                         visible=can_regenerate)
-                    action_row = ft.Row([copy_btn, regen_btn, del_btn], spacing=2, tight=True)
-                    content_ref["actions"] = (regen_btn, del_btn)
+                    add_btn = ft.IconButton(
+                        icon=ft.Icons.PLAYLIST_ADD, icon_size=16, tooltip="把这道题收进错题本",
+                        icon_color="#888888",
+                        on_click=lambda e: add_to_errorbook(),
+                        visible=False)
+                    action_row = ft.Row([copy_btn, regen_btn, del_btn, add_btn], spacing=2, tight=True)
+                    content_ref["actions"] = (regen_btn, del_btn, add_btn)
 
                     bubble = ft.Container(
                         content=ft.Column([content_col, action_row], spacing=4),
@@ -3704,6 +3711,36 @@ def main(page: ft.Page):
                 last_user_msg = {"text": ""}
                 last_ai_content_ref = {"col": None}
                 gen_token = {"id": 0}  # 代次令牌：防止旧生成线程串台/重复保存
+                _added_questions = set()  # 防重复：同一条问答只入一次错题本
+
+                def add_to_errorbook(e=None):
+                    """把当前一轮问答（用户题目 + AI 解答）一键收进错题本"""
+                    q = (last_user_msg.get("text") or "").strip()
+                    ref_ = last_ai_content_ref.get("ref") or {}
+                    ans = str(ref_.get("raw", "") or "")[:1500]
+                    if not q or not ans:
+                        show_toast("没有可加入的问答内容", "grey")
+                        return
+                    if subject == "总AI":
+                        show_toast("请先进入具体学科对话，再把题收进该科错题本", "orange")
+                        return
+                    if q in _added_questions:
+                        show_toast("这条问答已经收进错题本啦", "info")
+                        return
+                    clean_ans = re.sub(r"```chart.*?```", "", ans, flags=re.S).strip()
+                    # 题目段：问题本身（可能带【图】标记，去掉）
+                    orig_txt = re.sub(r"(\n)?【图】\S+", "", q).strip()[:800]
+                    try:
+                        save_error(subject,
+                                   original=orig_txt,
+                                   answer=clean_ans[:800],
+                                   idea=clean_ans[:400],
+                                   manual_tags="")
+                    except BaseException as ex:
+                        show_toast(f"加入失败：{str(ex)[:40]}", "red")
+                        return
+                    _added_questions.add(q)
+                    show_toast("📥 已加入错题本，AI 正在后台打标签；知识树会同步生长", "green")
 
                 def ask_similar_q(e=None):
                     """DeepTutor 式难度校准出题：
@@ -3999,8 +4036,11 @@ def main(page: ft.Page):
                                 content_ref["col"].controls.append(chart_btn)
                             acts = content_ref.get("actions")
                             if acts:
-                                acts[0].visible = True
-                                acts[1].visible = True
+                                for _a in acts:
+                                    try:
+                                        _a.visible = True
+                                    except BaseException:
+                                        pass
                         except Exception:
                             pass
                         send_btn.visible = True
@@ -4037,6 +4077,13 @@ def main(page: ft.Page):
                                                         and "〔未完成，等待继续〕" in _hs[-1].get("content", ""))
                         except BaseException:
                             continue_btn.visible = False
+                        try:
+                            _looks_q = any(k in content for k in
+                                           ("求", "怎么做", "怎么解", "这题", "题目", "为什么", "请讲", "？", "?"))
+                            if subject != "总AI" and _looks_q:
+                                show_toast("💡 点回答右下角的 📥，可把这道题收进错题本", "info")
+                        except BaseException:
+                            pass
                         # —— DeepTutor 闭环：识别"未掌握"信号 → 记录遗留问题 + 回写科目薄弱度 ——
                         try:
                             _p_ = load_user_profile()
@@ -5272,10 +5319,29 @@ def main(page: ft.Page):
                                                          discussed=True)
                                         open_chat(subj_ask, initial_message=prompt, auto_send=True)
 
+                                    def open_mm_view(e):
+                                        kp_title = ""
+                                        try:
+                                            _tg = item_data.get("tags", []) or []
+                                            _subj = item_data.get("subject", subject)
+                                            for t in _tg:
+                                                if t and str(t) != _subj:
+                                                    kp_title = str(t)
+                                                    break
+                                            if not kp_title and item_data.get("idea"):
+                                                kp_title = str(item_data["idea"]).split("，")[0][:12]
+                                        except BaseException:
+                                            kp_title = ""
+                                        page.close(detail_dlg)
+                                        _MM_HIGHLIGHT["kp"] = kp_title
+                                        open_function_page(item_data.get("subject", subject), "思维导图")
+
                                     action_row = ft.Row([
                                         ft.ElevatedButton("🎓 问老师", on_click=open_ask_teacher,
                                                           icon=ft.Icons.SCHOOL, bgcolor="#7AA2F7",
                                                           color=ft.Colors.WHITE),
+                                        ft.ElevatedButton("🧭 导图", on_click=open_mm_view,
+                                                          icon=ft.Icons.ACCOUNT_TREE),
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
                                         ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
                                     ], alignment=ft.MainAxisAlignment.END, spacing=8)
@@ -5594,7 +5660,29 @@ def main(page: ft.Page):
                                         page.close(detail_dlg)
                                         make_edit_note(item_data)(e)
 
+                                    def open_mm_from_note(e):
+                                        kp_title = ""
+                                        try:
+                                            note_content_txt = str(item_data.get("content", "") or "")
+                                            tree_now = load_mindmap(subject)
+                                            if tree_now:
+                                                for c_nd in (tree_now.get("children") or []):
+                                                    t_nd = str(c_nd.get("title", ""))
+                                                    if t_nd and (t_nd in note_content_txt or
+                                                                (note_content_txt and t_nd[:4] in note_content_txt)):
+                                                        kp_title = t_nd
+                                                        break
+                                                if not kp_title and (tree_now.get("children") or []):
+                                                    kp_title = tree_now["children"][0].get("title", "")
+                                        except BaseException:
+                                            kp_title = ""
+                                        page.close(detail_dlg)
+                                        _MM_HIGHLIGHT["kp"] = kp_title
+                                        open_function_page(subject, "思维导图")
+
                                     action_row = ft.Row([
+                                        ft.ElevatedButton("🧭 导图", on_click=open_mm_from_note,
+                                                          icon=ft.Icons.ACCOUNT_TREE),
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
                                         ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
                                     ], alignment=ft.MainAxisAlignment.END)
@@ -5711,12 +5799,40 @@ def main(page: ft.Page):
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
                 return ft.Column([upload_bar, ft.Divider(height=1), list_view], spacing=8, expand=True)
 
-            def build_mindmap_page(subject):
+            def build_mindmap_page(subject, highlight_kp=None):
                 """学科思维导图：XMind 式横向展开 + 缩放/平移 + 知识点挂错题可点开详情"""
                 tree = build_mindmap(subject)
                 view_state = {"scale": 1.0, "dx": 0.0, "dy": 0.0,
                               "base_scale": 1.0, "base_dx": 0.0, "base_dy": 0.0,
-                              "layout": {}, "open": set()}
+                              "layout": {}, "open": set(), "grown": False,
+                              "grow_nodes": [], "hl": highlight_kp}
+                # 掌握度：画像薄弱度 + 复习卡熟练度 + 错题数 综合（0~1，越高越熟）
+                def mastery_for(kp_title):
+                    try:
+                        prof = load_user_profile()
+                        wk = prof.get("weak_knowledge", {}) or {}
+                        weak = wk.get(kp_title)
+                        if weak is None:
+                            for k, v in wk.items():
+                                if kp_title and (k in kp_title or kp_title in k):
+                                    weak = v
+                                    break
+                        base = 1.0 if weak is None else max(0.0, 1.0 - float(weak) * 1.6)
+                        rc = 0.0
+                        try:
+                            cards = load_jsonl(REVIEW_CARDS_FILE)
+                            prs = [float(c.get("proficiency", 0)) for c in cards
+                                   if c.get("knowledge_point") and
+                                   (c["knowledge_point"] == kp_title or
+                                    kp_title in str(c.get("knowledge_point", "")))]
+                            if prs:
+                                rc = min(1.0, sum(prs) / len(prs) / 100.0)
+                        except BaseException:
+                            pass
+                        return min(1.0, base * 0.6 + rc * 0.4)
+                    except BaseException:
+                        return None
+
                 # 深度优先布局：返回该节点子树的垂直范围 (top, bottom)，节点置于自身子树垂直中心
                 NODE_W, NODE_H, DX, DY = 180, 46, 210, 24
 
@@ -5850,6 +5966,7 @@ def main(page: ft.Page):
                 def make_node_widget(title, depth, count, is_root=False, kind=None, kp=""):
                     box_w, box_h = NODE_W, NODE_H
                     colors = ["#7AA2F7", "#BB9AF7", "#7DCFFF", "#9ECE6A", "#FF9E64", "#F7768E"]
+                    is_hl = (not is_root) and view_state.get("hl") and view_state["hl"] == title
                     if is_root:
                         bg, border, fg = "#414868", "#7AA2F7", "#FFFFFF"
                     elif kind == "notes":
@@ -5859,6 +5976,22 @@ def main(page: ft.Page):
                     else:
                         bg, border, fg = "#1A1B26", colors[min(depth, len(colors) - 1)], "#E0E3F0"
                     badge = f"  ·{count}题" if count else ""
+                    if is_hl:
+                        border, fg = "#FFD54F", "#FFECB3"
+                        bg = "#3B3110"
+                        badge = (badge + " ·定位") if badge else " ·定位"
+                    elif kind is None and not is_root:
+                        # 世界树掌握度：不会的知识点暗淡，会的点亮
+                        mv = mastery_for(title)
+                        if mv is not None:
+                            if mv < 0.35:
+                                bg, border, fg = "#191921", "#45454F", "#6E6E7C"
+                                badge = (badge + " ·弱") if badge else " ·弱"
+                            elif mv >= 0.7:
+                                bg, border = "#1C2630", "#4DB6AC"
+                                badge = (badge + " ·熟") if badge else " ·熟"
+                    shadow_c = (ft.BoxShadow(blur_radius=20, spread_radius=2, color="#99FFD54F")
+                                if is_hl else ft.BoxShadow(blur_radius=10, color="#33000000"))
 
                     def _on_click(e):
                         if is_root:
@@ -5880,7 +6013,7 @@ def main(page: ft.Page):
                         ], spacing=4),
                         width=box_w, height=box_h, padding=ft.Padding(left=12, top=6, right=12, bottom=6),
                         border_radius=12, bgcolor=bg, border=ft.border.all(1, border),
-                        shadow=ft.BoxShadow(blur_radius=10, color="#33000000"),
+                        shadow=shadow_c,
                         ink=True,
                         on_click=_on_click,
                     )
@@ -5998,13 +6131,26 @@ def main(page: ft.Page):
                                     paint=ft.canvas.Paint(stroke_width=2, color="#33364D")))
                     canvas = ft.canvas.Canvas(width=LAYOUT_W, height=LAYOUT_H, shapes=shapes)
                     nodes = []
+                    if not view_state.get("grown"):
+                        view_state["grow_nodes"] = []
+
+                    def _node_box(content, pos):
+                        """世界树生长：首帧节点透明，动画点亮；已生长完则直接显示"""
+                        if view_state.get("grown"):
+                            return ft.Container(content=content, left=pos[0], top=pos[1])
+                        c = ft.Container(content=content, left=pos[0], top=pos[1],
+                                         opacity=0.0,
+                                         animate_opacity=ft.animation.Animation(
+                                             360, ft.AnimationCurve.EASE_OUT_CUBIC))
+                        view_state["grow_nodes"].append(c)
+                        return c
+
                     root_pos = view_state["layout"].get(tree["title"])
                     if root_pos:
                         nodes.append(ft.Stack([
                             ft.Container(width=1, height=1),
-                            ft.Container(
-                                content=make_node_widget(tree["title"], 0, 0, is_root=True),
-                                left=root_pos[0], top=root_pos[1]),
+                            _node_box(make_node_widget(tree["title"], 0, 0, is_root=True),
+                                      (root_pos[0], root_pos[1])),
                         ]))
                     for nd in tree.get("children", []):
                         pos = view_state["layout"].get(nd["title"])
@@ -6013,10 +6159,9 @@ def main(page: ft.Page):
                         has_children = bool(nd.get("children"))
                         nodes.append(ft.Stack([
                             ft.Container(width=1, height=1),
-                            ft.Container(
-                                content=make_node_widget(nd["title"], pos[2], nd.get("count", 0),
-                                                         is_root=False),
-                                left=pos[0], top=pos[1]),
+                            _node_box(make_node_widget(nd["title"], pos[2], nd.get("count", 0),
+                                                       is_root=False),
+                                      (pos[0], pos[1])),
                         ]))
                         for ch in nd.get("children", []):
                             chp = view_state["layout"].get(ch["title"])
@@ -6024,11 +6169,10 @@ def main(page: ft.Page):
                                 continue
                             nodes.append(ft.Stack([
                                 ft.Container(width=1, height=1),
-                                ft.Container(
-                                    content=make_node_widget(ch["title"], chp[2], ch.get("count", 0),
-                                                             is_root=False, kind=ch.get("kind"),
-                                                             kp=ch.get("kp", "")),
-                                    left=chp[0], top=chp[1]),
+                                _node_box(make_node_widget(ch["title"], chp[2], ch.get("count", 0),
+                                                           is_root=False, kind=ch.get("kind"),
+                                                           kp=ch.get("kp", "")),
+                                          (chp[0], chp[1])),
                             ]))
                     return ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
 
@@ -6128,6 +6272,63 @@ def main(page: ft.Page):
                     scale=view_state["scale"], translate=ft.Offset(0, 0),
                     content=rebuild_mindmap_view())
                 _mm_root_ref["v"] = viewport
+
+                # —— 高亮定位：平移视图使知识点节点居中（从错题/笔记本跳转而来）——
+                def _apply_highlight(kp_title):
+                    layout = view_state["layout"]
+                    target = None
+                    if kp_title and kp_title in layout:
+                        target = kp_title
+                    elif kp_title:
+                        for t, _p in layout.items():
+                            if t != tree["title"] and (kp_title in t or t in kp_title):
+                                target = t
+                                break
+                    if not target:
+                        return False
+                    pos = layout[target]
+                    view_state["dx"] = -(pos[0]) + (LAYOUT_W - NODE_W) / 2.0
+                    view_state["dy"] = -(pos[1]) + (LAYOUT_H - NODE_H) / 2.0
+                    view_state["hl"] = target
+                    try:
+                        viewport.content = ft.Transform(
+                            scale=view_state["scale"],
+                            translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                            content=rebuild_mindmap_view())
+                        viewport.update()
+                        show_toast(f"🧭 已定位知识点：{target}", "orange")
+                    except BaseException:
+                        pass
+                    return True
+
+                # —— 世界树生长：从根向外逐节点点亮（像树枝蔓延）——
+                def _start_grow():
+                    if view_state.get("grown"):
+                        return
+                    import threading as _th
+                    def _job():
+                        time.sleep(0.15)
+                        gn = list(view_state.get("grow_nodes", []))
+                        for i, c in enumerate(gn):
+                            try:
+                                c.opacity = 1.0
+                                if i % 3 == 0:
+                                    page.update()
+                                time.sleep(0.045)
+                            except BaseException:
+                                pass
+                        view_state["grown"] = True
+                        page.update()
+                        _hl = view_state.get("hl")
+                        if _hl:
+                            try:
+                                _apply_highlight(_hl)
+                            except BaseException:
+                                pass
+                    _th.Thread(target=_job, daemon=True).start()
+
+                if not view_state.get("grown"):
+                    _start_grow()
                 vd = ft.GestureDetector(
                     content=viewport, expand=True,
                     on_scale_start=on_scale_start, on_scale_update=on_scale_update,
@@ -6399,10 +6600,16 @@ def main(page: ft.Page):
                     subject_page_content.content = build_subject_page()
                     page.update()
 
+                _mm_hl = None
+                try:
+                    if _MM_HIGHLIGHT and _MM_HIGHLIGHT.get("kp"):
+                        _mm_hl = _MM_HIGHLIGHT.pop("kp")
+                except BaseException:
+                    _mm_hl = None
                 func_pages = {
                     "错题本": build_error_list_page(subject),
                     "笔记本": build_note_list_page(subject),
-                    "思维导图": build_mindmap_page(subject),
+                    "思维导图": build_mindmap_page(subject, highlight_kp=_mm_hl),
                     "单词本": build_vocab_page(subject),
                     "金句": build_sentence_page(subject),
                 }
