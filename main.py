@@ -2470,37 +2470,53 @@ def main(page: ft.Page):
             except BaseException:
                 pass
 
-            page.theme = ft.Theme(
-                font_family="Segoe UI, -apple-system, Roboto, sans-serif",
-                color_scheme=ft.ColorScheme(
-                    primary="#7AA2F7",        # Tokyo Night 蓝紫（主操作色）
-                    primary_container="#24283B",
-                    secondary="#BB9AF7",      # 紫（辅助强调）
-                    tertiary="#73DACA",
-                    surface="#1A1B26",
-                    surface_variant="#24283B",
-                    background="#16161E",
-                    on_surface="#C0CAF5",
-                    on_background="#C0CAF5",
-                ),
-                visual_density=ft.VisualDensity.STANDARD,
-            )
-
-            page.dark_theme = ft.Theme(
-                font_family="Segoe UI, -apple-system, Roboto, sans-serif",
-                color_scheme=ft.ColorScheme(
-                    primary="#7AA2F7",        # Tokyo Night 蓝紫
-                    primary_container="#24283B",
-                    secondary="#BB9AF7",
-                    tertiary="#73DACA",
-                    surface="#1A1B26",
-                    surface_variant="#24283B",
-                    background="#16161E",     # 深蓝黑背景（PyDracula 系）
-                    on_surface="#C0CAF5",
-                    on_background="#C0CAF5",
-                ),
-                visual_density=ft.VisualDensity.STANDARD,
-            )
+            try:
+                # 苹果风组件主题：全局限一次生效（按钮/输入框/卡片/弹窗/底部导航）
+                _shared_btn_style = ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=14),
+                    padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+                    elevation=0.5,
+                    overlay_color="#267AA2F7",
+                )
+                page.theme = ft.Theme(
+                    font_family="Segoe UI, -apple-system, Roboto, sans-serif",
+                    color_scheme=ft.ColorScheme(
+                        primary="#7AA2F7",        # Tokyo Night 蓝紫（主操作色）
+                        primary_container="#24283B",
+                        secondary="#BB9AF7",      # 紫（辅助强调）
+                        tertiary="#73DACA",
+                        surface="#1A1B26",
+                        surface_variant="#24283B",
+                        background="#16161E",
+                        on_surface="#C0CAF5",
+                        on_background="#C0CAF5",
+                    ),
+                    visual_density=ft.VisualDensity.STANDARD,
+                    navigation_bar_theme=ft.NavigationBarThemeData(
+                        background_color="#D914141C",
+                        indicator_color="#7AA2F7",
+                        height=72,
+                    ),
+                    elevated_button_theme=ft.ElevatedButtonThemeData(style=_shared_btn_style),
+                    text_button_theme=ft.TextButtonThemeData(style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=12),
+                        padding=ft.Padding(left=16, right=16, top=10, bottom=10))),
+                    input_decoration_theme=ft.InputDecorationThemeData(
+                        filled=True, fill_color="#CC1F1F26",
+                        border_radius=14, border=ft.border.all(1, "#414868")),
+                    card_theme=ft.CardThemeData(
+                        color="#B31A1B26", elevation=6,
+                        shape=ft.RoundedRectangleBorder(radius=18)),
+                    dialog_theme=ft.DialogThemeData(
+                        backgroundColor="#F21A1B26", elevation=24,
+                        shape=ft.RoundedRectangleBorder(radius=26)),
+                    snack_bar_theme=ft.SnackBarThemeData(
+                        bgcolor="#E61A1B26", elevation=6,
+                        shape=ft.RoundedRectangleBorder(radius=14)),
+                )
+                page.dark_theme = page.theme
+            except BaseException:
+                pass
 
             main_subject_page = None
             subject_page_content = ft.Container(expand=True)
@@ -2522,11 +2538,12 @@ def main(page: ft.Page):
                         ft.Text(text, size=16, color=ft.Colors.WHITE, weight=ft.FontWeight.W_500),
                     ], spacing=10, tight=True, alignment=ft.MainAxisAlignment.CENTER),
                     bgcolor=bg,
-                    blur=20,
-                    border_radius=24,
-                    padding=ft.Padding(left=28, right=28, top=16, bottom=16),
-                    border=ft.border.all(1, ft.Colors.WHITE24),
-                    shadow=ft.BoxShadow(blur_radius=30, color="#88000000"),
+                    blur=30,
+                    border_radius=26,
+                    padding=ft.Padding(left=30, right=30, top=16, bottom=16),
+                    border=ft.border.all(1, "#44FFFFFF"),
+                    shadow=ft.BoxShadow(blur_radius=36, color="#88000000",
+                                        offset=ft.Offset(0, 8)),
                     opacity=0,
                     offset=ft.Offset(0, 0.3),
                     animate_opacity=ft.Animation(350, ft.AnimationCurve.EASE_OUT),
@@ -3043,17 +3060,34 @@ def main(page: ft.Page):
                     ft.Container(expand=True, height=1, bgcolor="#2A2A32"),
                 ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
-            def u_card(content, padding=18, radius=20, bg="#1A1B26"):
-                """苹果风卡片：圆角 + 细边框 + 柔和阴影"""
-                return ft.Container(
+            def u_card(content, padding=18, radius=22, bg="#CC1A1B26"):
+                """苹果风液态玻璃卡片：半透明底色 + 背景模糊 + 细亮边 + 柔和阴影"""
+                def _on_hover(e):
+                    try:
+                        card.scale = 1.012 if e.data == "true" else 1.0
+                        card.shadow = (ft.BoxShadow(blur_radius=26, color="#44000000",
+                                                    offset=ft.Offset(0, 8)) if e.data == "true"
+                                       else ft.BoxShadow(blur_radius=18, color="#33000000",
+                                                         offset=ft.Offset(0, 6)))
+                        page.update()
+                    except BaseException:
+                        pass
+
+                card = ft.Container(
                     content=content,
                     padding=padding,
                     border_radius=radius,
                     bgcolor=bg,
-                    border=ft.border.all(1, "#2A2A32"),
-                    shadow=ft.BoxShadow(blur_radius=14, color="#22000000",
-                                        offset=ft.Offset(0, 4)),
+                    blur=ft.Blur(18, 18, ft.BlurTileMode.CLAMP),
+                    border=ft.border.all(1, "#33FFFFFF"),
+                    shadow=ft.BoxShadow(blur_radius=18, color="#33000000",
+                                        offset=ft.Offset(0, 6)),
+                    scale=1.0,
+                    animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+                    animate_shadow=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+                    on_hover=_on_hover,
                 )
+                return card
 
             def u_primary_btn(text, on_click, icon=None, color="#7AA2F7"):
                 """全宽圆角主按钮"""
@@ -3231,10 +3265,10 @@ def main(page: ft.Page):
                 width=56,
                 height=56,
                 border_radius=28,
-                bgcolor="#DD1C1C22",
-                blur=12,
-                border=ft.border.all(1, ft.Colors.WHITE24),
-                shadow=ft.BoxShadow(blur_radius=22, color="#99000000"),
+                bgcolor="#CC1C1C26",
+                blur=16,
+                border=ft.border.all(1, "#44FFFFFF"),
+                shadow=ft.BoxShadow(blur_radius=24, color="#887AA2F7", spread_radius=1),
                 alignment=ft.alignment.center,
                 ink=True,
                 animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
@@ -3637,7 +3671,7 @@ def main(page: ft.Page):
                     border_color="#414868",
                     focused_border_color="#7AA2F7",
                     filled=True,
-                    fill_color="#1F1F26",
+                    fill_color="#CC1F1F26",
                     text_size=14,
                     content_padding=ft.Padding(left=14, right=14, top=10, bottom=10),
                     expand=True,
@@ -6590,17 +6624,40 @@ def main(page: ft.Page):
                 ]
                 cards_config = all_cards if subject == "英语" else all_cards[:3]
                 grid = ft.ResponsiveRow(spacing=20, run_spacing=20, expand=True)
-                for icon, name, bg in cards_config:
+                for i, (icon, name, bg) in enumerate(cards_config):
+                    def _card_hover(e, _card=None):
+                        try:
+                            _card.scale = 1.02 if e.data == "true" else 1.0
+                            _card.shadow = (ft.BoxShadow(blur_radius=24, color="#66000000",
+                                                         offset=ft.Offset(0, 10)) if e.data == "true"
+                                            else ft.BoxShadow(blur_radius=16, color="#44000000",
+                                                              offset=ft.Offset(0, 5)))
+                            page.update()
+                        except BaseException:
+                            pass
+
                     card = ft.Container(
                         content=ft.Column([
                             ft.Text(icon, size=36),
                             ft.Text(name, size=16, weight=ft.FontWeight.BOLD),
+                            ft.Text(("词典/考核/生词" if name == "单词本" else
+                                     "直达知识点世界树" if name == "思维导图" else
+                                     "按学科整理" if name == "错题本" else
+                                     "随手记录灵感" if name == "笔记本" else
+                                     "摘抄与回看"), size=12, color="#8E8E93"),
                         ], alignment=ft.MainAxisAlignment.CENTER,
                            horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
-                        bgcolor=bg, border_radius=18, padding=20,
-                        border=ft.border.all(1, ft.Colors.WHITE10),
-                        shadow=ft.BoxShadow(blur_radius=12, color="#44000000"),
+                        bgcolor="#CC" + bg[1:] if bg.startswith("#") else bg,
+                        blur=ft.Blur(14, 14, ft.BlurTileMode.CLAMP),
+                        border_radius=22, padding=22,
+                        border=ft.border.all(1, "#33FFFFFF"),
+                        shadow=ft.BoxShadow(blur_radius=16, color="#44000000",
+                                            offset=ft.Offset(0, 5)),
                         ink=True,
+                        scale=1.0,
+                        animate_scale=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+                        animate_shadow=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+                        on_hover=lambda e, c=card: _card_hover(e, c),
                         on_click=lambda e, subj=subject, fn=name: open_function_page(subj, fn),
                         expand=True)
                     grid.controls.append(
@@ -6614,7 +6671,6 @@ def main(page: ft.Page):
                     selected_subject_for_page = subject
                     subject_page_content.content = build_subject_page()
                     page.update()
-
                 _mm_hl = None
                 try:
                     if _MM_HIGHLIGHT and _MM_HIGHLIGHT.get("kp"):
@@ -6638,8 +6694,16 @@ def main(page: ft.Page):
                     ft.Divider(),
                     ft.Container(content=func_content, expand=True) if func_content
                     else ft.Container(content=ft.Text("暂无内容"), expand=True),
-                ], spacing=10, expand=True)
+                ], spacing=10, expand=True,
+                   animate_opacity=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
+                   animate_offset=ft.Animation(240, ft.AnimationCurve.EASE_OUT_BACK))
+                # 苹果风进入动画：上浮淡入
+                full_page.opacity = 0
+                full_page.offset = ft.Offset(0, 0.015)
                 subject_page_content.content = full_page
+                page.update()
+                full_page.opacity = 1
+                full_page.offset = ft.Offset(0, 0)
                 page.update()
 
             def build_subject_left_panel(subj):
@@ -7541,7 +7605,9 @@ def main(page: ft.Page):
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
             current_page = ft.Container(expand=True,
-                                        animate_opacity=ft.Animation(220, ft.AnimationCurve.EASE_OUT))
+                                        animate_opacity=ft.Animation(240, ft.AnimationCurve.EASE_OUT),
+                                        animate_scale=ft.Animation(260, ft.AnimationCurve.EASE_OUT),
+                                        scale=1.0)
 
             def switch_page(index):
                 if index == 0:
@@ -7554,9 +7620,12 @@ def main(page: ft.Page):
                         refresh_band_sync_status()
                     except Exception:
                         pass
-                current_page.opacity = 0
+                # 苹果风页面切换：轻微缩放 + 淡入
+                current_page.scale = 0.98
+                current_page.opacity = 0.6
                 page.update()
-                current_page.opacity = 1
+                current_page.scale = 1.0
+                current_page.opacity = 1.0
                 page.update()
 
             page.navigation_bar = ft.NavigationBar(
@@ -7567,13 +7636,19 @@ def main(page: ft.Page):
                     ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="我的"),
                 ])
             switch_page(0)
-            _gradient_bg = ft.Container(
-                expand=True,
-                gradient=ft.LinearGradient(
-                    begin=ft.alignment.top_left,
-                    end=ft.alignment.bottom_right,
-                    colors=["#1A1B2E", "#16161E", "#101020"]),
-                border_radius=0)
+            _gradient_bg = ft.Stack([
+                # 液态玻璃底色：深蓝黑渐变（iOS 动态壁纸质感）
+                ft.Container(expand=True, gradient=ft.LinearGradient(
+                    begin=ft.alignment.top_left, end=ft.alignment.bottom_right,
+                    colors=["#12121C", "#16161E", "#0E0E16"])),
+                # 右上蓝紫柔光 + 左下紫光晕（模拟液态玻璃反射）
+                ft.Container(expand=True, gradient=ft.RadialGradient(
+                    center=ft.alignment.top_right, radius=1.5,
+                    colors=["#441A2B5E", "#00000000"])),
+                ft.Container(expand=True, gradient=ft.RadialGradient(
+                    center=ft.alignment.bottom_left, radius=1.2,
+                    colors=["#22BB9AF7", "#00000000"])),
+            ], expand=True)
             page.add(ft.Stack([
                 _gradient_bg,
                 ft.Stack([current_page, chat_dialog, contact_panel, ball_container], expand=True),
