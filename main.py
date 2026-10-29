@@ -5332,6 +5332,9 @@ def main(page: ft.Page):
                                                 kp_title = str(item_data["idea"]).split("，")[0][:12]
                                         except BaseException:
                                             kp_title = ""
+                                        if not kp_title:
+                                            show_toast("该错题还没有知识点标签，先点一次 AI 理解/标签后再试", "orange")
+                                            return
                                         page.close(detail_dlg)
                                         _MM_HIGHLIGHT["kp"] = kp_title
                                         open_function_page(item_data.get("subject", subject), "思维导图")
@@ -5805,7 +5808,8 @@ def main(page: ft.Page):
                 view_state = {"scale": 1.0, "dx": 0.0, "dy": 0.0,
                               "base_scale": 1.0, "base_dx": 0.0, "base_dy": 0.0,
                               "layout": {}, "open": set(), "grown": False,
-                              "grow_nodes": [], "hl": highlight_kp}
+                              "grow_nodes": [], "hl": highlight_kp,
+                              "rebuild_count": 0}
                 # 掌握度：画像薄弱度 + 复习卡熟练度 + 错题数 综合（0~1，越高越熟）
                 def mastery_for(kp_title):
                     try:
@@ -6110,6 +6114,7 @@ def main(page: ft.Page):
                     viewport.update()
 
                 def rebuild_mindmap_view():
+                    view_state["rebuild_count"] = view_state.get("rebuild_count", 0) + 1
                     layout_node(tree, 24, 40)
                     shapes = []
                     # 连线：父 → 每个直接子节点
@@ -6208,11 +6213,12 @@ def main(page: ft.Page):
                     _apply_transform()
 
                 def _apply_transform():
-                    content_holder.content = ft.Transform(
+                    # 双指缩放/拖动 → 更新真正显示的 viewport（历史版本曾更新未挂载的 content_holder 导致手势无效）
+                    viewport.content = ft.Transform(
                         scale=view_state["scale"],
                         translate=ft.Offset(view_state["dx"], view_state["dy"]),
                         content=rebuild_mindmap_view())
-                    page.update()
+                    viewport.update()
 
                 def zoom_by(delta):
                     view_state["scale"] = min(2.6, max(0.4, view_state["scale"] + delta))
@@ -6308,8 +6314,17 @@ def main(page: ft.Page):
                     import threading as _th
                     def _job():
                         time.sleep(0.15)
+                        start_cnt = view_state.get("rebuild_count", 0)
                         gn = list(view_state.get("grow_nodes", []))
                         for i, c in enumerate(gn):
+                            if view_state.get("rebuild_count", 0) != start_cnt:
+                                # 生长期间视图被重建（用户点击折叠/缩放）→ 直接点亮新批次，跳过动画
+                                for cc in list(view_state.get("grow_nodes", [])):
+                                    try:
+                                        cc.opacity = 1.0
+                                    except BaseException:
+                                        pass
+                                break
                             try:
                                 c.opacity = 1.0
                                 if i % 3 == 0:
