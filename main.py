@@ -1603,7 +1603,7 @@ def auto_tag_error(timestamp):
                 match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
                 tag_data = json.loads(match.group()) if match else {}
             subject = target.get("subject", "")
-            ai_tags = tag_data.get("tags", [])
+            ai_tags = tag_data.get("tags") or []
             if not isinstance(ai_tags, list):
                 ai_tags = []
             ai_tags = [str(t).strip() for t in ai_tags if str(t).strip()]
@@ -1702,7 +1702,7 @@ def pick_relevant_notes(query, subject=None, limit=4):
     scored = []
     for n in notes:
         s = 0.0
-        text = (str(n.get("content", "")) + " " + " ".join(str(t) for t in n.get("tags", []))).lower()
+        text = (str(n.get("content", "")) + " " + " ".join(str(t) for t in (n.get("tags") or []))).lower()
         for kw in kws:
             if kw and kw in text:
                 s += 3
@@ -1742,7 +1742,7 @@ def build_mindmap(subject):
     # 按知识点标签聚类（每个错题的主要标签）
     clusters = {}
     for e in subj_errors:
-        tags = [str(t) for t in e.get("tags", []) if str(t).strip()] or ["未分类"]
+        tags = [str(t) for t in (e.get("tags") or []) if str(t).strip()] or ["未分类"]
         main_tag = tags[0]
         kp = (e.get("kp") or main_tag).strip()
         clusters.setdefault(kp, {"title": kp, "children": [], "kp": kp, "count": 0})
@@ -1917,7 +1917,7 @@ def pick_relevant_errors(query, subject=None, limit=5):
     scored = []
     for e in errors:
         s = 0.5
-        tags = " ".join(str(t) for t in e.get("tags", [])).lower()
+        tags = " ".join(str(t) for t in (e.get("tags") or [])).lower()
         text = ((e.get("original", "") or e.get("question", "")) + " " + str(e.get("mistake", ""))).lower()
         for kw in kws:
             if kw and kw in tags:
@@ -1936,7 +1936,7 @@ def weighted_search_errors(items, query):
         return items, {}
     scored = []
     for idx, item in enumerate(items):
-        tags = [str(t).lower() for t in item.get("tags", [])]
+        tags = [str(t).lower() for t in (item.get("tags") or [])]
         original = str(item.get("original", "") or item.get("question", "")).lower()
         mistake = str(item.get("mistake", "")).lower()
         total_score = 0
@@ -3060,6 +3060,14 @@ def main(page: ft.Page):
                     ft.Container(expand=True, height=1, bgcolor="#2A2A32"),
                 ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
+            # 能力探测：旧版 Flet 可能不支持 Container.on_hover / animate_shadow，提前检测避免启动崩溃
+            _HOVER_OK = False
+            try:
+                ft.Container(on_hover=lambda e: None, animate_shadow=ft.Animation(150, ft.AnimationCurve.EASE_OUT))
+                _HOVER_OK = True
+            except BaseException:
+                _HOVER_OK = False
+
             def u_card(content, padding=18, radius=22, bg="#CC1A1B26"):
                 """苹果风液态玻璃卡片：半透明底色 + 背景模糊 + 细亮边 + 柔和阴影"""
                 def _on_hover(e):
@@ -3073,6 +3081,14 @@ def main(page: ft.Page):
                     except BaseException:
                         pass
 
+                hover_kw = {}
+                if _HOVER_OK:
+                    hover_kw = {
+                        "scale": 1.0,
+                        "animate_scale": ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+                        "animate_shadow": ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+                        "on_hover": _on_hover,
+                    }
                 card = ft.Container(
                     content=content,
                     padding=padding,
@@ -3082,10 +3098,7 @@ def main(page: ft.Page):
                     border=ft.border.all(1, "#33FFFFFF"),
                     shadow=ft.BoxShadow(blur_radius=18, color="#33000000",
                                         offset=ft.Offset(0, 6)),
-                    scale=1.0,
-                    animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
-                    animate_shadow=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
-                    on_hover=_on_hover,
+                    **hover_kw,
                 )
                 return card
 
@@ -3196,6 +3209,9 @@ def main(page: ft.Page):
                 ball_state["dragging"] = True
                 ball_state["moved"] = False
                 ball_inner.scale = 0.9  # 按压反馈
+                # 清除上次拖完设置的动画，避免拖动中每帧赋值触发补间导致不跟手
+                ball_container.animate_left = None
+                ball_container.animate_top = None
 
             def on_ball_pan_update(e):
                 if not ball_state["dragging"]:
@@ -3917,7 +3933,7 @@ def main(page: ft.Page):
                         if rel:
                             lines = ["【学生错题本中的相关错题（请务必结合这些具体内容回答，不要泛泛而谈）】"]
                             for i, e in enumerate(rel):
-                                tags = "、".join(str(t) for t in e.get("tags", []))
+                                tags = "、".join(str(t) for t in (e.get("tags") or []))
                                 orig = (e.get("original", "") or e.get("question", ""))[:200]
                                 mis = str(e.get("mistake", ""))[:120]
                                 ans = str(e.get("answer", ""))[:120]
@@ -5200,7 +5216,7 @@ def main(page: ft.Page):
                             idea = item.get("idea", "")
                             q_media = item.get("question_media", []) or item.get("question_images", [])
                             ts_clean = clean_time_str(item.get("time", ""))
-                            tags = item.get("tags", [])
+                            tags = item.get("tags") or []
                             shown_tags = tags[:3]
                             tag_text = "、".join(shown_tags) if shown_tags else "未分类"
                             if len(tags) > 3:
@@ -5277,7 +5293,7 @@ def main(page: ft.Page):
                                         detail_children.append(
                                             ft.Text(f"💡 理解：{item_data['idea']}",
                                                     size=14, color="#90CAF9", selectable=True))
-                                    tags_now = item_data.get("tags", [])
+                                    tags_now = item_data.get("tags") or []
                                     if tags_now:
                                         tag_chips = ft.Row(spacing=6, wrap=True)
                                         for t in tags_now:
@@ -5337,7 +5353,7 @@ def main(page: ft.Page):
 ❌ 我错在：{item_data.get('mistake', '')}
 ✅ 标准答案：{item_data.get('answer', '')}
 💡 我的理解：{item_data.get('idea', '')}
-🏷️ 标签：{', '.join(item_data.get('tags', []))}
+🏷️ 标签：{', '.join(item_data.get('tags') or [])}
 
 请按以下步骤回答：
 1. 先指出我的理解或做法哪里有问题
@@ -5413,7 +5429,7 @@ def main(page: ft.Page):
                                                               multiline=True, min_lines=2)
                                     tags_input_edit = ft.TextField(
                                         label="标签（逗号分隔）",
-                                        value=", ".join(item_data.get("tags", [])),
+                                        value=", ".join(item_data.get("tags") or []),
                                         multiline=True, min_lines=2)
                                     status_dropdown = ft.Dropdown(
                                         label="标记状态",
@@ -6636,6 +6652,14 @@ def main(page: ft.Page):
                         except BaseException:
                             pass
 
+                    hover_kw = {}
+                    if _HOVER_OK:
+                        hover_kw = {
+                            "scale": 1.0,
+                            "animate_scale": ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+                            "animate_shadow": ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+                            "on_hover": lambda e, c=card: _card_hover(e, c),
+                        }
                     card = ft.Container(
                         content=ft.Column([
                             ft.Text(icon, size=36),
@@ -6654,10 +6678,7 @@ def main(page: ft.Page):
                         shadow=ft.BoxShadow(blur_radius=16, color="#44000000",
                                             offset=ft.Offset(0, 5)),
                         ink=True,
-                        scale=1.0,
-                        animate_scale=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
-                        animate_shadow=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
-                        on_hover=lambda e, c=card: _card_hover(e, c),
+                        **hover_kw,
                         on_click=lambda e, subj=subject, fn=name: open_function_page(subj, fn),
                         expand=True)
                     grid.controls.append(
@@ -6678,13 +6699,15 @@ def main(page: ft.Page):
                 except BaseException:
                     _mm_hl = None
                 func_pages = {
-                    "错题本": build_error_list_page(subject),
-                    "笔记本": build_note_list_page(subject),
-                    "思维导图": build_mindmap_page(subject, highlight_kp=_mm_hl),
-                    "单词本": build_vocab_page(subject),
-                    "金句": build_sentence_page(subject),
+                    # 惰性构建：只渲染目标页，避免每次打开都全量构建（含思维导图生长线程）
+                    "错题本": lambda: build_error_list_page(subject),
+                    "笔记本": lambda: build_note_list_page(subject),
+                    "思维导图": lambda: build_mindmap_page(subject, highlight_kp=_mm_hl),
+                    "单词本": lambda: build_vocab_page(subject),
+                    "金句": lambda: build_sentence_page(subject),
                 }
-                func_content = func_pages.get(function_name)
+                _builder = func_pages.get(function_name)
+                func_content = _builder() if _builder else None
                 full_page = ft.Column([
                     ft.Row([
                         ft.IconButton(icon=ft.Icons.ARROW_BACK, on_click=go_back),
@@ -6772,7 +6795,7 @@ def main(page: ft.Page):
                     recent = errors_sorted[:15]
                     detail_lines = []
                     for i, e in enumerate(recent):
-                        tags = "、".join(e.get("tags", []))
+                        tags = "、".join(e.get("tags") or [])
                         orig = (e.get("original", "") or e.get("question", ""))[:150]
                         mistake = e.get("mistake", "")[:100]
                         answer = e.get("answer", "")[:100]
@@ -7610,6 +7633,15 @@ def main(page: ft.Page):
                                         scale=1.0)
 
             def switch_page(index):
+                # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
+                try:
+                    chat_dialog.visible = False
+                except BaseException:
+                    pass
+                try:
+                    close_contact_panel()
+                except BaseException:
+                    pass
                 if index == 0:
                     current_page.content = home_page
                 elif index == 1:
