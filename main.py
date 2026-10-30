@@ -783,8 +783,19 @@ def retry_request(max_retries=3, base_delay=2, backoff=2,
 
 
 def init_vocabulary():
-    if not os.path.exists(VOCAB_FILE):
-        with open(VOCAB_FILE, "w", encoding="utf-8") as f:
+    """词库自愈：文件缺失或为空时，从内置打包副本（data/vocabulary.jsonl，4678词）自动恢复"""
+    if not os.path.exists(VOCAB_FILE) or os.path.getsize(VOCAB_FILE) == 0:
+        bundled = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "vocabulary.jsonl")
+        if os.path.exists(bundled) and os.path.getsize(bundled) > 0:
+            try:
+                shutil.copy2(bundled, VOCAB_FILE)
+                return
+            except BaseException:
+                pass
+        try:
+            with open(VOCAB_FILE, "w", encoding="utf-8") as f:
+                pass
+        except BaseException:
             pass
 
 
@@ -2788,6 +2799,8 @@ def main(page: ft.Page):
             def on_sync_folder_selected(e: ft.FilePickerResultEvent):
                 if e.path:
                     update_data_dir(e.path)
+                    init_vocabulary()  # 新目录词库缺失/为空时自动从打包副本恢复
+                    _vocab_cache["data"] = None
                     try:
                         page.client_storage.set("data_path", e.path)
                     except BaseException:
@@ -3153,13 +3166,18 @@ def main(page: ft.Page):
                            ("物理", "⚛️"), ("化学", "🧪"), ("生物", "🧬"),
                            ("历史", "🏛️"), ("政治", "⚖️"), ("地理", "🌍")]
 
+            def _panel_size():
+                pw = 228
+                ph = min(470, max(250, 128 + len(AI_SUBJECTS) * 50))
+                return pw, ph
+
             contact_panel = ft.Container(
                 visible=False,
                 bgcolor="#CC242424",
                 blur=16,
                 border_radius=16,
                 padding=15,
-                width=220,
+                width=228,
                 border=ft.border.all(1, ft.Colors.WHITE24),
                 shadow=ft.BoxShadow(blur_radius=20, color="#88000000"),
                 animate_opacity=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
@@ -3175,8 +3193,7 @@ def main(page: ft.Page):
                     h = page.height or (page.window.height if page.window else None) or 640
                 except Exception:
                     w, h = 360, 640
-                panel_w = 220
-                panel_h = 420
+                panel_w, panel_h = _panel_size()
                 bx = ball_state["ball_x"]
                 by = ball_state["ball_y"]
                 if bx < w / 2:
@@ -3193,15 +3210,32 @@ def main(page: ft.Page):
                 contact_panel.visible = True
                 page.update()
 
-            contact_list = ft.Column(spacing=8)
+            contact_list = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO)
             for subj_name, subj_icon in AI_SUBJECTS:
-                btn = ft.TextButton(
-                    text=f"{subj_icon} {subj_name}",
-                    on_click=lambda e, s=subj_name: open_chat(s))
-                contact_list.controls.append(btn)
+                contact_list.controls.append(ft.Container(
+                    content=ft.Row([
+                        ft.Container(
+                            content=ft.Text(subj_icon, size=15),
+                            width=30, height=30,
+                            border_radius=15,
+                            bgcolor="#26FFFFFF",
+                            alignment=ft.alignment.center),
+                        ft.Text(subj_name, size=14, weight=ft.FontWeight.W_600, color="#E6E6F0"),
+                        ft.Container(expand=True),
+                        ft.Icon(ft.Icons.CHEVRON_RIGHT, size=16, color="#7AA2F7"),
+                    ], spacing=8),
+                    padding=ft.Padding(left=10, right=10, top=8, bottom=8),
+                    border_radius=11,
+                    bgcolor="#22FFFFFF",
+                    border=ft.border.all(1, "#1AFFFFFF"),
+                    ink=True,
+                    on_click=lambda e, s=subj_name: (close_contact_panel(), open_chat(s)),
+                ))
             contact_panel.content = ft.Column(
-                [ft.Text("🧠 AI 助手", size=18), ft.Divider(), contact_list],
-                spacing=5)
+                [ft.Text("🧠 AI 助手", size=17, weight=ft.FontWeight.BOLD, color="#F0F0FA"),
+                 ft.Divider(height=1, color="#22FFFFFF"),
+                 contact_list],
+                spacing=10, expand=True)
 
             ball_state = {"dragging": False, "moved": False, "ball_x": 300, "ball_y": 500}
 
@@ -3232,8 +3266,7 @@ def main(page: ft.Page):
                 ball_container.right = None
                 ball_container.bottom = None
                 if contact_panel.visible:
-                    panel_w = 220
-                    panel_h = 420
+                    panel_w, panel_h = _panel_size()
                     bx = ball_state["ball_x"]
                     by = ball_state["ball_y"]
                     if bx < w / 2:
@@ -3250,6 +3283,7 @@ def main(page: ft.Page):
             def on_ball_pan_end(e):
                 ball_state["dragging"] = False
                 ball_inner.scale = 1.0  # 松开恢复
+                ball_state["moved"] = False  # 拖动结束即清除标记：拖完球后单击一次即可打开菜单
                 try:
                     w = page.width or (page.window.width if page.window else None) or 360
                     h = page.height or (page.window.height if page.window else None) or 640
@@ -3302,6 +3336,29 @@ def main(page: ft.Page):
                 left=ball_state["ball_x"],
                 top=ball_state["ball_y"],
             )
+
+            # 自适应：窗口尺寸变化时 clamp 悬浮球回窗内，并让菜单/聊天跟随重定位
+            def _on_resize(e=None):
+                try:
+                    w = page.width or (page.window.width if page.window else None) or 900
+                    h = page.height or (page.window.height if page.window else None) or 700
+                    bw, bh = 56, 56
+                    bx, by = ball_state["ball_x"], ball_state["ball_y"]
+                    if bx > w - bw:
+                        bx = max(0, w - bw)
+                    if by > h - bh:
+                        by = max(0, h - bh)
+                    if bx != ball_state["ball_x"] or by != ball_state["ball_y"]:
+                        ball_state["ball_x"], ball_state["ball_y"] = bx, by
+                        ball_container.left = bx
+                        ball_container.top = by
+                    if contact_panel.visible:
+                        open_contact_panel(None)
+                    page.update()
+                except BaseException:
+                    pass
+
+            page.on_resize = _on_resize
 
             chat_dialog = ft.Container(
                 visible=False,
@@ -4249,10 +4306,11 @@ def main(page: ft.Page):
                             ], spacing=2, expand=True),
                             ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_size=20,
                                           tooltip="清除历史", on_click=clear_history),
-                            ft.IconButton(icon=ft.Icons.CLOSE, icon_size=22,
-                                          on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                         padding=ft.Padding(left=4, right=4, top=10, bottom=8),
+                        bgcolor="#26FFFFFF",
+                        blur=ft.Blur(8, 8, ft.BlurTileMode.CLAMP),
+                        border_radius=ft.BorderRadius(0, 0, 16, 16),
                     ),
                     ft.Divider(height=1, color="#2A2E44"),
                     ft.Container(content=chat_history_display, expand=True, padding=ft.Padding(left=6, right=6, top=10, bottom=8)),
@@ -6964,10 +7022,12 @@ def main(page: ft.Page):
 
             free_key_input = ft.TextField(label="智谱 GLM API 密钥",
                                           value=ai_config.get("api_key_free", ""),
-                                          password=True)
+                                          password=True,
+                                          can_reveal_password=True)
             deepseek_key_input = ft.TextField(label="DeepSeek API 密钥",
                                               value=ai_config.get("api_key_deepseek", ""),
-                                              password=True)
+                                              password=True,
+                                              can_reveal_password=True)
             deepseek_model_input = ft.TextField(
                 label="DeepSeek 模型（deepseek-flash / deepseek-v4-pro）",
                 value=ai_config.get("deepseek_model", "deepseek-flash"),
@@ -7581,7 +7641,7 @@ def main(page: ft.Page):
                                       on_click=on_band_export_click),
                     ft.ElevatedButton("📥 导入记录", icon=ft.Icons.DOWNLOAD_DONE,
                                       on_click=on_band_records_click),
-                ]),
+                ], wrap=True),
                 band_status,
                 ft.Divider(),
                 ft.Text("✅ 学习任务清单", size=20),
@@ -7593,8 +7653,6 @@ def main(page: ft.Page):
                     empty_recycle(), refresh_recycle(), show_toast("已清空", "green"))),
                 ft.Divider(),
                 ft.Text("🧠 AI 引擎设置", size=20),
-                ft.ElevatedButton("👤 查看我的 AI 画像", on_click=lambda e: show_learning_profile(e),
-                                  icon=ft.Icons.PERSON_OUTLINE),
                 memory_dropdown := ft.Dropdown(
                     label="对话记忆长度",
                     options=[
@@ -7644,7 +7702,7 @@ def main(page: ft.Page):
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
                                       icon=ft.Icons.MERGE_TYPE),
-                ], spacing=10),
+                ], spacing=10, wrap=True),
                 backup_status,
                 ft.Container(height=20),
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
