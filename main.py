@@ -4582,7 +4582,11 @@ def main(page: ft.Page):
                     search_field = ft.TextField(label="🔍 搜索单词", hint_text="英文前缀或中文关键词", expand=True)
                     count_text = ft.Text(f"共 {len(all_words)} 词", size=13, color=ft.Colors.GREY_500)
 
-                    def _render_list(keyword=""):
+                    _offset = [0]
+
+                    def _render_list(keyword="", reset_offset=False):
+                        if reset_offset:
+                            _offset[0] = 0
                         vocab_list_view.controls.clear()
                         kw = keyword.strip()
                         kws = kw.lower()
@@ -4596,13 +4600,22 @@ def main(page: ft.Page):
                             else:
                                 filtered = [w for w in all_words
                                             if w.get("word", "").lower().startswith(kws)]
-                        
+
                         BATCH = 100
                         total = len(filtered)
-                        shown = min(BATCH, total)
-                        count_text.value = f"共 {total} 词" + (f"（前 {shown} 条）" if total > BATCH else "")
+                        offset = _offset[0]
+                        shown = min(offset + BATCH, total)
+                        if total > BATCH:
+                            count_text.value = f"共 {total} 词（显示 {offset + 1}-{shown}）"
+                        else:
+                            count_text.value = f"共 {total} 词"
+
+                        def load_more():
+                            _offset[0] += BATCH
+                            _render_list(search_field.value)
+
                         nw_set = set(_load_user_new_words())
-                        for w in filtered[:BATCH]:
+                        for w in filtered[offset:offset + BATCH]:
                             word = w.get("word", "")
                             phonetic = w.get("phonetic", "")
                             meaning_short = w.get("meaning", "")[:50]
@@ -4620,9 +4633,18 @@ def main(page: ft.Page):
                                                        tooltip="查看详情", on_click=_show_detail),
                                 on_click=_show_detail, dense=True)
                             vocab_list_view.controls.append(tile)
+                        # 分页：还有更多时挂"加载更多"按钮
+                        if shown < total:
+                            vocab_list_view.controls.append(ft.Container(
+                                content=ft.TextButton(
+                                    f"⬇ 加载更多（还剩 {total - shown} 词）",
+                                    icon=ft.Icons.EXPAND_MORE,
+                                    on_click=lambda e: load_more()),
+                                alignment=ft.alignment.center,
+                                padding=ft.Padding(top=4, bottom=4)))
                         page.update()
 
-                    search_field.on_change = lambda e: _render_list(search_field.value)
+                    search_field.on_change = lambda e: _render_list(search_field.value, reset_offset=True)
                     add_word_input = ft.TextField(label="新增单词", hint_text="英文或中文", expand=True)
 
                     def _add_custom_word(e):
