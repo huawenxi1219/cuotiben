@@ -1295,7 +1295,7 @@ def load_ai_config():
     _defaults = {"provider": "zhipu", "model": "free", "api_key_free": "", "api_key_deepseek": "",
                  "api_key_enhanced": "", "monthly_limit": 5.0, "subject_models": {},
                  "deepseek_model": "deepseek-flash", "deepseek_thinking": True,
-                 "ctx_chars": "auto"}
+                 "deepseek_reasoning": "medium", "ctx_chars": "auto"}
     if not os.path.exists(AI_CONFIG_FILE):
         return _defaults
     with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -1657,9 +1657,10 @@ def auto_tag_error(timestamp):
         pass
 
 
-def save_note(subject, content, media):
+def save_note(subject, content, media, tags=None):
     data = load_jsonl(NOTES_FILE)
     data.append({"type": "note", "subject": subject, "content": content, "media": media,
+                 "tags": [str(t).strip() for t in (tags or []) if str(t).strip()],
                  "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
     save_jsonl(NOTES_FILE, data)
     log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
@@ -1684,6 +1685,75 @@ def save_note(subject, content, media):
             _th.Thread(target=_understand, args=(data[-1].get("timestamp"),), daemon=True).start()
         except BaseException:
             pass
+
+
+def _match_existing_kp(subject, kp):
+    """把 AI 识别出的知识点与思维导图已有节点标题对齐，保持知识树一致"""
+    try:
+        if not kp:
+            return kp
+        tree = load_mindmap(subject)
+        for c in (tree.get("children") or []):
+            t = str(c.get("title", "") or "")
+            if t and (t == kp or t in kp or kp in t or t[:4] in kp):
+                return t
+    except BaseException:
+        pass
+    return kp
+
+
+@retry_request(max_retries=2, base_delay=2)
+def _ai_extract_chat(subject, text, mode="error"):
+    """长按收录时 AI 自动识别：题目/错因/知识点归属（mode=error|note）。
+    知识点优先归入思维导图已有节点；返回 {"kp":..., "mistake":..., "question":...}。"""
+    text = (text or "").strip()[:1200]
+    if not text:
+        return {}
+    api_key, api_url, api_model, _v = endpoint_for("cheap")
+    if not api_key:
+        return {}
+    tree_hint = ""
+    try:
+        tree = load_mindmap(subject)
+        titles = [str(c.get("title", "")) for c in (tree.get("children") or []) if c.get("title")]
+        if titles:
+            tree_hint = "\n该科思维导图现有知识点节点（请优先从中选择归属）：" + "、".join(titles[:40])
+    except BaseException:
+        pass
+    if mode == "note":
+        prompt = f"""你是「池鱼」的笔记整理助手。下面是从学生与 AI 老师的对话中摘取的学习内容（知识点讲解/方法/笔记）。
+{tree_hint}
+请用 2-8 个字提炼它所属的【知识点】（如"二次函数最值""氧化还原配平"），优先选思维导图已有节点；没有匹配就新起一个精准知识点名。
+内容：
+{text}
+只返回 JSON：{{"kp": "知识点"}}
+只输出 JSON。"""
+    else:
+        prompt = f"""你是「池鱼」的错题收录助手。下面是从学生与 AI 老师的对话中摘取的内容，请自动识别错题要素。
+{tree_hint}
+内容：
+{text}
+只返回 JSON：
+{{"question": "学生问的题目（精简成题目本身，去掉寒暄与讲解）", "mistake": "学生的错因/薄弱点（如：忽略了定义域、符号错误；看不出就写学生不会的知识盲区）", "kp": "本题知识点（2-8字，优先选思维导图已有节点）"}}
+只输出 JSON。"""
+    try:
+        resp = requests.post(api_url,
+                             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                             json={"model": api_model, "messages": [{"role": "user", "content": prompt}],
+                                   "temperature": 0.2, "max_tokens": 400}, timeout=30)
+        if resp.status_code != 200:
+            return {}
+        content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+        m = re.search(r'\{.*\}', content, re.S)
+        data = json.loads(m.group()) if m else {}
+        if not isinstance(data, dict):
+            return {}
+        out = {k: str(v).strip() for k, v in data.items() if v}
+        if out.get("kp"):
+            out["kp"] = _match_existing_kp(subject, out["kp"])
+        return out
+    except BaseException:
+        return {}
 
 
 def _note_sort_key(x):
@@ -1758,6 +1828,18 @@ def build_mindmap(subject):
         kp = (e.get("kp") or main_tag).strip()
         clusters.setdefault(kp, {"title": kp, "children": [], "kp": kp, "count": 0})
         clusters[kp]["count"] += 1
+    # 笔记的知识点标签也并入知识树：长按收录的笔记（带 tags）能长出自己的节点
+    try:
+        _notes_all = load_jsonl(NOTES_FILE)
+        for _n in _notes_all:
+            if _n.get("subject") != subject:
+                continue
+            for _tg in (_n.get("tags") or []):
+                _tg_s = str(_tg).strip()
+                if _tg_s and _tg_s not in clusters:
+                    clusters[_tg_s] = {"title": _tg_s, "children": [], "kp": _tg_s, "count": 0}
+    except BaseException:
+        pass
     # 分层：每个知识点节点下自动挂「笔记层 / 错题层」两个子层（像导航分层）
     for kp, nd in clusters.items():
         nd.setdefault("children", []).insert(0, {"title": "📓 笔记", "kind": "notes", "kp": kp})
@@ -3417,12 +3499,15 @@ def main(page: ft.Page):
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 payload = {"model": api_model, "messages": messages,
                            "temperature": 0.7, "max_tokens": 2048, "stream": True}
-                # DeepSeek：按设置开关思考模式（V4.1 默认思考，含 reasoning_content）
+                # DeepSeek：按设置开关思考模式 + 推理程度档位（同官方 Harness：low/medium/high/max）
                 if api_model.startswith("deepseek"):
                     _cfg = load_ai_config()
                     if _cfg.get("deepseek_thinking", True):
                         payload["thinking"] = {"type": "enabled"}
-                        payload["reasoning_effort"] = "high"
+                        _eff = str(_cfg.get("deepseek_reasoning", "medium") or "medium").strip().lower()
+                        if _eff not in ("low", "medium", "high", "max"):
+                            _eff = "medium"
+                        payload["reasoning_effort"] = _eff
                 try:
                     resp = requests.post(
                         api_url,
@@ -3579,6 +3664,228 @@ def main(page: ft.Page):
 
                 chat_history_display = ft.ListView(spacing=12, expand=True, auto_scroll=True)
 
+                # ============ 长按收录 · 侧边抽屉（收录错题/笔记 → 归入思维导图知识树） ============
+                _drawer = {"open": False, "mode": "error", "items": [], "busy": False}
+                _all_subjects = ["总AI", "数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]
+
+                drawer_mode_title = ft.Text("📕 收录错题", size=16, weight=ft.FontWeight.BOLD, color="#F0F0F8")
+                drawer_kp_input = ft.TextField(
+                    label="知识点（自动归入思维导图知识树）", hint_text="🤖 会自动识别，可手动改",
+                    value="⏳ 识别中...", width=220)
+                drawer_subject_drop = ft.Dropdown(
+                    label="科目", value=subject,
+                    options=[ft.dropdown.Option(s) for s in _all_subjects], width=132)
+                drawer_ai_btn = ft.ElevatedButton("🤖 识别", on_click=lambda e: _ai_fill_fields(),
+                                                  icon=ft.Icons.AUTO_AWESOME)
+                drawer_q_input = ft.TextField(label="题目（自动识别，可改）", multiline=True, min_lines=2, width=272)
+                drawer_m_input = ft.TextField(label="错因 / 薄弱点（自动识别，可改）", multiline=True, min_lines=2, width=272)
+                drawer_a_input = ft.TextField(label="AI 解答", multiline=True, min_lines=3, width=272)
+                drawer_note_input = ft.TextField(label="笔记内容（可再补充）", multiline=True, min_lines=4, width=272)
+                drawer_items_col = ft.Column([], spacing=4)
+                drawer_error_fields = ft.Column([drawer_q_input, drawer_m_input, drawer_a_input], spacing=8)
+                drawer_note_fields = ft.Column([drawer_note_input], spacing=8)
+
+                def _refresh_drawer_items():
+                    drawer_items_col.controls.clear()
+                    for i, it in enumerate(_drawer["items"]):
+                        _t = str(it).strip().replace("\n", " ")[:46]
+                        drawer_items_col.controls.append(ft.Container(
+                            content=ft.Row([
+                                ft.Text(f"{i+1}. {_t}", size=12, color="#C9D1F5", expand=True, max_lines=2),
+                                ft.IconButton(icon=ft.Icons.CLOSE, icon_size=14, icon_color="#F7768E",
+                                              tooltip="移除",
+                                              on_click=lambda ev, idx=i: _drawer_remove_item(idx)),
+                            ], spacing=4),
+                            padding=ft.Padding(left=8, right=4, top=4, bottom=4),
+                            border_radius=8, bgcolor="#221A1B26",
+                            border=ft.border.all(1, "#33414868"),
+                        ))
+                    try:
+                        drawer_items_col.update()
+                    except BaseException:
+                        pass
+
+                def _drawer_add_item(text, source="AI 解答"):
+                    _t = (text or "").strip()
+                    if not _t:
+                        return
+                    if not _drawer["open"]:
+                        _ask_collect_menu(_t, source)
+                        return
+                    _drawer["items"].append(_t)
+                    _refresh_drawer_items()
+                    page.update()
+
+                def _drawer_remove_item(idx):
+                    if 0 <= idx < len(_drawer["items"]):
+                        _drawer["items"].pop(idx)
+                        _refresh_drawer_items()
+                        page.update()
+
+                def _drawer_open(mode, auto_text=None, q_hint=""):
+                    _drawer["mode"] = mode
+                    _drawer["items"] = []
+                    _drawer["busy"] = False
+                    drawer_mode_title.value = "📕 收录错题" if mode == "error" else "📓 收录笔记"
+                    drawer_error_fields.visible = (mode == "error")
+                    drawer_note_fields.visible = (mode == "note")
+                    drawer_q_input.value = q_hint or ""
+                    drawer_m_input.value = ""
+                    drawer_a_input.value = ""
+                    drawer_note_input.value = ""
+                    drawer_kp_input.value = "⏳ 识别中..."
+                    if auto_text:
+                        _drawer["items"].append(auto_text)
+                    _refresh_drawer_items()
+                    drawer_container.visible = True
+                    drawer_container.right = 0
+                    _drawer["open"] = True
+                    page.update()
+                    _ai_fill_fields(auto=True)
+
+                def _drawer_close():
+                    _drawer["open"] = False
+                    _drawer["busy"] = False
+                    drawer_container.right = -330
+                    page.update()
+
+                def _ask_collect_menu(text, source="AI 解答"):
+                    _t = (text or "").strip()
+                    if not _t:
+                        show_toast("这条消息还没有内容", "grey")
+                        return
+                    _q = _t if source == "我的提问" else str(last_user_msg.get("text", "") or "")
+                    dlg = ft.AlertDialog(
+                        title=ft.Text("收录到哪里？"),
+                        content=ft.Text(f"来自「{source}」气泡 · {len(_t)} 字\n将自动识别题目 / 错因 / 知识点", size=13, color="#888888"),
+                        actions=[
+                            ft.ElevatedButton("📕 收录错题", icon=ft.Icons.EDIT_NOTE,
+                                              on_click=lambda e: (page.close(dlg), _drawer_open("error", _t, _q))),
+                            ft.ElevatedButton("📓 收录笔记", icon=ft.Icons.BOOKMARK_ADD,
+                                              on_click=lambda e: (page.close(dlg), _drawer_open("note", _t, _q))),
+                            ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
+                        ],
+                        actions_alignment=ft.MainAxisAlignment.END)
+                    page.open(dlg)
+                    page.update()
+
+                def _drawer_payload_text():
+                    parts = []
+                    parts.extend([str(it) for it in _drawer["items"] if str(it).strip()])
+                    if _drawer["mode"] == "error":
+                        if drawer_q_input.value and drawer_q_input.value.strip():
+                            parts.append("题目：" + drawer_q_input.value.strip())
+                        if drawer_a_input.value and drawer_a_input.value.strip():
+                            parts.append("解答：" + drawer_a_input.value.strip())
+                    else:
+                        if drawer_note_input.value and drawer_note_input.value.strip():
+                            parts.append(drawer_note_input.value.strip())
+                    return "\n".join(parts)
+
+                def _ai_fill_fields(auto=False):
+                    if _drawer.get("busy"):
+                        return
+                    _payload = _drawer_payload_text()
+                    if not _payload:
+                        drawer_kp_input.value = ""
+                        page.update()
+                        return
+                    _drawer["busy"] = True
+                    if not auto:
+                        drawer_kp_input.value = "⏳ 识别中..."
+                        page.update()
+                    _mode = _drawer["mode"]
+                    _subj = drawer_subject_drop.value or subject
+
+                    def _work():
+                        try:
+                            res = _ai_extract_chat(_subj, _payload, _mode)
+                            if res:
+                                if res.get("kp"):
+                                    drawer_kp_input.value = res["kp"]
+                                if _mode == "error":
+                                    if res.get("question") and not (drawer_q_input.value or "").strip():
+                                        drawer_q_input.value = res["question"]
+                                    if res.get("mistake"):
+                                        drawer_m_input.value = res["mistake"]
+                                try:
+                                    page.update()
+                                except BaseException:
+                                    pass
+                        except BaseException:
+                            pass
+                        finally:
+                            _drawer["busy"] = False
+
+                    threading.Thread(target=_work, daemon=True).start()
+
+                def _drawer_done(e):
+                    if _drawer.get("busy"):
+                        show_toast("AI 识别中，稍等片刻", "grey")
+                        return
+                    _mode = _drawer["mode"]
+                    _subj = drawer_subject_drop.value or subject
+                    _kp = (drawer_kp_input.value or "").strip()
+                    if _kp.startswith("⏳"):
+                        _kp = ""
+                    items = [str(it).strip() for it in _drawer["items"] if str(it).strip()]
+                    if _mode == "error":
+                        q = (drawer_q_input.value or "").strip() or (items[0] if items else "")
+                        a = (drawer_a_input.value or "").strip()
+                        m = (drawer_m_input.value or "").strip()
+                        if not q and not a:
+                            show_toast("题目或解答不能都为空", "red")
+                            return
+                        save_error(_subj, original=q, answer=a, mistake=m, manual_tags=_kp)
+                        show_toast(f"✅ 已收录错题{(' · 知识点：' + _kp) if _kp else ''}", "green")
+                    else:
+                        parts = items[:]
+                        if (drawer_note_input.value or "").strip():
+                            parts.append(drawer_note_input.value.strip())
+                        content = "\n\n".join(parts)
+                        if not content:
+                            show_toast("笔记内容不能为空", "red")
+                            return
+                        save_note(_subj, content, media=[], tags=[_kp] if _kp else None)
+                        show_toast(f"✅ 已收录笔记{(' · 已挂知识树：' + _kp) if _kp else ''}", "green")
+                    _drawer_close()
+
+                drawer_header = ft.Row([
+                    drawer_mode_title,
+                    ft.Container(expand=True),
+                    ft.IconButton(icon=ft.Icons.CHEVRON_RIGHT, icon_size=20, tooltip="收回",
+                                  on_click=lambda e: _drawer_close()),
+                ])
+                drawer_items_head = ft.Text("📎 已加入片段（对话气泡点 ➕ 可继续加）", size=12, color="#888888")
+                drawer_container = ft.Container(
+                    visible=False,
+                    right=-330, top=0, bottom=0, width=310,
+                    bgcolor="#F21A1B26",
+                    blur=ft.Blur(18, 18, ft.BlurTileMode.CLAMP),
+                    border=ft.border.only(left=ft.BorderSide(1, "#44FFFFFF")),
+                    border_radius=ft.BorderRadius(18, 0, 0, 18),
+                    padding=ft.Padding(left=14, right=14, top=12, bottom=12),
+                    animate=ft.Animation(220, ft.AnimationCurve.EASE_OUT_CUBIC),
+                    content=ft.Column([
+                        drawer_header,
+                        ft.Divider(height=1, color="#2A2E44"),
+                        ft.Row([drawer_subject_drop, ft.Container(width=4), drawer_ai_btn],
+                               spacing=6, wrap=True),
+                        drawer_kp_input,
+                        drawer_items_head,
+                        ft.Container(content=drawer_items_col, height=110, padding=2,
+                                     border=ft.border.all(1, "#33414868"), border_radius=10),
+                        drawer_error_fields,
+                        drawer_note_fields,
+                        ft.Row([
+                            ft.ElevatedButton("✅ 完成", icon=ft.Icons.CHECK,
+                                              on_click=_drawer_done,
+                                              bgcolor="#4DB6AC", color="#06121A"),
+                            ft.TextButton("取消", on_click=lambda e: _drawer_close()),
+                        ], alignment=ft.MainAxisAlignment.END),
+                    ], spacing=8, scroll=ft.ScrollMode.AUTO),
+                )
+
                 def make_user_bubble(text):
                     # 支持多模态图片：消息里以【图】标记携带本地图片路径，拆出文本+图片渲染
                     txt = re.sub(r"(\n)?【图】\S+", "", text).strip()
@@ -3593,7 +3900,8 @@ def main(page: ft.Page):
                                                   border_radius=8, fit=ft.ImageFit.CONTAIN))
                     if not inner:
                         inner.append(ft.Text(text, size=14, selectable=True, color="#FFFFFF"))
-                    return ft.Row([
+                    _bubble_text = txt or text
+                    _row = ft.Row([
                         ft.Container(expand=True),
                         ft.Container(
                             content=ft.Column(inner, spacing=4),
@@ -3606,6 +3914,10 @@ def main(page: ft.Page):
                             width=300,
                         ),
                     ], alignment=ft.MainAxisAlignment.END)
+                    # 长按我的提问 → 弹收录菜单（错题/笔记）
+                    return ft.GestureDetector(
+                        content=_row,
+                        on_long_press=lambda e: _ask_collect_menu(_bubble_text, "我的提问"))
 
                 def make_ai_bubble(text, can_regenerate=True, content_ref=None):
                     if content_ref is None:
@@ -3675,7 +3987,19 @@ def main(page: ft.Page):
                         icon_color="#888888",
                         on_click=lambda e: add_to_errorbook(),
                         visible=False)
-                    action_row = ft.Row([copy_btn, regen_btn, del_btn, add_btn], spacing=2, tight=True)
+
+                    def _bubble_now():
+                        try:
+                            return md.value if md.value else (stream_text.value or content_ref.get("raw", "") or "")
+                        except BaseException:
+                            return content_ref.get("raw", "") or ""
+
+                    collect_btn = ft.IconButton(
+                        icon=ft.Icons.ADD_CIRCLE_OUTLINE, icon_size=16, tooltip="➕ 收录到错题/笔记（侧边小窗）",
+                        icon_color="#4DB6AC",
+                        on_click=lambda e: _drawer_add_item(_bubble_now(), "AI 解答"))
+                    action_row = ft.Row([copy_btn, regen_btn, del_btn, add_btn, collect_btn],
+                                        spacing=2, tight=True)
                     content_ref["actions"] = (regen_btn, del_btn, add_btn)
 
                     bubble = ft.Container(
@@ -3699,7 +4023,12 @@ def main(page: ft.Page):
                                  alignment=ft.MainAxisAlignment.START,
                                  vertical_alignment=ft.CrossAxisAlignment.START)
                     content_ref["row"] = row
-                    return row, content_col
+                    # 长按 AI 回答 → 弹收录菜单（错题/笔记）；内部按钮点击不受影响
+                    _gd = ft.GestureDetector(
+                        content=row,
+                        on_long_press=lambda e: _ask_collect_menu(_bubble_now(), "AI 解答"))
+                    content_ref["row"] = _gd
+                    return _gd, content_col
 
                 for msg in history:
                     if msg["role"] == "user":
@@ -4266,6 +4595,16 @@ def main(page: ft.Page):
                     ink=True, tooltip="发图片（需要视觉模型）",
                 )
 
+                # —— 相机按钮：直接调用摄像头拍照插入对话（拍不会的题）——
+                cam_btn = ft.Container(
+                    content=ft.Icon(ft.Icons.PHOTO_CAMERA_OUTLINED, size=20, color="#BBBBBB"),
+                    width=38, height=38, border_radius=19,
+                    bgcolor="#24283B", border=ft.border.all(1, "#414868"),
+                    alignment=ft.alignment.center,
+                    on_click=lambda e: pick_chat_camera(),
+                    ink=True, tooltip="调用相机拍照（拍题直接问）",
+                )
+
                 def on_chat_img_picked(e: ft.FilePickerResultEvent):
                     if not e.files:
                         return
@@ -4294,6 +4633,49 @@ def main(page: ft.Page):
                     page.update()
                     _pkr.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
 
+                def pick_chat_camera():
+                    """调用本机摄像头拍照：拍题 → 自动插入对话（与相册同一发送链路）"""
+                    try:
+                        import cv2
+                    except ImportError:
+                        show_toast("相机组件未安装，请先运行：pip install opencv-python", "red")
+                        return
+
+                    def _shot():
+                        cap = None
+                        try:
+                            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+                            if not cap.isOpened():
+                                show_toast("无法打开摄像头（请检查是否被占用/已授权）", "red")
+                                return
+                            ret, frame = cap.read()
+                            if not ret:
+                                show_toast("拍照失败，请重试", "red")
+                                return
+                            _chat_dir = os.path.join(IMAGES_DIR, "chat")
+                            os.makedirs(_chat_dir, exist_ok=True)
+                            _dest = os.path.join(_chat_dir, f"cam_{now_ms()}.jpg")
+                            cv2.imwrite(_dest, frame)
+                            _rel = os.path.relpath(_dest, DATA_DIR)
+                            cur = chat_input.value or ""
+                            marks = f"\n【图】{_rel}"
+                            chat_input.value = (cur + marks) if cur else marks.lstrip("\n")
+                            try:
+                                page.update()
+                            except BaseException:
+                                pass
+                            show_toast("📸 已拍照，按发送让 AI 看题", "green")
+                        except BaseException as _ex:
+                            show_toast(f"相机出错：{str(_ex)[:40]}", "red")
+                        finally:
+                            try:
+                                if cap is not None:
+                                    cap.release()
+                            except BaseException:
+                                pass
+
+                    threading.Thread(target=_shot, daemon=True).start()
+
                 result_col = ft.Column([
                     ft.Container(
                         content=ft.Row([
@@ -4318,6 +4700,7 @@ def main(page: ft.Page):
                     ft.Container(
                         content=ft.Row([
                             web_btn,
+                            cam_btn,
                             chat_img_btn,
                             chat_input,
                             send_btn,
@@ -4335,7 +4718,8 @@ def main(page: ft.Page):
                         time.sleep(0.6)
                         handle_send()
                     threading.Thread(target=trigger, daemon=True).start()
-                return result_col
+                # 聊天主层 + 右侧收录抽屉（长按气泡弹出）
+                return ft.Stack([result_col, drawer_container], expand=True)
 
             mine_msg = ft.Text("", size=16)
 
@@ -7028,11 +7412,25 @@ def main(page: ft.Page):
                                               value=ai_config.get("api_key_deepseek", ""),
                                               password=True,
                                               can_reveal_password=True)
-            deepseek_model_input = ft.TextField(
-                label="DeepSeek 模型（deepseek-flash / deepseek-v4-pro）",
+            deepseek_model_input = ft.Dropdown(
+                label="DeepSeek 模型",
+                options=[
+                    ft.dropdown.Option("deepseek-flash", "V4.1 Flash（自动升级到 1017，含图片理解）"),
+                    ft.dropdown.Option("deepseek-v4-pro", "V4.1 Pro（更强，推理更深度）"),
+                ],
                 value=ai_config.get("deepseek_model", "deepseek-flash"),
-                hint_text="deepseek-flash = V4.1-Flash-1017（默认，含图片理解）；更强选 deepseek-v4-pro",
                 width=280)
+            deepseek_reasoning_dropdown = ft.Dropdown(
+                label="推理程度（同官方 Harness）",
+                options=[
+                    ft.dropdown.Option("low", "Low（最快，适合简单问答）"),
+                    ft.dropdown.Option("medium", "Medium（均衡，默认）"),
+                    ft.dropdown.Option("high", "High（更强，稍慢）"),
+                    ft.dropdown.Option("max", "Max（最强推理，最慢）"),
+                ],
+                value=str(ai_config.get("deepseek_reasoning", "medium") or "medium"),
+                width=280,
+                tooltip="像 DeepSeek 官方 Harness 一样选择推理深度：low/middle/high/max")
             deepseek_thinking_switch = ft.Switch(
                 label="DeepSeek 思考模式",
                 value=ai_config.get("deepseek_thinking", True),
@@ -7045,6 +7443,7 @@ def main(page: ft.Page):
                 cfg["api_key_deepseek"] = deepseek_key_input.value.strip()
                 cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
                 cfg["deepseek_thinking"] = deepseek_thinking_switch.value
+                cfg["deepseek_reasoning"] = str(deepseek_reasoning_dropdown.value or "medium")
                 try:
                     cfg["ctx_chars"] = memory_dropdown.value or "auto"
                 except BaseException:
@@ -7667,6 +8066,7 @@ def main(page: ft.Page):
                 free_key_input,
                 deepseek_key_input,
                 deepseek_model_input,
+                deepseek_reasoning_dropdown,
                 deepseek_thinking_switch,
                 ft.ElevatedButton("保存密钥", on_click=save_keys),
                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
