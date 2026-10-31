@@ -6665,10 +6665,21 @@ def main(page: ft.Page):
                 # 深度优先布局：返回该节点子树的垂直范围 (top, bottom)，节点置于自身子树垂直中心
                 NODE_W, NODE_H, DX, DY = 180, 46, 210, 24
 
+                # R3-D：运行时给每个节点分配 uid（父路径/标题，全局唯一），layout/open/highlight 全部用 uid 作键，
+                # 避免同名知识点（如两个「函数」）互相覆盖/折叠串台。uid 只加在内存节点上，不落盘不改 JSONL。
+                def _assign_uid(node, parent_uid=None):
+                    uid = node["title"] if parent_uid is None else f"{parent_uid}/{node['title']}"
+                    node["_uid"] = uid
+                    for ch in node.get("children", []):
+                        _assign_uid(ch, uid)
+
+                _assign_uid(tree)
+
                 def layout_node(node, x, y, depth=0):
-                    if not node.get("children") or node["title"] in view_state["open"]:
+                    uid = node["_uid"]
+                    if not node.get("children") or uid in view_state["open"]:
                         node["_x"], node["_y"] = x, y
-                        view_state["layout"][node["title"]] = (x, y, depth)
+                        view_state["layout"][uid] = (x, y, depth)
                         return y, y + NODE_H
                     node["_x"], node["_y"] = x, y
                     cy = y
@@ -6683,7 +6694,7 @@ def main(page: ft.Page):
                     bottom = max(sub_bots) + 12
                     center = (top + bottom) / 2
                     node["_y"] = center - NODE_H / 2
-                    view_state["layout"][node["title"]] = (x, center - NODE_H / 2, depth)
+                    view_state["layout"][uid] = (x, center - NODE_H / 2, depth)
                     return top, bottom
 
                 layout_node(tree, 24, 40)
@@ -6792,10 +6803,10 @@ def main(page: ft.Page):
                     page.open(dlg)
                     page.update()
 
-                def make_node_widget(title, depth, count, is_root=False, kind=None, kp=""):
+                def make_node_widget(title, depth, count, uid="", is_root=False, kind=None, kp=""):
                     box_w, box_h = NODE_W, NODE_H
                     colors = ["#7AA2F7", "#BB9AF7", "#7DCFFF", "#9ECE6A", "#FF9E64", "#F7768E"]
-                    is_hl = (not is_root) and view_state.get("hl") and view_state["hl"] == title
+                    is_hl = (not is_root) and view_state.get("hl") and view_state["hl"] == uid
                     if is_root:
                         bg, border, fg = "#414868", "#7AA2F7", "#FFFFFF"
                     elif kind == "notes":
@@ -6824,13 +6835,13 @@ def main(page: ft.Page):
 
                     def _on_click(e):
                         if is_root:
-                            _toggle_node(title)
+                            _toggle_node(uid)
                         elif kind == "notes":
                             mm_note_list(kp or title)
                         elif kind == "errors":
                             mm_error_detail(kp or title)
-                        elif _node_has_children(title):
-                            _toggle_node(title)
+                        elif _node_has_children(uid):
+                            _toggle_node(uid)
                         else:
                             mm_error_detail(title)
 
@@ -6919,10 +6930,10 @@ def main(page: ft.Page):
                     page.open(dlg)
                     page.update()
 
-                def _node_has_children(t):
-                    t2 = load_mindmap(subject)
-                    for nd in (t2 or {}).get("children", []):
-                        if nd.get("title") == t and nd.get("children"):
+                def _node_has_children(uid):
+                    # R3-D：按 uid 匹配（同一棵 tree 的内存节点都带 _uid）
+                    for nd in (tree.get("children") or []):
+                        if nd.get("_uid") == uid and nd.get("children"):
                             return True
                     return False
 
@@ -6948,16 +6959,16 @@ def main(page: ft.Page):
                     shapes = []
                     # 连线：父 → 每个直接子节点
                     for nd in tree.get("children", []):
-                        p = view_state["layout"].get(tree["title"])
-                        c = view_state["layout"].get(nd["title"])
+                        p = view_state["layout"].get(tree["_uid"])
+                        c = view_state["layout"].get(nd["_uid"])
                         if p and c:
                             shapes.append(ft.canvas.Line(
                                 p[0] + NODE_W, p[1] + NODE_H / 2,
                                 c[0] - 8, c[1] + NODE_H / 2,
                                 paint=ft.canvas.Paint(stroke_width=2, color="#414868")))
                         for ch in nd.get("children", []):
-                            cp = view_state["layout"].get(nd["title"])
-                            cc = view_state["layout"].get(ch["title"])
+                            cp = view_state["layout"].get(nd["_uid"])
+                            cc = view_state["layout"].get(ch["_uid"])
                             if cp and cc:
                                 shapes.append(ft.canvas.Line(
                                     cp[0] + NODE_W, cp[1] + NODE_H / 2,
@@ -6979,32 +6990,32 @@ def main(page: ft.Page):
                         view_state["grow_nodes"].append(c)
                         return c
 
-                    root_pos = view_state["layout"].get(tree["title"])
+                    root_pos = view_state["layout"].get(tree["_uid"])
                     if root_pos:
                         nodes.append(ft.Stack([
                             ft.Container(width=1, height=1),
-                            _node_box(make_node_widget(tree["title"], 0, 0, is_root=True),
+                            _node_box(make_node_widget(tree["title"], 0, 0, uid=tree["_uid"], is_root=True),
                                       (root_pos[0], root_pos[1])),
                         ]))
                     for nd in tree.get("children", []):
-                        pos = view_state["layout"].get(nd["title"])
+                        pos = view_state["layout"].get(nd["_uid"])
                         if not pos:
                             continue
                         has_children = bool(nd.get("children"))
                         nodes.append(ft.Stack([
                             ft.Container(width=1, height=1),
                             _node_box(make_node_widget(nd["title"], pos[2], nd.get("count", 0),
-                                                       is_root=False),
+                                                       uid=nd["_uid"], is_root=False),
                                       (pos[0], pos[1])),
                         ]))
                         for ch in nd.get("children", []):
-                            chp = view_state["layout"].get(ch["title"])
+                            chp = view_state["layout"].get(ch["_uid"])
                             if not chp:
                                 continue
                             nodes.append(ft.Stack([
                                 ft.Container(width=1, height=1),
                                 _node_box(make_node_widget(ch["title"], chp[2], ch.get("count", 0),
-                                                           is_root=False, kind=ch.get("kind"),
+                                                           uid=ch["_uid"], is_root=False, kind=ch.get("kind"),
                                                            kp=ch.get("kp", "")),
                                           (chp[0], chp[1])),
                             ]))
@@ -7114,13 +7125,22 @@ def main(page: ft.Page):
                 def _apply_highlight(kp_title):
                     layout = view_state["layout"]
                     target = None
-                    if kp_title and kp_title in layout:
-                        target = kp_title
-                    elif kp_title:
-                        for t, _p in layout.items():
-                            if t != tree["title"] and (kp_title in t or t in kp_title):
-                                target = t
+                    if kp_title:
+                        # R3-D：layout 键已改为 uid。先精确匹配（入参本身是完整 uid），
+                        # 再按路径末段（标题）模糊匹配，避免父路径被前缀/子串误命中
+                        for uid, _p in layout.items():
+                            if uid == kp_title:
+                                target = uid
                                 break
+                        if target is None:
+                            for uid, _p in layout.items():
+                                if uid == tree.get("_uid"):
+                                    continue
+                                tail = uid.rsplit("/", 1)[-1]
+                                if tail == kp_title or kp_title in tail or (
+                                        "/" not in kp_title and tail in kp_title):
+                                    target = uid
+                                    break
                     if not target:
                         return False
                     pos = layout[target]
