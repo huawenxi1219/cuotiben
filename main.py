@@ -6230,13 +6230,21 @@ def main(page: ft.Page):
                             search_status.color = "#EF5350"
                             page.update()
                             return
+                        # 本地加权预筛：只喂 AI 前 20 条最相关的错题，避免整库塞进超长 prompt
+                        candidates = subject_items[:20]
+                        try:
+                            _ordered, _ = weighted_search_errors(subject_items, query)
+                            if _ordered:
+                                candidates = _ordered[:20]
+                        except BaseException:
+                            pass
                         prompt = f"""请分析以下错题列表，找出与用户查询匹配的题目。
 用户查询：{query}
 
-错题列表：
-{chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(subject_items)])}
+错题列表（最多显示前20条）：
+{chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(candidates)])}
 
-返回匹配的题目序号（从1开始），JSON数组格式，如：[1, 3, 5]
+返回匹配的题目序号（从1开始，序号对应上面列表），JSON数组格式，如：[1, 3, 5]
 只返回JSON数组。"""
                         try:
                             resp = requests.post(api_url,
@@ -6253,13 +6261,15 @@ def main(page: ft.Page):
                                     match = re.search(r'\[[0-9,\s]*\]', content)
                                     matches = json.loads(match.group()) if match else []
                                 if matches and isinstance(matches, list):
-                                    highlight_indices = [m - 1 for m in matches if 1 <= m <= len(subject_items)]
-                                    if highlight_indices:
-                                        matched_items = [(subject_items[i], 99) for i in highlight_indices]
+                                    # AI 返回的序号映射回候选列表，再映射回原 subject_items（保留原始索引语义）
+                                    matched_positions = [m - 1 for m in matches if 1 <= m <= len(candidates)]
+                                    if matched_positions:
+                                        highlight_items = [candidates[i] for i in matched_positions]
+                                        matched_items = [(it, 99) for it in highlight_items]
                                         other_items = [(item, None) for i, item in enumerate(subject_items)
-                                                       if i not in highlight_indices]
+                                                       if item not in highlight_items]
                                         render_list(matched_items + other_items)
-                                        search_status.value = f"✅ AI 找到 {len(highlight_indices)} 个匹配（已置顶）"
+                                        search_status.value = f"✅ AI 找到 {len(matched_positions)} 个匹配（已置顶）"
                                         search_status.color = "#81C784"
                                     else:
                                         search_status.value = "❌ 未找到匹配的错题"
