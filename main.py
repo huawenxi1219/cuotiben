@@ -3126,6 +3126,10 @@ def main(page: ft.Page):
 
             @retry_request(max_retries=2, base_delay=2)
             def analyze_single_image(image_path):
+                # 兼容相对路径：copy_file_to_lib 现在返回相对 DATA_DIR 的路径（如 images\abc.jpg），
+                # 不归一化会按工作目录解析导致 FileNotFoundError 被吞掉，界面表现为"什么都没发生"
+                if not os.path.isabs(image_path):
+                    image_path = os.path.join(DATA_DIR, image_path)
                 if not provider_supports_vision():
                     show_toast("当前 API 不支持图像识别，请切换到智谱 GLM", "red")
                     return None
