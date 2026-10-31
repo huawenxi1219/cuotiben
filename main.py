@@ -1513,6 +1513,39 @@ def load_chat_history(subject):
     return load_jsonl(get_chat_history_file(subject))
 
 
+def cleanup_orphan_chat_images():
+    """启动时一次性清理：images/chat/chat_tmp_* 中不被任何聊天历史引用的文件。
+    聊天临时图只记在内存 _pending_chat_imgs，程序崩溃/强退后会永久残留，这里兜底清理。"""
+    try:
+        chat_img_dir = os.path.join(IMAGES_DIR, "chat")
+        if not os.path.isdir(chat_img_dir):
+            return 0
+        used = set()
+        if os.path.isdir(CHAT_HISTORY_DIR):
+            for fname in os.listdir(CHAT_HISTORY_DIR):
+                if not fname.endswith(".jsonl"):
+                    continue
+                try:
+                    for m in load_jsonl(os.path.join(CHAT_HISTORY_DIR, fname)):
+                        for ref in re.findall(r"【图】(\S+)", str(m.get("content", "") or "")):
+                            used.add(os.path.basename(ref))
+                except BaseException:
+                    continue
+        removed = 0
+        for fname in os.listdir(chat_img_dir):
+            if not fname.startswith("chat_tmp_"):
+                continue
+            if os.path.basename(fname) not in used:
+                try:
+                    os.remove(os.path.join(chat_img_dir, fname))
+                    removed += 1
+                except BaseException:
+                    pass
+        return removed
+    except BaseException:
+        return 0
+
+
 def save_chat_message(subject, role, content):
     fp = get_chat_history_file(subject)
     data = load_jsonl(fp)
@@ -2593,6 +2626,7 @@ def main(page: ft.Page):
         init_vocabulary()
         init_content_lib()
         migrate_timestamps()
+        cleanup_orphan_chat_images()   # R2-P1-7：清理崩溃/强退残留的聊天临时图
 
         def load_ui():
             page.controls.clear()
@@ -8464,6 +8498,13 @@ def main(page: ft.Page):
                 # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
                 try:
                     _cleanup_pending_chat_imgs()   # 关聊天窗时清掉未发送的临时图
+                except BaseException:
+                    pass
+                try:
+                    # R2-P1-7：错题录入表单选了图但没保存就切页 → 删掉已复制未入库的副本，不留孤儿图片
+                    reset_picker1(keep=False)
+                    reset_picker2(keep=False)
+                    reset_picker3(keep=False)
                 except BaseException:
                     pass
                 try:
