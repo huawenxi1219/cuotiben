@@ -8200,6 +8200,7 @@ def main(page: ft.Page):
 
                 def do_restore():
                     tmp_dir = None
+                    _cleared = False   # 标记现网是否已清空：此后若异常，tmp_dir 是唯一数据副本，绝不删除
                     try:
                         app_state["busy"] = "覆盖恢复"
                         # 1) 解压到临时目录（带 zip-slip 越界防护），绝不直接覆盖现网
@@ -8211,11 +8212,15 @@ def main(page: ft.Page):
                                 if not _tgt.startswith(os.path.realpath(tmp_dir) + os.sep):
                                     raise RuntimeError(f"备份包内存在越界路径：{_n}")
                             zf.extractall(tmp_dir)
-                        # 2) 校验关键文件可解析，损坏则中止，原数据不受影响
+                        # 2) 校验关键文件可解析；根级一个都不存在 → 备份包结构不正确（可能带顶层目录），中止
+                        _found = 0
                         for _fname in ("errors.jsonl", "notes.jsonl", "vocabulary.jsonl"):
                             _fp = os.path.join(tmp_dir, _fname)
                             if os.path.exists(_fp):
+                                _found += 1
                                 _validate_jsonl(_fp)
+                        if _found == 0:
+                            raise RuntimeError("备份包结构不正确：根目录下未找到数据文件（包内可能还套了一层 data/ 目录）")
                         _up = os.path.join(tmp_dir, "user_profile.json")
                         if os.path.exists(_up):
                             with open(_up, "r", encoding="utf-8") as f:
@@ -8245,6 +8250,7 @@ def main(page: ft.Page):
                                     os.remove(_p)
                                 except BaseException:
                                     pass
+                        _cleared = True
                         for _n in os.listdir(tmp_dir):
                             shutil.move(os.path.join(tmp_dir, _n), os.path.join(DATA_DIR, _n))
                         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -8252,10 +8258,16 @@ def main(page: ft.Page):
                         backup_status.value = f"✅ 恢复成功！恢复前数据已自动备份到：\n{_bak_zip}\n（建议重启应用）"
                         backup_status.color = "#81C784"
                     except Exception as ex:
-                        backup_status.value = f"❌ 恢复失败（原数据未受影响）：{str(ex)[:80]}"
+                        if _cleared and tmp_dir and os.path.isdir(tmp_dir):
+                            # 现网已被清空，tmp_dir 是唯一数据副本：必须保留，并把路径写进提示
+                            backup_status.value = (f"❌ 恢复中断：备份内容已保留在 {tmp_dir}\n"
+                                                   f"（请勿删除该目录；核对无误后手动复制回 {DATA_DIR}）。\n"
+                                                   f"原因：{str(ex)[:60]}")
+                        else:
+                            backup_status.value = f"❌ 恢复失败（原数据未受影响）：{str(ex)[:80]}"
+                            if tmp_dir and os.path.isdir(tmp_dir):
+                                shutil.rmtree(tmp_dir, ignore_errors=True)
                         backup_status.color = "#EF5350"
-                        if tmp_dir and os.path.isdir(tmp_dir):
-                            shutil.rmtree(tmp_dir, ignore_errors=True)
                     finally:
                         app_state["busy"] = None
                         page.update()
