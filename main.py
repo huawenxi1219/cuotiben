@@ -5109,7 +5109,8 @@ def main(page: ft.Page):
                     content=ft.Container(
                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
                         width=400, height=None, padding=10),
-                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dialog))])
+                    # R2-P0-4：关闭按钮只 page.close 不会触发 on_close → 关闭后列表不刷新；手动补调
+                    actions=[ft.TextButton("关闭", on_click=lambda e: (page.close(dialog), on_close and on_close()))])
                 page.open(dialog)
                 page.update()
 
