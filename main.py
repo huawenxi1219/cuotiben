@@ -2829,7 +2829,8 @@ def main(page: ft.Page):
                     for i, p in enumerate(valid_paths):
                         is_active = (i == state["index"])
                         thumb = ft.Container(
-                            content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER),
+                            content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER,
+                                             cache_width=96, cache_height=96),
                             width=48, height=48,
                             border_radius=8,
                             border=ft.border.all(2, "#7AA2F7" if is_active else "#555555"),
@@ -2924,8 +2925,7 @@ def main(page: ft.Page):
                     show_toast(f"渲染失败：{str(ex)[:40]}", "red")
 
             sync_status_text = ft.Text("", size=14)
-            sync_folder_picker = ft.FilePicker(on_result=lambda e: on_sync_folder_selected(e))
-            page.overlay.append(sync_folder_picker)
+            sync_folder_picker = _use_picker(page, None)   # 全局复用 FilePicker，避免重复挂 overlay
 
             def on_sync_folder_selected(e: ft.FilePickerResultEvent):
                 if e.path:
@@ -5208,7 +5208,21 @@ def main(page: ft.Page):
                                 padding=ft.Padding(top=4, bottom=4)))
                         page.update()
 
-                    search_field.on_change = lambda e: _render_list(search_field.value, reset_offset=True)
+                    _search_timer = [None]
+
+                    def _on_search_change(e):
+                        # 300ms 防抖：停止输入后才真正搜索，避免每个按键全量过滤卡顿
+                        if _search_timer[0]:
+                            try:
+                                _search_timer[0].cancel()
+                            except BaseException:
+                                pass
+                        _search_timer[0] = threading.Timer(
+                            0.3, lambda: _render_list(search_field.value, reset_offset=True))
+                        _search_timer[0].daemon = True
+                        _search_timer[0].start()
+
+                    search_field.on_change = _on_search_change
                     add_word_input = ft.TextField(label="新增单词", hint_text="英文或中文", expand=True)
 
                     def _add_custom_word(e):
@@ -5786,10 +5800,15 @@ def main(page: ft.Page):
                     except BaseException:
                         pass
 
+                _tab_cache = {}   # P2-14：tab 构建结果缓存，切换 tab 复用已构建内容，保留搜索词/滚动位置
+
                 def render_tab():
                     idx = tab_index[0]
                     if idx == 0:
-                        tab_content.content = build_lib_tab()
+                        # 词库 tab 最重：只构建一次，之后复用（内部搜索/分页/滚动状态随之保留）
+                        if _tab_cache.get(0) is None:
+                            _tab_cache[0] = build_lib_tab()
+                        tab_content.content = _tab_cache[0]
                     elif idx == 1:
                         tab_content.content = build_nw_tab()
                     elif idx == 2:
@@ -5878,7 +5897,8 @@ def main(page: ft.Page):
                                 if os.path.exists(full_path):
                                     try:
                                         thumb_img = ft.Image(src=full_path, width=80, height=80,
-                                                             fit=ft.ImageFit.COVER)
+                                                             fit=ft.ImageFit.COVER,
+                                                             cache_width=160, cache_height=160)
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
                                                 content=thumb_img, width=80, height=80,
@@ -5972,7 +5992,8 @@ def main(page: ft.Page):
                                                 try:
                                                     img = ft.Container(
                                                         content=ft.Image(src=full_path, width=100, height=100,
-                                                                         fit=ft.ImageFit.COVER, border_radius=8),
+                                                                         fit=ft.ImageFit.COVER, border_radius=8,
+                                                                         cache_width=200, cache_height=200),
                                                         on_click=lambda e, paths=unique_media,
                                                                        idx=unique_media.index(img_path): show_image_gallery(paths, idx),
                                                         ink=True, border_radius=8)
@@ -6322,7 +6343,8 @@ def main(page: ft.Page):
                                 if os.path.exists(full_path):
                                     try:
                                         thumb_img = ft.Image(src=full_path, width=80, height=80,
-                                                             fit=ft.ImageFit.COVER)
+                                                             fit=ft.ImageFit.COVER,
+                                                             cache_width=160, cache_height=160)
                                         thumb_container = ft.GestureDetector(
                                             content=ft.Container(
                                                 content=thumb_img, width=80, height=80,
@@ -6358,7 +6380,8 @@ def main(page: ft.Page):
                                                 try:
                                                     img = ft.Container(
                                                         content=ft.Image(src=full_path, width=100, height=100,
-                                                                         fit=ft.ImageFit.COVER, border_radius=8),
+                                                                         fit=ft.ImageFit.COVER, border_radius=8,
+                                                                         cache_width=200, cache_height=200),
                                                         on_click=lambda e, paths=note_images,
                                                                        idx=note_images.index(img_path): show_image_gallery(paths, idx, on_close=lambda: show(None)),
                                                         ink=True, border_radius=8)
@@ -6824,14 +6847,18 @@ def main(page: ft.Page):
                         view_state["open"].discard(t)
                     else:
                         view_state["open"].add(t)
-                    # 重建视图（保持当前缩放/平移），刷新折叠状态
+                    # 重建视图（保持当前缩放/平移），刷新折叠状态；折叠=数据变更，强制重建内容
                     viewport.content = ft.Transform(
                         scale=view_state["scale"],
                         translate=ft.Offset(view_state["dx"], view_state["dy"]),
-                        content=rebuild_mindmap_view())
+                        content=rebuild_mindmap_view(force=True))
                     viewport.update()
 
-                def rebuild_mindmap_view():
+                _mm_content_cache = {"content": None}   # P2-16：内容只构建一次，缩放/平移只改 Transform
+
+                def rebuild_mindmap_view(force=False):
+                    if not force and _mm_content_cache["content"] is not None:
+                        return _mm_content_cache["content"]
                     view_state["rebuild_count"] = view_state.get("rebuild_count", 0) + 1
                     layout_node(tree, 24, 40)
                     shapes = []
@@ -6897,7 +6924,8 @@ def main(page: ft.Page):
                                                            kp=ch.get("kp", "")),
                                           (chp[0], chp[1])),
                             ]))
-                    return ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
+                    _mm_content_cache["content"] = ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
+                    return _mm_content_cache["content"]
 
                 content_holder = ft.Container(content=rebuild_mindmap_view())
 
@@ -7906,12 +7934,9 @@ def main(page: ft.Page):
                 page.update()
 
             backup_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
-            backup_picker = ft.FilePicker(on_result=lambda e: on_backup_result(e))
-            restore_picker = ft.FilePicker(on_result=lambda e: on_restore_result(e))
-            merge_picker = ft.FilePicker(on_result=lambda e: on_merge_result(e))
-            page.overlay.append(backup_picker)
-            page.overlay.append(restore_picker)
-            page.overlay.append(merge_picker)
+            backup_picker = _use_picker(page, None)   # 备份/恢复/合并共用同一个 FilePicker 实例
+            restore_picker = backup_picker
+            merge_picker = backup_picker
 
             # ---------- 手环背单词 操控中心 ----------
             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
@@ -8356,7 +8381,7 @@ def main(page: ft.Page):
                 ], spacing=10),
                 ft.Text(f"🔍 {DIAG_TEXT}", size=10, color="#888888", selectable=True),
                 ft.ElevatedButton("📂 切换文件夹",
-                                  on_click=lambda e: sync_folder_picker.get_directory_path(),
+                                  on_click=lambda e: _use_picker(page, on_sync_folder_selected).get_directory_path(),
                                   icon=ft.Icons.FOLDER_OPEN),
                 ft.Text("长按路径可复制", size=12, color="#888888"),
                 sync_status_text,
@@ -8364,15 +8389,15 @@ def main(page: ft.Page):
                 ft.Text("💾 数据备份与恢复", size=18, weight=ft.FontWeight.BOLD),
                 ft.Row([
                     ft.ElevatedButton("📤 备份数据",
-                                      on_click=lambda e: backup_picker.get_directory_path(),
+                                      on_click=lambda e: _use_picker(page, on_backup_result).get_directory_path(),
                                       icon=ft.Icons.BACKUP),
                     ft.ElevatedButton("📥 覆盖恢复",
-                                      on_click=lambda e: restore_picker.pick_files(
+                                      on_click=lambda e: _use_picker(page, on_restore_result).pick_files(
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
                                       icon=ft.Icons.RESTORE),
                     ft.ElevatedButton("🔀 合并恢复",
-                                      on_click=lambda e: merge_picker.pick_files(
+                                      on_click=lambda e: _use_picker(page, on_merge_result).pick_files(
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
                                       icon=ft.Icons.MERGE_TYPE),
