@@ -860,6 +860,7 @@ def save_jsonl(filepath, data_list):
 
 _vocab_cache = {"data": None, "ts": 0.0}
 _vocab_dirty = {"v": False}   # R2-P1-5：词库写操作标记（AI 补齐在 load_ui 层，跨作用域使词库 tab 缓存失效）
+VOCAB_SUBJECT = "英语"   # R3-B：词库学习/考核事件统一科目名，以后多语种词库时改成参数
 def load_vocab_cached(max_age=2.0):
     """词库短缓存：详情页高频打开时避免每次都全量读文件"""
     now = time.time()
@@ -5561,7 +5562,7 @@ def main(page: ft.Page):
                             return
                         word = w.get("word", "")
                         update_word_learning(word, result)
-                        log_learning_event("vocab_study", "英语", kp=word,
+                        log_learning_event("vocab_study", VOCAB_SUBJECT, kp=word,
                                            detail=result, correct=(result == "know"))
                         state["learned"] += 1
                         state["seen"][word] = state["seen"].get(word, 0) + 1
@@ -5685,7 +5686,7 @@ def main(page: ft.Page):
                                         update_word_learning(word, "quiz_wrong")
                                         result_text.value = f"❌ 错了，正确答案：{correct}"
                                         result_text.color = "#EF5350"
-                                    log_learning_event("vocab_test", "英语", kp=word,
+                                    log_learning_event("vocab_test", VOCAB_SUBJECT, kp=word,
                                                        detail="word2meaning", correct=is_correct)
                                     page.update()
                                 return click
@@ -5754,7 +5755,7 @@ def main(page: ft.Page):
                                         update_word_learning(word, "quiz_wrong")
                                         result_text.value = f"❌ 错了，正确答案：{correct}"
                                         result_text.color = "#EF5350"
-                                    log_learning_event("vocab_test", "英语", kp=word,
+                                    log_learning_event("vocab_test", VOCAB_SUBJECT, kp=word,
                                                        detail="meaning2word", correct=is_correct)
                                     page.update()
                                 return click
@@ -5796,7 +5797,7 @@ def main(page: ft.Page):
                                     update_word_learning(word, "quiz_wrong")
                                     result_text.value = f"❌ 正确拼写：{word}"
                                     result_text.color = "#EF5350"
-                                log_learning_event("vocab_test", "英语", kp=word,
+                                log_learning_event("vocab_test", VOCAB_SUBJECT, kp=word,
                                                    detail="spelling", correct=is_correct)
                                 page.update()
 
