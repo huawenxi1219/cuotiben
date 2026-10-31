@@ -1709,7 +1709,8 @@ def save_note(subject, content, media, tags=None):
     data = load_jsonl(NOTES_FILE)
     data.append({"type": "note", "subject": subject, "content": content, "media": media,
                  "tags": [str(t).strip() for t in (tags or []) if str(t).strip()],
-                 "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
+                 "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                 "timestamp": now_ms(), "event_id": gen_uid()})
     save_jsonl(NOTES_FILE, data)
     log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
     # 带图笔记：后台让 AI 自动理解图片内容，写回 ai_text（不阻塞上传）
@@ -5996,6 +5997,15 @@ def main(page: ft.Page):
                                     q_val = item_data.get("question", "")
                                     time_val = item_data.get("time", "")
                                     ts_int = item_data.get("timestamp", 0)
+                                    ev_id = item_data.get("event_id", "")
+
+                                    def _same_item(d):
+                                        # 主键优先用 event_id；旧数据（无 event_id）回落 timestamp+内容匹配
+                                        if ev_id and d.get("event_id") == ev_id:
+                                            return True
+                                        if d.get("timestamp") == ts_int and d.get("question") == q_val and d.get("time") == time_val:
+                                            return True
+                                        return False
                                     current_status = item_data.get("status", "未看")
                                     orig_input = ft.TextField(label="题目 🔒（锁定中）", value=orig_val,
                                                               multiline=True, min_lines=2, disabled=True)
@@ -6039,8 +6049,7 @@ def main(page: ft.Page):
                                         elif item_data.get("subject") not in new_tags:
                                             new_tags.insert(0, item_data.get("subject", "未知"))
                                         for d in all_items:
-                                            if d.get("timestamp") == ts_int or (
-                                                    d.get("question") == q_val and d.get("time") == time_val):
+                                            if _same_item(d):
                                                 d["original"] = orig_input.value
                                                 d["question"] = orig_input.value
                                                 d["mistake"] = mis_input.value
@@ -6059,9 +6068,7 @@ def main(page: ft.Page):
 
                                     def delete_item(e):
                                         all_items = load_jsonl(ERRORS_FILE)
-                                        filtered = [d for d in all_items if not (
-                                                d.get("timestamp") == ts_int or (
-                                                d.get("question") == q_val and d.get("time") == time_val))]
+                                        filtered = [d for d in all_items if not _same_item(d)]
                                         save_jsonl(ERRORS_FILE, filtered)
                                         page.close(edit_dlg)
                                         show_toast("🗑️ 已删除", "green")
@@ -6331,6 +6338,15 @@ def main(page: ft.Page):
                             def make_edit_note(item_data=item):
                                 def show(e):
                                     current_ts = item_data.get("timestamp", 0)
+                                    ev_id = item_data.get("event_id", "")
+
+                                    def _same_item(d):
+                                        # 主键优先用 event_id；旧数据（无 event_id）回落 timestamp 匹配
+                                        if ev_id and d.get("event_id") == ev_id:
+                                            return True
+                                        if d.get("timestamp") == current_ts:
+                                            return True
+                                        return False
                                     content_input = ft.TextField(label="笔记内容",
                                                                  value=item_data.get("content", ""),
                                                                  multiline=True, min_lines=4)
@@ -6338,7 +6354,7 @@ def main(page: ft.Page):
                                     def save_edit(e):
                                         all_items = load_jsonl(NOTES_FILE)
                                         for d in all_items:
-                                            if d.get("timestamp") == current_ts:
+                                            if _same_item(d):
                                                 d["content"] = content_input.value
                                                 break
                                         save_jsonl(NOTES_FILE, all_items)
@@ -6349,7 +6365,7 @@ def main(page: ft.Page):
 
                                     def delete_item(e):
                                         all_items = load_jsonl(NOTES_FILE)
-                                        filtered = [d for d in all_items if d.get("timestamp") != current_ts]
+                                        filtered = [d for d in all_items if not _same_item(d)]
                                         save_jsonl(NOTES_FILE, filtered)
                                         page.close(edit_dlg)
                                         show_toast("🗑️ 已删除", "green")
@@ -8040,22 +8056,85 @@ def main(page: ft.Page):
             def on_restore_result(e: ft.FilePickerResultEvent):
                 if not e.files or len(e.files) == 0:
                     return
+                if app_state["busy"]:
+                    backup_status.value = f"⏳ 正在「{app_state['busy']}」，先等它跑完"
+                    backup_status.color = "#E0AF68"
+                    page.update()
+                    return
                 zip_path = e.files[0].path
-                backup_status.value = "⏳ 正在恢复..."
+                backup_status.value = "⏳ 正在恢复（解压校验 + 自动备份当前数据）..."
                 backup_status.color = "#A9B1D6"
                 page.update()
 
+                def _validate_jsonl(fp):
+                    """严格校验 jsonl：任一行解析失败即视为备份损坏"""
+                    with open(fp, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line:
+                                json.loads(line)
+
                 def do_restore():
+                    tmp_dir = None
                     try:
-                        os.makedirs(DATA_DIR, exist_ok=True)
+                        app_state["busy"] = "覆盖恢复"
+                        # 1) 解压到临时目录（带 zip-slip 越界防护），绝不直接覆盖现网
+                        tmp_dir = os.path.join(DATA_DIR, "_restore_tmp_" + gen_uid())
+                        os.makedirs(tmp_dir, exist_ok=True)
                         with zipfile.ZipFile(zip_path, "r") as zf:
-                            zf.extractall(DATA_DIR)
-                        backup_status.value = "✅ 恢复成功！请重启应用"
+                            for _n in zf.namelist():
+                                _tgt = os.path.realpath(os.path.join(tmp_dir, _n))
+                                if not _tgt.startswith(os.path.realpath(tmp_dir) + os.sep):
+                                    raise RuntimeError(f"备份包内存在越界路径：{_n}")
+                            zf.extractall(tmp_dir)
+                        # 2) 校验关键文件可解析，损坏则中止，原数据不受影响
+                        for _fname in ("errors.jsonl", "notes.jsonl", "vocabulary.jsonl"):
+                            _fp = os.path.join(tmp_dir, _fname)
+                            if os.path.exists(_fp):
+                                _validate_jsonl(_fp)
+                        _up = os.path.join(tmp_dir, "user_profile.json")
+                        if os.path.exists(_up):
+                            with open(_up, "r", encoding="utf-8") as f:
+                                json.load(f)
+                        # 3) 自动备份当前数据（放 DATA_DIR 同级，避免被恢复过程覆盖）
+                        _parent = os.path.dirname(os.path.normpath(DATA_DIR))
+                        _bak_ts = time.strftime("%Y%m%d_%H%M%S")
+                        _bak_zip = os.path.join(_parent, f"池鱼Study恢复前自动备份_{_bak_ts}.zip")
+                        with zipfile.ZipFile(_bak_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+                            for root, dirs, files in os.walk(DATA_DIR):
+                                if "_restore_tmp" in root.split(os.sep):
+                                    continue
+                                for f in files:
+                                    if f.startswith("."):
+                                        continue
+                                    full = os.path.join(root, f)
+                                    zf.write(full, os.path.relpath(full, DATA_DIR))
+                        # 4) 原子替换：清空现网（保留本次临时目录），再把备份内容整体移入
+                        for _n in os.listdir(DATA_DIR):
+                            if _n.startswith("_restore_tmp"):
+                                continue
+                            _p = os.path.join(DATA_DIR, _n)
+                            if os.path.isdir(_p):
+                                shutil.rmtree(_p, ignore_errors=True)
+                            else:
+                                try:
+                                    os.remove(_p)
+                                except BaseException:
+                                    pass
+                        for _n in os.listdir(tmp_dir):
+                            shutil.move(os.path.join(tmp_dir, _n), os.path.join(DATA_DIR, _n))
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        _vocab_cache["data"] = None   # 词库缓存失效，重启后从新数据重新加载
+                        backup_status.value = f"✅ 恢复成功！恢复前数据已自动备份到：\n{_bak_zip}\n（建议重启应用）"
                         backup_status.color = "#81C784"
                     except Exception as ex:
-                        backup_status.value = f"❌ 恢复失败：{str(ex)[:80]}"
+                        backup_status.value = f"❌ 恢复失败（原数据未受影响）：{str(ex)[:80]}"
                         backup_status.color = "#EF5350"
-                    page.update()
+                        if tmp_dir and os.path.isdir(tmp_dir):
+                            shutil.rmtree(tmp_dir, ignore_errors=True)
+                    finally:
+                        app_state["busy"] = None
+                        page.update()
 
                 threading.Thread(target=do_restore, daemon=True).start()
 
