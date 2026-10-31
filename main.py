@@ -180,66 +180,69 @@ def schedule_next_review(level):
 
 def update_word_learning(word, result, review_time=None):
     """SM-2 间隔重复算法：记录每次选择的确切时间，按难度系数动态安排复习
-    review_time: 可选，手环同步时传入原始选择时间（格式 YYYY-MM-DD HH:MM:SS）"""
-    existing = load_jsonl(VOCAB_FILE)
-    now_dt = datetime.now()
-    if review_time:
-        try:
-            now_dt = datetime.strptime(str(review_time).strip(), "%Y-%m-%d %H:%M:%S")
-        except Exception:
-            now_dt = datetime.now()
-    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
-    for i, w in enumerate(existing):
-        if w.get("word", "").lower() == word.lower():
-            ensure_learning_field(existing[i])
-            L = existing[i]["learning"]
-            L["review_count"] = L.get("review_count", 0) + 1
-            L["last_review"] = now_str
-            # 初始化 SRS 字段
-            if "ease" not in L or not isinstance(L.get("ease"), (int, float)):
-                L["ease"] = 2.5
-            if "interval" not in L or not isinstance(L.get("interval"), (int, float)):
-                L["interval"] = 0
-            if "history" not in L or not isinstance(L.get("history"), list):
-                L["history"] = []
-            # SM-2 质量分：认识/答对=5，模糊=3，忘记/答错=1
-            if result in ("know", "quiz_correct"):
-                q = 5
-            elif result == "fuzzy":
-                q = 3
-            else:  # forget / quiz_wrong
-                q = 1
-            ease = float(L["ease"])
-            interval = int(L["interval"])
-            if q >= 3:
-                if interval == 0:
-                    interval = 1
-                elif interval == 1:
-                    interval = 3
+    review_time: 可选，手环同步时传入原始选择时间（格式 YYYY-MM-DD HH:MM:SS）
+    加锁：考核答题（UI 线程）与 AI 补齐/手环合并（后台线程）可能并发写 vocabulary.jsonl，读-改-写须原子化。
+    注意：merge_band_records 调用本函数，不能再给 merge_band_records 加同一把锁（普通 Lock 重入即死锁）。"""
+    with _vocab_rw_lock:
+        existing = load_jsonl(VOCAB_FILE)
+        now_dt = datetime.now()
+        if review_time:
+            try:
+                now_dt = datetime.strptime(str(review_time).strip(), "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                now_dt = datetime.now()
+        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+        for i, w in enumerate(existing):
+            if w.get("word", "").lower() == word.lower():
+                ensure_learning_field(existing[i])
+                L = existing[i]["learning"]
+                L["review_count"] = L.get("review_count", 0) + 1
+                L["last_review"] = now_str
+                # 初始化 SRS 字段
+                if "ease" not in L or not isinstance(L.get("ease"), (int, float)):
+                    L["ease"] = 2.5
+                if "interval" not in L or not isinstance(L.get("interval"), (int, float)):
+                    L["interval"] = 0
+                if "history" not in L or not isinstance(L.get("history"), list):
+                    L["history"] = []
+                # SM-2 质量分：认识/答对=5，模糊=3，忘记/答错=1
+                if result in ("know", "quiz_correct"):
+                    q = 5
+                elif result == "fuzzy":
+                    q = 3
+                else:  # forget / quiz_wrong
+                    q = 1
+                ease = float(L["ease"])
+                interval = int(L["interval"])
+                if q >= 3:
+                    if interval == 0:
+                        interval = 1
+                    elif interval == 1:
+                        interval = 3
+                    else:
+                        interval = max(2, round(interval * ease))
+                    ease = max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
+                    L["correct_count"] = L.get("correct_count", 0) + 1
+                    L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
+                    L["status"] = "mastered" if L["level"] >= 4 else "review"
                 else:
-                    interval = max(2, round(interval * ease))
-                ease = max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
-                L["correct_count"] = L.get("correct_count", 0) + 1
-                L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
-                L["status"] = "mastered" if L["level"] >= 4 else "review"
-            else:
-                # 答错/忘记：大幅缩短间隔，降低难度系数，重新进入学习
-                if interval <= 1:
-                    interval = 1
-                else:
-                    interval = max(1, round(interval * 0.3))
-                ease = max(1.3, ease - 0.2)
-                L["level"] = max(0, L.get("level", 0) - 2)
-                L["wrong_count"] = L.get("wrong_count", 0) + 1
-                L["status"] = "learning"
-            L["ease"] = round(ease, 2)
-            L["interval"] = interval
-            L["next_review"] = (now_dt + timedelta(days=interval)).strftime("%Y-%m-%d")
-            L["history"].append({"time": now_str, "action": result})
-            L["history"] = L["history"][-200:]  # 只保留最近 200 次选择记录
-            existing[i] = w
-            break
-    save_jsonl(VOCAB_FILE, existing)
+                    # 答错/忘记：大幅缩短间隔，降低难度系数，重新进入学习
+                    if interval <= 1:
+                        interval = 1
+                    else:
+                        interval = max(1, round(interval * 0.3))
+                    ease = max(1.3, ease - 0.2)
+                    L["level"] = max(0, L.get("level", 0) - 2)
+                    L["wrong_count"] = L.get("wrong_count", 0) + 1
+                    L["status"] = "learning"
+                L["ease"] = round(ease, 2)
+                L["interval"] = interval
+                L["next_review"] = (now_dt + timedelta(days=interval)).strftime("%Y-%m-%d")
+                L["history"].append({"time": now_str, "action": result})
+                L["history"] = L["history"][-200:]  # 只保留最近 200 次选择记录
+                existing[i] = w
+                break
+        save_jsonl(VOCAB_FILE, existing)
 
 
 # ========== 手环背单词：词表导出 / 记录回收（与手环端「池鱼单词」协议一致） ==========
@@ -470,16 +473,17 @@ def start_band_http_server():
                         word_list = []
                     marked = 0
                     with band_http_lock:
-                        existing = load_jsonl(VOCAB_FILE)
-                        wset = {str(x).lower() for x in word_list if str(x)}
-                        if wset:
-                            for w in existing:
-                                ensure_learning_field(w)
-                                if w.get("word", "").lower() in wset and not w["learning"].get("synced", True):
-                                    w["learning"]["synced"] = True
-                                    marked += 1
-                            if marked:
-                                save_jsonl(VOCAB_FILE, existing)
+                        with _vocab_rw_lock:   # R2-P1-6：回执写 vocabulary.jsonl 与考核/AI补齐串行化
+                            existing = load_jsonl(VOCAB_FILE)
+                            wset = {str(x).lower() for x in word_list if str(x)}
+                            if wset:
+                                for w in existing:
+                                    ensure_learning_field(w)
+                                    if w.get("word", "").lower() in wset and not w["learning"].get("synced", True):
+                                        w["learning"]["synced"] = True
+                                        marked += 1
+                                if marked:
+                                    save_jsonl(VOCAB_FILE, existing)
                     self._send({"ok": True, "marked": marked})
                 except Exception as ex:
                     self._send({"error": str(ex)}, 500)
@@ -618,20 +622,21 @@ def merge_restore_from_zip(zip_path):
 
         src_v = os.path.join(tmp_dir, "vocabulary.jsonl")
         if os.path.exists(src_v):
-            incoming = load_jsonl(src_v)
-            existing = load_jsonl(VOCAB_FILE)
-            seen = set(str(w.get("word", "")).lower() for w in existing if w.get("word"))
-            added = 0
-            for w in incoming:
-                word = str(w.get("word", "")).lower()
-                if not word or word in seen:
-                    continue
-                if not w.get("event_id"):
-                    w["event_id"] = gen_uid()
-                existing.append(w)
-                seen.add(word)
-                added += 1
-            save_jsonl(VOCAB_FILE, existing)
+            with _vocab_rw_lock:   # R2-P1-6：合并恢复写 vocabulary.jsonl 与考核/AI补齐串行化
+                incoming = load_jsonl(src_v)
+                existing = load_jsonl(VOCAB_FILE)
+                seen = set(str(w.get("word", "")).lower() for w in existing if w.get("word"))
+                added = 0
+                for w in incoming:
+                    word = str(w.get("word", "")).lower()
+                    if not word or word in seen:
+                        continue
+                    if not w.get("event_id"):
+                        w["event_id"] = gen_uid()
+                    existing.append(w)
+                    seen.add(word)
+                    added += 1
+                save_jsonl(VOCAB_FILE, existing)
             stats["vocab"] = added
 
         src_s = os.path.join(tmp_dir, "sentences.jsonl")
