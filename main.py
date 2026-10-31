@@ -845,6 +845,7 @@ def save_jsonl(filepath, data_list):
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
 _vocab_cache = {"data": None, "ts": 0.0}
+_vocab_dirty = {"v": False}   # R2-P1-5：词库写操作标记（AI 补齐在 load_ui 层，跨作用域使词库 tab 缓存失效）
 def load_vocab_cached(max_age=2.0):
     """词库短缓存：详情页高频打开时避免每次都全量读文件"""
     now = time.time()
@@ -4905,6 +4906,7 @@ def main(page: ft.Page):
                     if not str(word_data.get("meaning", "") or "").strip():
                         return None
                     save_jsonl(VOCAB_FILE, existing)
+                    _vocab_dirty["v"] = True   # R2-P1-5：词库有写，词库 tab 缓存下次 render 时重建
                 return word_data
 
             def _open_word_detail(word_data, on_close=None):
@@ -5250,6 +5252,7 @@ def main(page: ft.Page):
                             new_entry["learning"]["synced"] = False   # 新词未同步手环
                             existing.append(new_entry)
                             save_jsonl(VOCAB_FILE, existing)
+                        _tab_cache.pop(0, None)   # R2-P1-5：新增词后词库 tab 缓存失效，切回时重建
                         show_toast(f"已添加 {word}，点开自动补齐", "green")
                         add_word_input.value = ""
                         nonlocal all_vocab, all_words
@@ -5285,6 +5288,7 @@ def main(page: ft.Page):
                                         existing_words.add(wd)
                                         added += 1
                                     save_jsonl(VOCAB_FILE, existing)
+                                _tab_cache.pop(0, None)   # R2-P1-5：导入后词库 tab 缓存失效，切回时重建
                                 show_toast(f"✅ 已追加 {added} 个词", "green")
                                 nonlocal all_vocab, all_words
                                 all_vocab = load_jsonl(VOCAB_FILE)
@@ -5813,9 +5817,11 @@ def main(page: ft.Page):
                 def render_tab():
                     idx = tab_index[0]
                     if idx == 0:
-                        # 词库 tab 最重：只构建一次，之后复用（内部搜索/分页/滚动状态随之保留）
-                        if _tab_cache.get(0) is None:
+                        # 词库 tab 最重：内容未被写操作污染时复用；AI 补齐/新增/导入后重建，避免显示旧释义
+                        if _tab_cache.get(0) is None or _vocab_dirty["v"]:
+                            _tab_cache.pop(0, None)
                             _tab_cache[0] = build_lib_tab()
+                            _vocab_dirty["v"] = False
                         tab_content.content = _tab_cache[0]
                     elif idx == 1:
                         tab_content.content = build_nw_tab()
