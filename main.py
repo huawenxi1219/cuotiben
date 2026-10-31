@@ -50,6 +50,26 @@ else:
     DIAG_TEXT = "dev mode"
 os.makedirs(DATA_DIR, exist_ok=True)
 
+def _diag_log(exc, where=""):
+    """R3-E：把被静默吞掉的异常写入 data/diag.log（保留最近 200 行），排错可追溯。
+    自身失败时保持静默，绝不向上抛（它本身就是在兜底路径上）。"""
+    try:
+        path = os.path.join(DATA_DIR, "diag.log")
+        try:
+            with open(path, encoding="utf-8") as _f:
+                lines = _f.read().splitlines()
+        except Exception:
+            lines = []
+        tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
+        detail = " | ".join(s.strip() for s in tb if s.strip())
+        rec = "[%s] %s %s: %s :: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), where,
+                                        type(exc).__name__, exc, detail[-400:])
+        lines.append(rec.replace("\r", " ").replace("\n", " "))
+        with open(path, "w", encoding="utf-8") as _f:
+            _f.write("\n".join(lines[-200:]) + "\n")
+    except Exception:
+        pass
+
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
@@ -93,7 +113,9 @@ def _on_shared_picker_result(e):
     if h:
         try:
             h(e)
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L115")
+
             pass
 
 
@@ -149,7 +171,9 @@ def load_vocab_settings():
         for k, v in DEFAULT_VOCAB_SETTINGS.items():
             data.setdefault(k, v)
         return data
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L171")
+
         return dict(DEFAULT_VOCAB_SETTINGS)
 
 
@@ -718,7 +742,9 @@ def merge_restore_from_zip(zip_path):
                         shutil.copy2(src_f, dst_f)
                         if sub == "images":
                             stats["images"] += 1
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L740")
+
                         pass
 
         for sub in ["content_lib"]:
@@ -778,7 +804,9 @@ def merge_restore_from_zip(zip_path):
                 dp["total_chats"] = max(dp.get("total_chats", 0), sp.get("total_chats", 0))
                 with open(dst_p, "w", encoding="utf-8") as f:
                     json.dump(dp, f, ensure_ascii=False, indent=2)
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L800")
+
                 pass
 
         evs = load_jsonl(LEARNING_EVENTS_FILE)
@@ -796,7 +824,9 @@ def merge_restore_from_zip(zip_path):
         try:
             if os.path.exists(tmp_dir):
                 shutil.rmtree(tmp_dir)
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L818")
+
             pass
 def retry_request(max_retries=3, base_delay=2, backoff=2,
                   exceptions=(requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
@@ -828,12 +858,16 @@ def init_vocabulary():
             try:
                 shutil.copy2(bundled, VOCAB_FILE)
                 return
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L850")
+
                 pass
         try:
             with open(VOCAB_FILE, "w", encoding="utf-8") as f:
                 pass
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L855")
+
             pass
 
 
@@ -847,7 +881,9 @@ def load_jsonl(filepath):
                     if line:
                         try:
                             data.append(json.loads(line))
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L869")
+
                             pass
     return data
 
@@ -923,7 +959,9 @@ def migrate_timestamps():
                             dt = datetime.strptime(it.get("time", ""), "%Y-%m-%d %H:%M:%S")
                             it["timestamp"] = int(dt.timestamp() * 1000)
                             changed = True
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L945")
+
                             it["timestamp"] = now_ms()
                             changed = True
                 if changed:
@@ -1043,7 +1081,9 @@ AI回答：{ai_response[:500]}
                 content = resp.json()["choices"][0]["message"]["content"]
                 try:
                     info = json.loads(content)
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L1065")
+
                     match = re.search(r'\{[^}]+\}', content)
                     info = json.loads(match.group()) if match else {}
                 if info:
@@ -1068,7 +1108,9 @@ AI回答：{ai_response[:500]}
                         update_knowledge_memory(f"{subject}-{t}", summary=info.get("summary", ""))
                     log_learning_event("chat", subject, kp=topics[0] if topics else "",
                                        detail=user_msg[:80])
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L1090")
+
             pass
     threading.Thread(target=do_update, daemon=True).start()
 
@@ -1123,7 +1165,9 @@ def load_textbook_index(subject):
             idx = json.load(f)
         _TEXTBOOK_CACHE[subject] = idx
         return idx
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1145")
+
         return None
 
 
@@ -1376,7 +1420,9 @@ def get_gaokao_days_left():
             if (target - now).total_seconds() < 0:
                 target = datetime(now.year + 1, 6, 7)
         return max((target - datetime.now()).days, 0)
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1398")
+
         return 365
 
 
@@ -1467,7 +1513,9 @@ def deepseek_search(query, count=5):
                 continue
             lines.append(f"- {title}\n  {summary[:200]}\n  来源: {url}")
         return "\n".join(lines) if lines else None
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1489")
+
         return None
 
 
@@ -1486,7 +1534,9 @@ def deepseek_fetch(url):
         if r.status_code != 200:
             return None
         return r.json().get("content", "")[:3000]
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1508")
+
         return None
 
 
@@ -1539,7 +1589,9 @@ def cleanup_orphan_chat_images():
                     for m in load_jsonl(os.path.join(CHAT_HISTORY_DIR, fname)):
                         for ref in re.findall(r"【图】(\S+)", str(m.get("content", "") or "")):
                             used.add(os.path.basename(ref))
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L1561")
+
                     continue
         removed = 0
         for fname in os.listdir(chat_img_dir):
@@ -1549,10 +1601,14 @@ def cleanup_orphan_chat_images():
                 try:
                     os.remove(os.path.join(chat_img_dir, fname))
                     removed += 1
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L1571")
+
                     pass
         return removed
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1574")
+
         return 0
 
 
@@ -1710,7 +1766,9 @@ def auto_tag_error(timestamp):
             content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             try:
                 tag_data = json.loads(content)
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L1732")
+
                 match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
                 tag_data = json.loads(match.group()) if match else {}
             subject = target.get("subject", "")
@@ -1753,7 +1811,9 @@ def auto_tag_error(timestamp):
                 save_user_profile(profile)
             if kp_main:
                 add_recent_focus(f"{subject}-{kp_main}")
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1775")
+
         pass
 
 
@@ -1780,11 +1840,15 @@ def save_note(subject, content, media, tags=None):
                                 n["ai_text"] = txt
                                 save_jsonl(NOTES_FILE, notes2)
                                 break
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L1802")
+
                     pass
 
             _th.Thread(target=_understand, args=(data[-1].get("timestamp"),), daemon=True).start()
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L1806")
+
             pass
 
 
@@ -1798,7 +1862,9 @@ def _match_existing_kp(subject, kp):
             t = str(c.get("title", "") or "")
             if t and (t == kp or t in kp or kp in t or t[:4] in kp):
                 return t
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1820")
+
         pass
     return kp
 
@@ -1819,7 +1885,9 @@ def _ai_extract_chat(subject, text, mode="error"):
         titles = [str(c.get("title", "")) for c in (tree.get("children") or []) if c.get("title")]
         if titles:
             tree_hint = "\n该科思维导图现有知识点节点（请优先从中选择归属）：" + "、".join(titles[:40])
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1841")
+
         pass
     if mode == "note":
         prompt = f"""你是「池鱼」的笔记整理助手。下面是从学生与 AI 老师的对话中摘取的学习内容（知识点讲解/方法/笔记）。
@@ -1853,7 +1921,9 @@ def _ai_extract_chat(subject, text, mode="error"):
         if out.get("kp"):
             out["kp"] = _match_existing_kp(subject, out["kp"])
         return out
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1875")
+
         return {}
 
 
@@ -1905,7 +1975,9 @@ def load_mindmap(subject):
         try:
             with open(p, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L1927")
+
             pass
     return None
 
@@ -1939,7 +2011,9 @@ def build_mindmap(subject):
                 _tg_s = str(_tg).strip()
                 if _tg_s and _tg_s not in clusters:
                     clusters[_tg_s] = {"title": _tg_s, "children": [], "kp": _tg_s, "count": 0}
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L1961")
+
         pass
     # 分层：每个知识点节点下自动挂「笔记层 / 错题层」两个子层（像导航分层）
     for kp, nd in clusters.items():
@@ -1998,7 +2072,9 @@ def generate_word_info(word):
             content = resp.json()["choices"][0]["message"]["content"]
             try:
                 new_data = json.loads(content)
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L2020")
+
                 match = re.search(r'\{.*\}', content, re.S)
                 new_data = json.loads(match.group()) if match else None
             if new_data:
@@ -2307,7 +2383,9 @@ def render_chart_from_spec(spec):
             return _svg_timeline(title, spec.get("events", []))
         if t == "flow":
             return _svg_flow(title, spec.get("steps", []))
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L2329")
+
         return ""
     return ""
 
@@ -2324,7 +2402,9 @@ def extract_chart_block(text):
             svg = render_chart_from_spec(spec)
             if svg:
                 return clean, svg
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L2346")
+
             pass
         return clean, None
     m = re.search(r'```(svg|xml)\s*\n(.*?)```', text, re.DOTALL | re.IGNORECASE)
@@ -2364,7 +2444,9 @@ def load_ai_memory():
         try:
             with open(memory_file(), "r", encoding="utf-8") as f:
                 return json.load(f)
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L2386")
+
             pass
     return {}
 
@@ -2373,7 +2455,9 @@ def save_ai_memory(mem):
     try:
         with open(memory_file(), "w", encoding="utf-8") as f:
             json.dump(mem, f, ensure_ascii=False, indent=2)
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L2395")
+
         pass
 
 
@@ -2426,7 +2510,9 @@ def compress_old_history(subject, hist):
         rec["count"] = compressed + len(batch)
         save_ai_memory(mem)
         return len(batch)
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L2448")
+
         return 0
 
 
@@ -2451,7 +2537,9 @@ def vision_describe_image(img_path):
             buf = _io.BytesIO()
             im.convert("RGB").save(buf, format="JPEG", quality=82)
             raw = buf.getvalue()
-        except BaseException:
+        except BaseException as _be:
+            _diag_log(_be, "L2473")
+
             pass
         b64 = base64.b64encode(raw).decode("utf-8")
         payload = {"model": vision_model, "temperature": 0.3, "max_tokens": 200,
@@ -2467,7 +2555,9 @@ def vision_describe_image(img_path):
             return ""
         c = r.json()["choices"][0]["message"]["content"].strip()
         return c[:200]
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L2489")
+
         return ""
 
 
@@ -2526,7 +2616,9 @@ def save_svg_chart(svg_text):
         with open(fpath, "w", encoding="utf-8") as f:
             f.write(svg_text)
         return fpath
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L2548")
+
         return None
 
 
@@ -2603,7 +2695,9 @@ def load_content_lib(subject):
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
-    except BaseException:
+    except BaseException as _be:
+        _diag_log(_be, "L2625")
+
         return {"subject": subject}
 
 
@@ -2662,7 +2756,9 @@ def main(page: ft.Page):
             page.bgcolor = ft.Colors.TRANSPARENT
             try:
                 page.window.title_bar_hidden = False
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L2684")
+
                 pass
 
             try:
@@ -2710,7 +2806,9 @@ def main(page: ft.Page):
                         shape=ft.RoundedRectangleBorder(radius=14)),
                 )
                 page.dark_theme = page.theme
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L2732")
+
                 pass
 
             main_subject_page = None
@@ -2769,7 +2867,9 @@ def main(page: ft.Page):
                     time.sleep(0.4)
                     try:
                         page.overlay.remove(toast)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L2791")
+
                         pass
                     page.update()
 
@@ -2824,7 +2924,9 @@ def main(page: ft.Page):
                 def close_gallery(e=None):
                     try:
                         page.close(gallery_dlg)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L2846")
+
                         pass
                     if on_close:
                         try:
@@ -2832,10 +2934,14 @@ def main(page: ft.Page):
                                 time.sleep(0.15)
                                 try:
                                     on_close()
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L2854")
+
                                     pass
                             threading.Thread(target=_delayed, daemon=True).start()
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L2857")
+
                             pass
 
                 def update_image(idx):
@@ -2846,7 +2952,9 @@ def main(page: ft.Page):
                         refresh_thumbs()
                         try:
                             page.update()
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L2868")
+
                             pass
 
                 def open_in_system(e):
@@ -2987,7 +3095,9 @@ def main(page: ft.Page):
                     _vocab_cache["data"] = None
                     try:
                         page.client_storage.set("data_path", e.path)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L3009")
+
                         pass
                     sync_status_text.value = f"✅ 已切换到：{e.path}"
                     sync_status_text.color = "green"
@@ -3016,7 +3126,9 @@ def main(page: ft.Page):
                             _src = f_path if os.path.isabs(f_path) else os.path.join(DATA_DIR, f_path)
                             img = ft.Image(src=_src, width=60, height=60,
                                            fit=ft.ImageFit.COVER, border_radius=8)
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L3038")
+
                             img = ft.Text("🖼️", size=40)
                         del_btn = ft.IconButton(icon=ft.Icons.CLOSE, icon_size=16,
                                                 on_click=lambda e, i=idx: remove_file(i))
@@ -3051,7 +3163,9 @@ def main(page: ft.Page):
                             _rm_full = _rm if os.path.isabs(_rm) else os.path.join(DATA_DIR, _rm)
                             if os.path.exists(_rm_full):
                                 os.remove(_rm_full)
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L3073")
+
                             pass
                         selected_files.pop(idx)
                         refresh_file_list()
@@ -3074,7 +3188,9 @@ def main(page: ft.Page):
                                 _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
                                 if os.path.exists(_full):
                                     os.remove(_full)
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L3096")
+
                                 pass
                     selected_files.clear()
                     file_list.controls.clear()
@@ -3188,7 +3304,9 @@ def main(page: ft.Page):
                 try:
                     with open(image_path, "rb") as f:
                         img_b64 = base64.b64encode(f.read()).decode("utf-8")
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L3210")
+
                     return None
                 prompt = """请仔细识别这张图片中的题目内容，并返回以下 JSON 格式：
 {
@@ -3214,16 +3332,22 @@ def main(page: ft.Page):
                         try:
                             result = json.loads(content)
                             return result
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L3236")
+
                             match = re.search(r'\{[^{}]*\}', content)
                             if match:
                                 try:
                                     result = json.loads(match.group())
                                     return result
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L3242")
+
                                     pass
                     return None
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L3245")
+
                     return None
 
             def submit_error(e):
@@ -3283,7 +3407,9 @@ def main(page: ft.Page):
             try:
                 ft.Container(on_hover=lambda e: None, animate_shadow=ft.Animation(150, ft.AnimationCurve.EASE_OUT))
                 _HOVER_OK = True
-            except BaseException:
+            except BaseException as _be:
+                _diag_log(_be, "L3305")
+
                 _HOVER_OK = False
 
             def u_card(content, padding=18, radius=22, bg="#CC1A1B26"):
@@ -3296,7 +3422,9 @@ def main(page: ft.Page):
                                        else ft.BoxShadow(blur_radius=18, color="#33000000",
                                                          offset=ft.Offset(0, 6)))
                         page.update()
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L3318")
+
                         pass
 
                 hover_kw = {}
@@ -3560,7 +3688,9 @@ def main(page: ft.Page):
                     if contact_panel.visible:
                         open_contact_panel(None)
                     page.update()
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L3582")
+
                     pass
 
             page.on_resize = _on_resize
@@ -3594,7 +3724,9 @@ def main(page: ft.Page):
                     for _m in _hist:
                         for _t in re.findall(r"【图】(\S+)", str(_m.get("content", "") or "")):
                             _refs.add(_t)
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L3616")
+
                     _refs = set()
                 while _pending_chat_imgs:
                     _p = _pending_chat_imgs.pop()
@@ -3604,7 +3736,9 @@ def main(page: ft.Page):
                         _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
                         if os.path.exists(_full):
                             os.remove(_full)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L3626")
+
                         pass
 
             def open_chat(subject, initial_message=None, auto_send=False):
@@ -3673,7 +3807,9 @@ def main(page: ft.Page):
                                 if delta:
                                     accumulated += delta
                                     on_chunk(accumulated)
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L3695")
+
                                 continue
                     return accumulated
                 except Exception as e:
@@ -3741,7 +3877,9 @@ def main(page: ft.Page):
                                 system_prompt += (f"\n\n【教材参考（人教版{subject}）】\n"
                                                   "以下为教材原文摘录（含页码），回答时优先遵循教材定义与表述：\n"
                                                   + _tb)
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L3763")
+
                     pass
 
                 # —— DeepTutor 混合个性化：实时学情注入（薄弱点 + 上次遗留问题）——
@@ -3758,7 +3896,9 @@ def main(page: ft.Page):
                         system_prompt += ("\n\n【实时学情】\n" + "\n".join(_live_parts) +
                                           "\n- 优先讲解这些薄弱点；若用户问题与薄弱点相关，主动串联旧知识，让学生感到你在持续跟进。"
                                           "- 引用时用自然的说法，比如\"我看你最近在这个点上栽过跟头\"，别念数据。")
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L3780")
+
                     pass
 
                 system_prompt += """
@@ -3849,7 +3989,9 @@ def main(page: ft.Page):
                         ))
                     try:
                         drawer_items_col.update()
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L3871")
+
                         pass
 
                 def _drawer_add_item(text, source="AI 解答"):
@@ -3957,9 +4099,13 @@ def main(page: ft.Page):
                                         drawer_m_input.value = res["mistake"]
                                 try:
                                     page.update()
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L3979")
+
                                     pass
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L3981")
+
                             pass
                         finally:
                             _drawer["busy"] = False
@@ -4138,7 +4284,9 @@ def main(page: ft.Page):
                     def _bubble_now():
                         try:
                             return md.value if md.value else (stream_text.value or content_ref.get("raw", "") or "")
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4160")
+
                             return content_ref.get("raw", "") or ""
 
                     collect_btn = ft.IconButton(
@@ -4348,7 +4496,9 @@ def main(page: ft.Page):
                                     if not weak:
                                         km = p_.get("knowledge_memory", {}) or {}
                                         weak = list(km.keys())[:4]
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L4370")
+
                                     pass
                                 diag_prompt = (
                                     "你是资深高中老师，负责给学生做学情诊断。请只输出 JSON，不要任何其他内容："
@@ -4366,10 +4516,14 @@ def main(page: ft.Page):
                                     c_ = r_.json()["choices"][0]["message"]["content"]
                                     try:
                                         diag = json.loads(c_)
-                                    except BaseException:
+                                    except BaseException as _be:
+                                        _diag_log(_be, "L4388")
+
                                         m_ = re.search(r'\{.*\}', c_, re.S)
                                         diag = json.loads(m_.group()) if m_ else None
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4391")
+
                             diag = None
                         if diag and diag.get("weak_point"):
                             msg = (
@@ -4437,7 +4591,9 @@ def main(page: ft.Page):
                     else:
                         try:
                             _ctx_chars = int(_ctx_cfg)
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4459")
+
                             _ctx_chars = 50000
                     rebuilt = [{"role": "system", "content": system_prompt}]
                     # 个人画像注入：让 AI 基于学生画像个性化教学（按当前学科优先）
@@ -4446,7 +4602,9 @@ def main(page: ft.Page):
                         _pt = profile_to_prompt_text(_prof, subject)
                         if _pt:
                             rebuilt[0]["content"] = rebuilt[0]["content"] + "\n\n" + _pt
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4468")
+
                         pass
                     # 早期对话摘要注入（滚动记忆）
                     try:
@@ -4454,12 +4612,16 @@ def main(page: ft.Page):
                         if _sum:
                             rebuilt[0]["content"] = (rebuilt[0]["content"] +
                                                      "\n\n【更早的对话摘要（AI 自动压缩的长期记忆，仍有效）】\n" + _sum)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4476")
+
                         pass
                     # 发送后异步完善画像（问过计数/最近问题/主题词）
                     try:
                         update_subject_profile(subject, content)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4481")
+
                         pass
                     for _m in build_ctx(hist_now, max_chars=_ctx_chars):
                         rebuilt.append({"role": _m["role"], "content": _m["content"]})
@@ -4482,7 +4644,9 @@ def main(page: ft.Page):
                                     lines.append(f"  正确答案：{ans}")
                             rebuilt[0] = {"role": "system",
                                           "content": rebuilt[0]["content"] + "\n\n" + "\n".join(lines)}
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4504")
+
                         pass
                     # 笔记检索注入：让 AI 能读取学生自己的笔记内容
                     try:
@@ -4494,7 +4658,9 @@ def main(page: ft.Page):
                                 nlines.append(f"[{i+1}] {n.get('time','')}：{ntext}")
                             rebuilt[0] = {"role": "system",
                                           "content": rebuilt[0]["content"] + "\n\n" + "\n".join(nlines)}
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4516")
+
                         pass
                     # DeepSeek 联网增强：联网开关开启时每轮强制检索；否则按 URL/意图自动触发
                     try:
@@ -4503,7 +4669,9 @@ def main(page: ft.Page):
                             if _enrich:
                                 rebuilt[0] = {"role": "system",
                                               "content": rebuilt[0]["content"] + "\n\n" + _enrich}
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4525")
+
                         pass
                     # 多模态转换：历史/当前消息里带【图】标记的 user 消息 → OpenAI 多模态 content 数组
                     def _to_modal(m):
@@ -4531,7 +4699,9 @@ def main(page: ft.Page):
                                 _buf = io.BytesIO()
                                 _im.save(_buf, format="JPEG", quality=85)
                                 _raw = _buf.getvalue()
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L4553")
+
                                 with open(full, "rb") as _f:
                                     _raw = _f.read()
                             imgs.append({"type": "image_url",
@@ -4584,7 +4754,9 @@ def main(page: ft.Page):
                                 try:
                                     send_btn.visible = True
                                     stop_btn.visible = False
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L4606")
+
                                     pass
                                 generation_active = False
                         if gen_token["id"] != my_gen:
@@ -4632,7 +4804,9 @@ def main(page: ft.Page):
                                 for _a in acts:
                                     try:
                                         _a.visible = True
-                                    except BaseException:
+                                    except BaseException as _be:
+                                        _diag_log(_be, "L4654")
+
                                         pass
                         except Exception:
                             pass
@@ -4647,7 +4821,9 @@ def main(page: ft.Page):
                             _hh = load_chat_history(subject)
                             if sum(len(m.get("content", "") or "") for m in _hh) > 40000:
                                 compress_old_history(subject, _hh)
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4669")
+
                             pass
                         # —— 断点续传闭环：续写完成后把「半截+续写」合并为一条历史 ——
                         if continuing["v"]:
@@ -4662,20 +4838,26 @@ def main(page: ft.Page):
                                     hs_c[-3]["content"] = (half_c.rstrip() + "\n\n" + cont_c).strip() if cont_c else half_c
                                     hs_c = hs_c[:-2]
                                     save_jsonl(fp_c, hs_c)
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L4684")
+
                                 pass
                         try:
                             _hs = load_chat_history(subject)
                             continue_btn.visible = bool(_hs and _hs[-1].get("role") == "assistant"
                                                         and "〔未完成，等待继续〕" in _hs[-1].get("content", ""))
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4690")
+
                             continue_btn.visible = False
                         try:
                             _looks_q = any(k in content for k in
                                            ("求", "怎么做", "怎么解", "这题", "题目", "为什么", "请讲", "？", "?"))
                             if subject != "总AI" and _looks_q:
                                 show_toast("💡 点回答右下角的 📥，可把这道题收进错题本", "info")
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4697")
+
                             pass
                         # —— DeepTutor 闭环：识别"未掌握"信号 → 记录遗留问题 + 回写科目薄弱度 ——
                         try:
@@ -4688,7 +4870,9 @@ def main(page: ft.Page):
                                     _ws_ = _p_.setdefault("weak_subjects", {})
                                     _ws_[_sub_] = min(1.0, _ws_.get(_sub_, 0.2) + 0.15)
                                 save_user_profile(_p_)
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L4710")
+
                             pass
                         page.update()
 
@@ -4715,7 +4899,9 @@ def main(page: ft.Page):
                     hs[-1]["content"] = hs[-1]["content"].replace("〔未完成，等待继续〕", "").rstrip()
                     try:
                         save_jsonl(get_chat_history_file(subject), hs)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4737")
+
                         pass
                     # 原气泡更新为干净半截（去掉标记）
                     try:
@@ -4730,7 +4916,9 @@ def main(page: ft.Page):
                             _ref["md"] = _md2
                             _ref["raw"] = _half
                             _ref["col"].controls.append(_md2)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L4752")
+
                         pass
                     handle_send("（继续）请直接接着上面没写完的讲解继续写，不要重复已经写过的内容，从断点处最后一个字接着往下写。")
                 continue_btn.on_click = _continue_generation
@@ -4835,7 +5023,9 @@ def main(page: ft.Page):
                             chat_input.value = (cur + marks) if cur else marks.lstrip("\n")
                             try:
                                 page.update()
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L4857")
+
                                 pass
                             show_toast("📸 已拍照，按发送让 AI 看题", "green")
                         except BaseException as _ex:
@@ -4844,7 +5034,9 @@ def main(page: ft.Page):
                             try:
                                 if cap is not None:
                                     cap.release()
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L4866")
+
                                 pass
 
                     threading.Thread(target=_shot, daemon=True).start()
@@ -5008,7 +5200,9 @@ def main(page: ft.Page):
                                         try:
                                             e.control.disabled = True
                                             e.control.text = "⏳ 生成中..."
-                                        except BaseException:
+                                        except BaseException as _be:
+                                            _diag_log(_be, "L5030")
+
                                             pass
                                         page.update()
                                         def _bg():
@@ -5033,7 +5227,9 @@ def main(page: ft.Page):
                                                     e.control.disabled = False
                                                     e.control.text = _orig_text
                                                     page.update()
-                                                except BaseException:
+                                                except BaseException as _be:
+                                                    _diag_log(_be, "L5055")
+
                                                     pass
                                         threading.Thread(target=_bg, daemon=True).start()
                                     return on_click
@@ -5144,7 +5340,9 @@ def main(page: ft.Page):
                                     ai_btn.content.value = "🤖 使用 AI 补齐缺失信息"
                                     ai_btn.disabled = False
                                     page.update()
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L5166")
+
                                     pass
                         threading.Thread(target=_bg, daemon=True).start()
 
@@ -5277,7 +5475,9 @@ def main(page: ft.Page):
                         if _search_timer[0]:
                             try:
                                 _search_timer[0].cancel()
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L5299")
+
                                 pass
                         _search_timer[0] = threading.Timer(
                             0.3, lambda: _render_list(search_field.value, reset_offset=True))
@@ -5434,7 +5634,9 @@ def main(page: ft.Page):
                                 d = datetime.strptime(nxt, "%Y-%m-%d")
                                 if d <= now:
                                     base *= 3.0
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L5456")
+
                                 pass
                         last = L.get("last_review", "")
                         if last:
@@ -5445,7 +5647,9 @@ def main(page: ft.Page):
                                     base *= 4.0
                                 elif days_since > 14:
                                     base *= 2.0
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L5467")
+
                                 pass
                         if L.get("level", 0) >= 6:
                             base *= 0.3
@@ -5659,7 +5863,9 @@ def main(page: ft.Page):
                                             options.append(_m)
                                         if len(options) >= 4:
                                             break
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L5681")
+
                                     pass
                             random.shuffle(options)
                             correct = meaning
@@ -5728,7 +5934,9 @@ def main(page: ft.Page):
                                             options.append(_w)
                                         if len(options) >= 4:
                                             break
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L5750")
+
                                     pass
                             random.shuffle(options)
                             correct = word
@@ -5863,7 +6071,9 @@ def main(page: ft.Page):
                     try:
                         tab_content.content = build_wrong_tab()
                         page.update()
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L5885")
+
                         pass
 
                 _tab_cache = {}   # P2-14：tab 构建结果缓存，切换 tab 复用已构建内容，保留搜索词/滚动位置
@@ -6066,7 +6276,9 @@ def main(page: ft.Page):
                                                                        idx=unique_media.index(img_path): show_image_gallery(paths, idx),
                                                         ink=True, border_radius=8)
                                                     img_row.controls.append(img)
-                                                except BaseException:
+                                                except BaseException as _be:
+                                                    _diag_log(_be, "L6088")
+
                                                     pass
                                         if img_row.controls:
                                             detail_children.append(img_row)
@@ -6112,7 +6324,9 @@ def main(page: ft.Page):
                                                     break
                                             if not kp_title and item_data.get("idea"):
                                                 kp_title = str(item_data["idea"]).split("，")[0][:12]
-                                        except BaseException:
+                                        except BaseException as _be:
+                                            _diag_log(_be, "L6134")
+
                                             kp_title = ""
                                         if not kp_title:
                                             show_toast("该错题还没有知识点标签，先点一次 AI 理解/标签后再试", "orange")
@@ -6325,7 +6539,9 @@ def main(page: ft.Page):
                             _ordered, _ = weighted_search_errors(subject_items, query)
                             if _ordered:
                                 candidates = _ordered[:20]
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L6347")
+
                             pass
                         prompt = f"""请分析以下错题列表，找出与用户查询匹配的题目。
 用户查询：{query}
@@ -6346,7 +6562,9 @@ def main(page: ft.Page):
                                 content = resp.json()["choices"][0]["message"]["content"]
                                 try:
                                     matches = json.loads(content)
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L6368")
+
                                     match = re.search(r'\[[0-9,\s]*\]', content)
                                     matches = json.loads(match.group()) if match else []
                                 if matches and isinstance(matches, list):
@@ -6419,7 +6637,9 @@ def main(page: ft.Page):
                                                 border_radius=10,
                                                 clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
                                             on_long_press=lambda e, paths=images: show_image_gallery(paths, 0))
-                                    except BaseException:
+                                    except BaseException as _be:
+                                        _diag_log(_be, "L6441")
+
                                         pass
 
                             def make_show_note(item_data=item):
@@ -6454,7 +6674,9 @@ def main(page: ft.Page):
                                                                        idx=note_images.index(img_path): show_image_gallery(paths, idx, on_close=lambda: show(None)),
                                                         ink=True, border_radius=8)
                                                     img_row.controls.append(img)
-                                                except BaseException:
+                                                except BaseException as _be:
+                                                    _diag_log(_be, "L6476")
+
                                                     pass
                                         if img_row.controls:
                                             detail_children.append(img_row)
@@ -6477,7 +6699,9 @@ def main(page: ft.Page):
                                                         break
                                                 if not kp_title and (tree_now.get("children") or []):
                                                     kp_title = tree_now["children"][0].get("title", "")
-                                        except BaseException:
+                                        except BaseException as _be:
+                                            _diag_log(_be, "L6499")
+
                                             kp_title = ""
                                         page.close(detail_dlg)
                                         _MM_HIGHLIGHT["kp"] = kp_title
@@ -6588,7 +6812,9 @@ def main(page: ft.Page):
                                 _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
                                 if os.path.exists(_full):
                                     os.remove(_full)
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L6610")
+
                                 pass
                         up_files.clear()
 
@@ -6656,10 +6882,14 @@ def main(page: ft.Page):
                                     kp_title in str(c.get("knowledge_point", "")))]
                             if prs:
                                 rc = min(1.0, sum(prs) / len(prs) / 100.0)
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L6678")
+
                             pass
                         return min(1.0, base * 0.6 + rc * 0.4)
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L6681")
+
                         return None
 
                 # 深度优先布局：返回该节点子树的垂直范围 (top, bottom)，节点置于自身子树垂直中心
@@ -7098,7 +7328,9 @@ def main(page: ft.Page):
                             build_mindmap(subject)
                             open_function_page(subject, "思维导图")
                             page.update()
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L7120")
+
                             pass
                         if n:
                             show_toast(f"✅ AI 已理解 {n} 张图片，已加入知识树", "green")
@@ -7155,7 +7387,9 @@ def main(page: ft.Page):
                             content=rebuild_mindmap_view(force=True))
                         viewport.update()
                         show_toast(f"🧭 已定位知识点：{target}", "orange")
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L7177")
+
                         pass
                     return True
 
@@ -7174,7 +7408,9 @@ def main(page: ft.Page):
                                 for cc in list(view_state.get("grow_nodes", [])):
                                     try:
                                         cc.opacity = 1.0
-                                    except BaseException:
+                                    except BaseException as _be:
+                                        _diag_log(_be, "L7196")
+
                                         pass
                                 break
                             try:
@@ -7182,7 +7418,9 @@ def main(page: ft.Page):
                                 if i % 3 == 0:
                                     page.update()
                                 time.sleep(0.045)
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L7204")
+
                                 pass
                         view_state["grown"] = True
                         page.update()
@@ -7190,7 +7428,9 @@ def main(page: ft.Page):
                         if _hl:
                             try:
                                 _apply_highlight(_hl)
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L7212")
+
                                 pass
                     _th.Thread(target=_job, daemon=True).start()
 
@@ -7304,7 +7544,9 @@ def main(page: ft.Page):
                                     content = resp.json()["choices"][0]["message"]["content"]
                                     try:
                                         items = json.loads(content)
-                                    except BaseException:
+                                    except BaseException as _be:
+                                        _diag_log(_be, "L7326")
+
                                         match = re.search(r'\[.*\]', content, re.DOTALL)
                                         items = json.loads(match.group()) if match else None
                                     if items:
@@ -7451,7 +7693,9 @@ def main(page: ft.Page):
                                             else ft.BoxShadow(blur_radius=16, color="#44000000",
                                                               offset=ft.Offset(0, 5)))
                             page.update()
-                        except BaseException:
+                        except BaseException as _be:
+                            _diag_log(_be, "L7473")
+
                             pass
 
                     hover_kw = {}
@@ -7498,7 +7742,9 @@ def main(page: ft.Page):
                 try:
                     if _MM_HIGHLIGHT and _MM_HIGHLIGHT.get("kp"):
                         _mm_hl = _MM_HIGHLIGHT.pop("kp")
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L7520")
+
                     _mm_hl = None
                 func_pages = {
                     # 惰性构建：只渲染目标页，避免每次打开都全量构建（含思维导图生长线程）
@@ -7585,7 +7831,9 @@ def main(page: ft.Page):
                     errors = load_jsonl(ERRORS_FILE)
                     try:
                         days_left = get_gaokao_days_left()
-                    except BaseException:
+                    except BaseException as _be:
+                        _diag_log(_be, "L7607")
+
                         days_left = 365
                     subject_errors = {}
                     for err in errors:
@@ -7790,7 +8038,9 @@ def main(page: ft.Page):
                 cfg["gaokao_date"] = gaokao_date_input.value.strip()
                 try:
                     cfg["ctx_chars"] = memory_dropdown.value or "auto"
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L7812")
+
                     cfg["ctx_chars"] = "auto"
                 save_ai_config(cfg)
                 show_toast("API 配置已保存", "green")
@@ -7881,7 +8131,9 @@ def main(page: ft.Page):
                                     done += 1
                                 else:
                                     fail += 1
-                            except BaseException:
+                            except BaseException as _be:
+                                _diag_log(_be, "L7903")
+
                                 fail += 1
                             retag_status.value = f"⏳ 重打标签 {done+fail}/{total}（成功 {done}，失败 {fail}）"
                             page.update()
@@ -8327,7 +8579,9 @@ def main(page: ft.Page):
                             else:
                                 try:
                                     os.remove(_p)
-                                except BaseException:
+                                except BaseException as _be:
+                                    _diag_log(_be, "L8349")
+
                                     pass
                         _cleared = True
                         for _n in os.listdir(tmp_dir):
@@ -8531,22 +8785,30 @@ def main(page: ft.Page):
                 # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
                 try:
                     _cleanup_pending_chat_imgs()   # 关聊天窗时清掉未发送的临时图
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L8553")
+
                     pass
                 try:
                     # R2-P1-7：错题录入表单选了图但没保存就切页 → 删掉已复制未入库的副本，不留孤儿图片
                     reset_picker1(keep=False)
                     reset_picker2(keep=False)
                     reset_picker3(keep=False)
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L8560")
+
                     pass
                 try:
                     chat_dialog.visible = False
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L8564")
+
                     pass
                 try:
                     close_contact_panel()
-                except BaseException:
+                except BaseException as _be:
+                    _diag_log(_be, "L8568")
+
                     pass
                 if index == 0:
                     current_page.content = home_page
