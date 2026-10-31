@@ -4879,8 +4879,10 @@ def main(page: ft.Page):
                     return None   # 失败：调用处负责提示，避免假成功
                 with _vocab_rw_lock:
                     existing = load_jsonl(VOCAB_FILE)
+                    found = False
                     for i, w in enumerate(existing):
                         if w.get("word", "").lower() == word.lower():
+                            found = True
                             for k, v in new_data.items():
                                 if k == "grammar":
                                     existing[i]["grammar"] = v if v else existing[i].get("grammar", {})
@@ -4890,6 +4892,11 @@ def main(page: ft.Page):
                                     existing[i][k] = v
                             word_data = existing[i]
                             break
+                    if not found:
+                        return None   # 词不在词库中：不写不存，调用处按失败处理
+                    # 成功判据：AI 返回的释义非空才算补齐成功；否则保留原数据并让调用处提示失败
+                    if not str(word_data.get("meaning", "") or "").strip():
+                        return None
                     save_jsonl(VOCAB_FILE, existing)
                 return word_data
 
@@ -5209,17 +5216,18 @@ def main(page: ft.Page):
                         if not raw:
                             return
                         word = raw.lower()
-                        existing = load_jsonl(VOCAB_FILE)
-                        if any(w.get("word", "").lower() == word for w in existing):
-                            show_toast(f"单词 {word} 已存在", "info")
-                            add_word_input.value = ""
-                            return
-                        new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "",
-                                     "forms": "", "grammar": {}, "phrases": []}
-                        ensure_learning_field(new_entry)
-                        new_entry["learning"]["synced"] = False   # 新词未同步手环
-                        existing.append(new_entry)
-                        save_jsonl(VOCAB_FILE, existing)
+                        with _vocab_rw_lock:   # 读→改→写 原子化，避免与导入/AI补齐并发丢数据
+                            existing = load_jsonl(VOCAB_FILE)
+                            if any(w.get("word", "").lower() == word for w in existing):
+                                show_toast(f"单词 {word} 已存在", "info")
+                                add_word_input.value = ""
+                                return
+                            new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "",
+                                         "forms": "", "grammar": {}, "phrases": []}
+                            ensure_learning_field(new_entry)
+                            new_entry["learning"]["synced"] = False   # 新词未同步手环
+                            existing.append(new_entry)
+                            save_jsonl(VOCAB_FILE, existing)
                         show_toast(f"已添加 {word}，点开自动补齐", "green")
                         add_word_input.value = ""
                         nonlocal all_vocab, all_words
@@ -5228,8 +5236,7 @@ def main(page: ft.Page):
                         _render_list(search_field.value)
 
                     _render_list()
-                    import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
-                    page.overlay.append(import_picker)
+                    import_picker = _use_picker(page, None)
 
                     def on_import_result(e: ft.FilePickerResultEvent):
                         if e.files:
@@ -5242,19 +5249,20 @@ def main(page: ft.Page):
                                 if not imported:
                                     show_toast("文件内容为空", "red")
                                     return
-                                existing = load_jsonl(VOCAB_FILE)
-                                existing_words = {w.get("word", "").lower() for w in existing}
-                                added = 0
-                                for w in imported:
-                                    wd = w.get("word", "").lower()
-                                    if not wd or wd in existing_words:
-                                        continue
-                                    ensure_learning_field(w)
-                                    w["learning"]["synced"] = False   # 导入的新词未同步手环
-                                    existing.append(w)
-                                    existing_words.add(wd)
-                                    added += 1
-                                save_jsonl(VOCAB_FILE, existing)
+                                with _vocab_rw_lock:   # 读→改→写 原子化，避免并发丢数据
+                                    existing = load_jsonl(VOCAB_FILE)
+                                    existing_words = {w.get("word", "").lower() for w in existing}
+                                    added = 0
+                                    for w in imported:
+                                        wd = w.get("word", "").lower()
+                                        if not wd or wd in existing_words:
+                                            continue
+                                        ensure_learning_field(w)
+                                        w["learning"]["synced"] = False   # 导入的新词未同步手环
+                                        existing.append(w)
+                                        existing_words.add(wd)
+                                        added += 1
+                                    save_jsonl(VOCAB_FILE, existing)
                                 show_toast(f"✅ 已追加 {added} 个词", "green")
                                 nonlocal all_vocab, all_words
                                 all_vocab = load_jsonl(VOCAB_FILE)
@@ -5265,11 +5273,10 @@ def main(page: ft.Page):
 
                     import_btn = ft.ElevatedButton(
                         "📥 导入词汇文件", icon=ft.Icons.UPLOAD_FILE,
-                        on_click=lambda e: import_picker.pick_files(
+                        on_click=lambda e: _use_picker(page, on_import_result).pick_files(
                             file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["jsonl"]))
 
-                    export_picker = ft.FilePicker(on_result=lambda e: on_export_result(e))
-                    page.overlay.append(export_picker)
+                    export_picker = _use_picker(page, None)
 
                     def on_export_result(e: ft.FilePickerResultEvent):
                         if e.path:
@@ -5281,7 +5288,7 @@ def main(page: ft.Page):
 
                     export_btn = ft.ElevatedButton(
                         "📤 导出单词本", icon=ft.Icons.DOWNLOAD,
-                        on_click=lambda e: export_picker.save_file(
+                        on_click=lambda e: _use_picker(page, on_export_result).save_file(
                             dialog_title="导出单词本",
                             file_name="vocabulary.jsonl",
                             file_type=ft.FilePickerFileType.CUSTOM,
@@ -5762,7 +5769,7 @@ def main(page: ft.Page):
                                     alignment=ft.alignment.center),
                                 title=ft.Text(f"{word}  {w.get('phonetic', '')}", size=15),
                                 subtitle=ft.Text(w.get("meaning", "")[:50], size=12, color=ft.Colors.GREY_400),
-                                on_click=lambda e, wd=w: _open_word_detail(wd, on_close=lambda: build_wrong_tab()),
+                                on_click=lambda e, wd=w: _open_word_detail(wd, on_close=refresh_wrong_tab),
                                 dense=True)
                             ww_list.controls.append(tile)
                     return ft.Column([
@@ -5770,6 +5777,14 @@ def main(page: ft.Page):
                         ft.Divider(height=1),
                         ft.Container(content=ww_list, expand=True),
                     ], spacing=8, expand=True)
+
+                def refresh_wrong_tab():
+                    # 详情关闭后真正重建错词 tab 并挂回界面（此前只 build 未赋值，导致列表不刷新）
+                    try:
+                        tab_content.content = build_wrong_tab()
+                        page.update()
+                    except BaseException:
+                        pass
 
                 def render_tab():
                     idx = tab_index[0]
