@@ -5593,6 +5593,8 @@ def main(page: ft.Page):
                     ], spacing=12, expand=True)
 
                 def build_quiz_tab():
+                    # R3-C：每次进入考核 tab 重新读取设置，避免用 build_vocab_page 构建时的旧快照（改设置后即时生效）
+                    settings_now = load_vocab_settings()
                     today_review = get_today_review_words(50)
                     if not today_review:
                         return ft.Container(
@@ -5634,7 +5636,7 @@ def main(page: ft.Page):
                         phonetic = w.get("phonetic", "")
                         counter_text.value = f"{state['idx']+1} / {len(queue)}"
                         score_text.value = f"✅ {score['correct']} / {score['total']}"
-                        mode = settings.get("quiz_mode", "mix")
+                        mode = settings_now.get("quiz_mode", "mix")
                         if mode == "mix":
                             mode = random.choice(["word2meaning", "meaning2word"])
                         if mode == "word2meaning":
