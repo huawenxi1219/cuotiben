@@ -80,12 +80,16 @@ def gen_uid():
     return uuid.uuid4().hex[:16]
 
 
-_shared_file_picker = {"fp": None, "handler": None}
+_picker_registry = {}   # R2-P2-8：{id(page): {"fp": FilePicker, "handler": callable}} 按页面存放，Web 多会话互不串
 
 
 def _on_shared_picker_result(e):
-    """全局唯一 FilePicker 的回调分发：每次调用前用 _use_picker 绑定当前处理函数"""
-    h = _shared_file_picker.get("handler")
+    """FilePicker 回调分发：按事件所属页面取 handler；拿不到页面引用时（桌面单页）退回唯一注册项"""
+    _page = getattr(e, "page", None)
+    _entry = _picker_registry.get(id(_page)) if _page is not None else None
+    if _entry is None and len(_picker_registry) == 1:
+        _entry = next(iter(_picker_registry.values()))
+    h = _entry.get("handler") if _entry else None
     if h:
         try:
             h(e)
@@ -94,14 +98,19 @@ def _on_shared_picker_result(e):
 
 
 def _use_picker(page, handler=None):
-    """复用同一个 FilePicker 实例（避免每处新建实例导致的内存/覆盖层堆积）。
+    """每个页面各自复用同一个 FilePicker 实例（避免每处新建实例导致的内存/覆盖层堆积）。
+    按 {id(page): fp} 存放：桌面单页无感知，Web 多会话时第二个页面不会拿到已绑到第一个页面的控件。
     handler 可传 None，在真正 pick 之前再绑定，规避闭包回调尚未定义的问题。"""
-    if _shared_file_picker["fp"] is None:
-        _shared_file_picker["fp"] = ft.FilePicker(on_result=_on_shared_picker_result)
-        page.overlay.append(_shared_file_picker["fp"])
+    _key = id(page)
+    _entry = _picker_registry.get(_key)
+    if _entry is None:
+        _fp = ft.FilePicker(on_result=_on_shared_picker_result)
+        page.overlay.append(_fp)
+        _entry = {"fp": _fp, "handler": None}
+        _picker_registry[_key] = _entry
     if handler is not None:
-        _shared_file_picker["handler"] = handler
-    return _shared_file_picker["fp"]
+        _entry["handler"] = handler
+    return _entry["fp"]
 
 
 def dedup_keys(item, extra_fields):
@@ -2968,7 +2977,7 @@ def main(page: ft.Page):
                     show_toast(f"渲染失败：{str(ex)[:40]}", "red")
 
             sync_status_text = ft.Text("", size=14)
-            sync_folder_picker = _use_picker(page, None)   # 全局复用 FilePicker，避免重复挂 overlay
+            # R2-P2-9：sync_folder_picker 无用赋值已删除，点击时经 _use_picker 取实例
 
             def on_sync_folder_selected(e: ft.FilePickerResultEvent):
                 if e.path:
@@ -2993,7 +3002,6 @@ def main(page: ft.Page):
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
-                picker = _use_picker(page, None)   # 全局复用同一 FilePicker，不重复挂 overlay
                 progress_row = ft.Row(visible=False, spacing=10)
                 progress_bar = ft.ProgressBar(width=200, height=8, value=0)
                 progress_text = ft.Text("0%", size=14)
@@ -5300,7 +5308,7 @@ def main(page: ft.Page):
                         _render_list(search_field.value)
 
                     _render_list()
-                    import_picker = _use_picker(page, None)
+                    # R2-P2-9：import_picker/export_picker 无用赋值已删除，pick 时经 _use_picker 取实例
 
                     def on_import_result(e: ft.FilePickerResultEvent):
                         if e.files:
@@ -5341,7 +5349,7 @@ def main(page: ft.Page):
                         on_click=lambda e: _use_picker(page, on_import_result).pick_files(
                             file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["jsonl"]))
 
-                    export_picker = _use_picker(page, None)
+                    # R2-P2-9：export_picker 无用赋值已删除，点击时经 _use_picker 取实例
 
                     def on_export_result(e: ft.FilePickerResultEvent):
                         if e.path:
@@ -8005,9 +8013,7 @@ def main(page: ft.Page):
                 page.update()
 
             backup_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
-            backup_picker = _use_picker(page, None)   # 备份/恢复/合并共用同一个 FilePicker 实例
-            restore_picker = backup_picker
-            merge_picker = backup_picker
+            # R2-P2-9：backup_picker/restore_picker/merge_picker 无用赋值已删除，点击时经 _use_picker 取实例
 
             # ---------- 手环背单词 操控中心 ----------
             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
