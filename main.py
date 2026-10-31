@@ -4312,12 +4312,16 @@ def main(page: ft.Page):
                     clean_ans = re.sub(r"```chart.*?```", "", ans, flags=re.S).strip()
                     # 题目段：问题本身（可能带【图】标记，去掉）
                     orig_txt = re.sub(r"(\n)?【图】\S+", "", q).strip()[:800]
+                    # R3-A：提取问题里实际存在的图片（相对路径按 DATA_DIR 解析），随错题一起入库，不再丢图
+                    _imgs = [p for p in re.findall(r"【图】(\S+)", q)
+                             if os.path.exists(p if os.path.isabs(p) else os.path.join(DATA_DIR, p))]
                     try:
                         save_error(subject,
                                    original=orig_txt,
                                    answer=clean_ans[:800],
                                    idea=clean_ans[:400],
-                                   manual_tags="")
+                                   manual_tags="",
+                                   original_media=_imgs)
                     except BaseException as ex:
                         show_toast(f"加入失败：{str(ex)[:40]}", "red")
                         return
