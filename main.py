@@ -80,6 +80,30 @@ def gen_uid():
     return uuid.uuid4().hex[:16]
 
 
+_shared_file_picker = {"fp": None, "handler": None}
+
+
+def _on_shared_picker_result(e):
+    """全局唯一 FilePicker 的回调分发：每次调用前用 _use_picker 绑定当前处理函数"""
+    h = _shared_file_picker.get("handler")
+    if h:
+        try:
+            h(e)
+        except BaseException:
+            pass
+
+
+def _use_picker(page, handler=None):
+    """复用同一个 FilePicker 实例（避免每处新建实例导致的内存/覆盖层堆积）。
+    handler 可传 None，在真正 pick 之前再绑定，规避闭包回调尚未定义的问题。"""
+    if _shared_file_picker["fp"] is None:
+        _shared_file_picker["fp"] = ft.FilePicker(on_result=_on_shared_picker_result)
+        page.overlay.append(_shared_file_picker["fp"])
+    if handler is not None:
+        _shared_file_picker["handler"] = handler
+    return _shared_file_picker["fp"]
+
+
 def dedup_keys(item, extra_fields):
     """返回一条记录的去重键集合。任意一个键撞上就算重复"""
     keys = set()
@@ -1314,6 +1338,29 @@ def save_ai_config(config):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
+def resolve_deepseek_model(cfg):
+    """统一 DeepSeek 模型名：全文件只认 deepseek-flash 这一种写法（旧名已由 load_ai_config 迁移）。
+    禁止再出现 deepseek-v4-flash 之类的第二套写法。"""
+    return (cfg.get("deepseek_model") or "deepseek-flash").strip() or "deepseek-flash"
+
+
+def get_gaokao_days_left():
+    """高考倒计时：设置里可配置日期（YYYY-MM-DD）；未配置时按「下一个 6 月 7 日」动态计算；禁止返回负数。"""
+    try:
+        cfg = load_ai_config()
+        raw = str(cfg.get("gaokao_date") or "").strip()
+        if raw:
+            target = datetime.strptime(raw, "%Y-%m-%d")
+        else:
+            now = datetime.now()
+            target = datetime(now.year, 6, 7)
+            if (target - now).total_seconds() < 0:
+                target = datetime(now.year + 1, 6, 7)
+        return max((target - datetime.now()).days, 0)
+    except BaseException:
+        return 365
+
+
 PROVIDERS = {
     "zhipu": {
         "name": "智谱 GLM",
@@ -1342,8 +1389,8 @@ def get_api_endpoint():
     key = cfg.get(info["key_field"], "").strip()
     model = info["model"]
     if provider == "deepseek":
-        # DeepSeek 支持自定义模型：deepseek-chat / deepseek-reasoner / 新版模型 ID
-        model = (cfg.get("deepseek_model") or "deepseek-v4-flash").strip() or "deepseek-v4-flash"
+        # DeepSeek 支持自定义模型：统一走 resolve_deepseek_model（旧名 deepseek-v4-flash 已由 load_ai_config 迁移）
+        model = resolve_deepseek_model(cfg)
     return key, info["url"], model, info["vision_model"]
 
 
@@ -1365,7 +1412,7 @@ def endpoint_for(task="smart"):
     key_ds = cfg.get("api_key_deepseek", "").strip()
     if key_ds:
         dk = PROVIDERS["deepseek"]
-        model = (cfg.get("deepseek_model") or "deepseek-v4-flash").strip() or "deepseek-v4-flash"
+        model = resolve_deepseek_model(cfg)
         return key_ds, dk["url"], model, dk.get("vision_model", "")
     return endpoint_for("cheap")
 
@@ -1511,7 +1558,8 @@ def copy_file_to_lib(src_path, target_dir, allowed_exts):
     new_name = str(uuid.uuid4().hex) + ext
     dst = os.path.join(target_dir, new_name)
     shutil.copy(src_path, dst)
-    return dst
+    # 入库存「相对 DATA_DIR」的路径：切换数据文件夹/迁移设备后图片仍有效；读取处统一做相对→绝对转换
+    return os.path.relpath(dst, DATA_DIR)
 
 
 IMG_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
@@ -2901,8 +2949,7 @@ def main(page: ft.Page):
             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
                 selected_files = []
                 file_list = ft.Column(spacing=4)
-                picker = ft.FilePicker(on_result=lambda e: handle_picker_result(e))
-                page.overlay.append(picker)
+                picker = _use_picker(page, None)   # 全局复用同一 FilePicker，不重复挂 overlay
                 progress_row = ft.Row(visible=False, spacing=10)
                 progress_bar = ft.ProgressBar(width=200, height=8, value=0)
                 progress_text = ft.Text("0%", size=14)
@@ -2913,7 +2960,8 @@ def main(page: ft.Page):
                     row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
                     for idx, f_path in enumerate(selected_files):
                         try:
-                            img = ft.Image(src=f_path, width=60, height=60,
+                            _src = f_path if os.path.isabs(f_path) else os.path.join(DATA_DIR, f_path)
+                            img = ft.Image(src=_src, width=60, height=60,
                                            fit=ft.ImageFit.COVER, border_radius=8)
                         except BaseException:
                             img = ft.Text("🖼️", size=40)
@@ -2944,11 +2992,20 @@ def main(page: ft.Page):
 
                 def remove_file(idx):
                     if 0 <= idx < len(selected_files):
+                        # 复制进来的临时文件：手动移除时一并删除（尚未入库，不留孤儿图片）
+                        try:
+                            _rm = selected_files[idx]
+                            _rm_full = _rm if os.path.isabs(_rm) else os.path.join(DATA_DIR, _rm)
+                            if os.path.exists(_rm_full):
+                                os.remove(_rm_full)
+                        except BaseException:
+                            pass
                         selected_files.pop(idx)
                         refresh_file_list()
 
                 def pick_files(e):
-                    picker.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+                    _use_picker(page, handle_picker_result).pick_files(
+                        file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
 
                 complete_btn = ft.ElevatedButton(
                     "✅ 完成上传", icon=ft.Icons.DONE,
@@ -2956,7 +3013,16 @@ def main(page: ft.Page):
                     disabled=True, visible=False,
                 )
 
-                def reset():
+                def reset(keep=False):
+                    # keep=True：文件已成功入库，仅清空选择列表；keep=False：删除已复制但未入库的文件
+                    if not keep:
+                        for _p in list(selected_files):
+                            try:
+                                _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
+                                if os.path.exists(_full):
+                                    os.remove(_full)
+                            except BaseException:
+                                pass
                     selected_files.clear()
                     file_list.controls.clear()
                     complete_btn.disabled = True
@@ -3119,9 +3185,9 @@ def main(page: ft.Page):
                 answer_input.value = ""
                 idea_input.value = ""
                 tags_input.value = ""
-                reset_picker1()
-                reset_picker2()
-                reset_picker3()
+                reset_picker1(keep=True)   # 文件已随 save_error 入库，只清列表不删文件
+                reset_picker2(keep=True)
+                reset_picker3(keep=True)
                 show_toast(f"✅ {subj} 错题已保存！", "green")
 
             note_subject_dd = ft.Dropdown(
@@ -3143,7 +3209,7 @@ def main(page: ft.Page):
                     return
                 save_note(subj, content, list(note_files))
                 note_content_input.value = ""
-                reset_note_picker()
+                reset_note_picker(keep=True)   # 文件已随 save_note 入库，只清列表不删文件
                 show_toast(f"✅ {subj} 笔记已保存！", "green")
 
             # ===== 苹果风 UI 组件 =====
@@ -3460,6 +3526,29 @@ def main(page: ft.Page):
             current_chat_subject = "总AI"
             stop_flag = False
             generation_active = False
+            _pending_chat_imgs = set()  # 全局跟踪：聊天选图但尚未发送成功的临时文件（相对 DATA_DIR）
+
+            def _cleanup_pending_chat_imgs():
+                """删除「选了图但没发送」的临时副本，避免孤儿图片。
+                已写入当前科目历史的图片（含发送后 AI 失败等边缘情况）一律保留，防止历史图片失效。"""
+                try:
+                    _hist = load_jsonl(get_chat_history_file(current_chat_subject or "总AI"))
+                    _refs = set()
+                    for _m in _hist:
+                        for _t in re.findall(r"【图】(\S+)", str(_m.get("content", "") or "")):
+                            _refs.add(_t)
+                except BaseException:
+                    _refs = set()
+                while _pending_chat_imgs:
+                    _p = _pending_chat_imgs.pop()
+                    if _p in _refs:
+                        continue
+                    try:
+                        _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
+                        if os.path.exists(_full):
+                            os.remove(_full)
+                    except BaseException:
+                        pass
 
             def open_chat(subject, initial_message=None, auto_send=False):
                 nonlocal current_chat_subject, stop_flag, generation_active
@@ -3468,6 +3557,7 @@ def main(page: ft.Page):
                     time.sleep(0.2)
                 generation_active = False
                 stop_flag = False
+                _cleanup_pending_chat_imgs()   # 切聊天窗口前清掉未发送的临时图
                 current_chat_subject = subject
                 close_contact_panel()
                 chat_dialog.content = build_chat_window(subject, initial_message, auto_send)
@@ -4429,6 +4519,12 @@ def main(page: ft.Page):
                                 ai_response["text"] = final_accum
                         finally:
                             if gen_token["id"] == my_gen:
+                                # 无论正常结束/异常/被停止，只要是当前代次就恢复按钮，避免停止后按钮卡死
+                                try:
+                                    send_btn.visible = True
+                                    stop_btn.visible = False
+                                except BaseException:
+                                    pass
                                 generation_active = False
                         if gen_token["id"] != my_gen:
                             return  # 过期线程，不再写界面/不保存历史
@@ -4479,11 +4575,11 @@ def main(page: ft.Page):
                                         pass
                         except Exception:
                             pass
-                        send_btn.visible = True
-                        stop_btn.visible = False
                         if ai_response["text"]:
                             save_chat_message(subject, "assistant", ai_response["text"])
                             update_chat_memory(subject, content, ai_response["text"])
+                        # 发送成功：本次消息里的临时图正式生效（从待清理集合移除，防止后续清历史/关窗误删）
+                        _pending_chat_imgs.difference_update(set(re.findall(r"【图】(\S+)", content)))
                         update_chat_stats(subject)
                         # —— 长记忆：历史过长时后台压缩早期对话为摘要（不阻塞，失败静默）——
                         try:
@@ -4579,9 +4675,22 @@ def main(page: ft.Page):
                 continue_btn.on_click = _continue_generation
 
                 def clear_history(e):
+                    nonlocal generation_active, stop_flag
+                    stop_flag = True
+                    gen_token["id"] += 1  # 使正在跑的旧生成线程过期：不再写已清空的历史、不再恢复按钮
+                    generation_active = False
                     fp = get_chat_history_file(subject)
                     save_jsonl(fp, [])
                     chat_history_display.controls.clear()
+                    last_user_msg["text"] = ""
+                    last_ai_content_ref["col"] = None
+                    last_ai_content_ref["ref"] = None
+                    continuing["v"] = False
+                    _added_questions.clear()
+                    continue_btn.visible = False
+                    send_btn.visible = True
+                    stop_btn.visible = False
+                    _cleanup_pending_chat_imgs()   # 清历史的同时清掉未发送的临时图
                     page.update()
                     show_toast("✅ 对话历史已清除", "green")
 
@@ -4613,9 +4722,13 @@ def main(page: ft.Page):
                         _chat_dir = os.path.join(IMAGES_DIR, "chat")
                         os.makedirs(_chat_dir, exist_ok=True)
                         for _f in e.files:
-                            _dest = os.path.join(_chat_dir, os.path.basename(_f.name))
+                            # 唯一命名（uid+扩展名）：避免同名文件互相覆盖；未发送前视为临时文件
+                            _ext = os.path.splitext(_f.name)[1].lower() or ".jpg"
+                            _dest = os.path.join(_chat_dir, f"chat_tmp_{gen_uid()}{_ext}")
                             shutil.copy2(_f.path, _dest)
-                            saved.append(os.path.relpath(_dest, DATA_DIR))
+                            _rel = os.path.relpath(_dest, DATA_DIR)
+                            saved.append(_rel)
+                            _pending_chat_imgs.add(_rel)
                     except BaseException as _ex:
                         show_toast(f"图片保存失败：{str(_ex)[:30]}", "red")
                         return
@@ -4628,10 +4741,8 @@ def main(page: ft.Page):
                     show_toast(f"已添加 {len(saved)} 张图片，按发送即可", "green")
 
                 def pick_chat_image():
-                    _pkr = ft.FilePicker(on_result=on_chat_img_picked)
-                    page.overlay.append(_pkr)
-                    page.update()
-                    _pkr.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+                    _use_picker(page, on_chat_img_picked).pick_files(
+                        file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
 
                 def pick_chat_camera():
                     """调用本机摄像头拍照：拍题 → 自动插入对话（与相册同一发送链路）"""
@@ -4654,9 +4765,10 @@ def main(page: ft.Page):
                                 return
                             _chat_dir = os.path.join(IMAGES_DIR, "chat")
                             os.makedirs(_chat_dir, exist_ok=True)
-                            _dest = os.path.join(_chat_dir, f"cam_{now_ms()}.jpg")
+                            _dest = os.path.join(_chat_dir, f"chat_tmp_cam_{gen_uid()}.jpg")
                             cv2.imwrite(_dest, frame)
                             _rel = os.path.relpath(_dest, DATA_DIR)
+                            _pending_chat_imgs.add(_rel)
                             cur = chat_input.value or ""
                             marks = f"\n【图】{_rel}"
                             chat_input.value = (cur + marks) if cur else marks.lstrip("\n")
@@ -4681,7 +4793,9 @@ def main(page: ft.Page):
                         content=ft.Row([
                             ft.IconButton(icon=ft.Icons.ARROW_BACK, icon_size=22,
                                           tooltip="返回",
-                                          on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
+                                          on_click=lambda e: (_cleanup_pending_chat_imgs(),
+                                                              setattr(chat_dialog, 'visible', False),
+                                                              page.update())),
                             ft.Column([
                                 ft.Text(f"💬 {display_name}", size=18, weight=ft.FontWeight.BOLD),
                                 ft.Text(f"{_provider_name} · {_model_name}", size=11, color="#888888"),
@@ -7246,7 +7360,7 @@ def main(page: ft.Page):
                     profile = load_user_profile()
                     errors = load_jsonl(ERRORS_FILE)
                     try:
-                        days_left = (datetime(2026, 6, 7) - datetime.now()).days
+                        days_left = get_gaokao_days_left()
                     except BaseException:
                         days_left = 365
                     subject_errors = {}
@@ -7435,6 +7549,11 @@ def main(page: ft.Page):
                 label="DeepSeek 思考模式",
                 value=ai_config.get("deepseek_thinking", True),
                 tooltip="开启后模型先深度思考再回答（更强但稍慢）")
+            gaokao_date_input = ft.TextField(
+                label="高考日期（可选，YYYY-MM-DD）",
+                hint_text="留空自动按「下一个 6 月 7 日」计算",
+                value=str(ai_config.get("gaokao_date") or ""),
+                width=280)
 
             def save_keys(e):
                 cfg = load_ai_config()
@@ -7444,6 +7563,7 @@ def main(page: ft.Page):
                 cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
                 cfg["deepseek_thinking"] = deepseek_thinking_switch.value
                 cfg["deepseek_reasoning"] = str(deepseek_reasoning_dropdown.value or "medium")
+                cfg["gaokao_date"] = gaokao_date_input.value.strip()
                 try:
                     cfg["ctx_chars"] = memory_dropdown.value or "auto"
                 except BaseException:
@@ -8068,6 +8188,7 @@ def main(page: ft.Page):
                 deepseek_model_input,
                 deepseek_reasoning_dropdown,
                 deepseek_thinking_switch,
+                gaokao_date_input,
                 ft.ElevatedButton("保存密钥", on_click=save_keys),
                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
                         test_conn_result]),
@@ -8114,6 +8235,10 @@ def main(page: ft.Page):
 
             def switch_page(index):
                 # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
+                try:
+                    _cleanup_pending_chat_imgs()   # 关聊天窗时清掉未发送的临时图
+                except BaseException:
+                    pass
                 try:
                     chat_dialog.visible = False
                 except BaseException:
