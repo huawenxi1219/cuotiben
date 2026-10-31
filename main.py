@@ -5553,22 +5553,45 @@ def main(page: ft.Page):
                         if mode == "mix":
                             mode = random.choice(["word2meaning", "meaning2word"])
                         if mode == "word2meaning":
+                            # 干扰项按释义去重：避免重复按钮/两个“正确答案”；不足 4 项时从全词库补齐
                             options = [meaning]
-                            others = random.sample([x for x in queue if x.get("word", "") != word],
-                                                   min(3, max(0, len(queue) - 1))) if len(queue) > 1 else []
-                            for o in others:
-                                options.append(o.get("meaning", ""))
+                            seen = {meaning}
+                            for o in (x for x in queue if x.get("word", "") != word):
+                                _m = str(o.get("meaning", "") or "").strip()
+                                if _m and _m not in seen:
+                                    seen.add(_m)
+                                    options.append(_m)
+                                if len(options) >= 4:
+                                    break
+                            if len(options) < 4:
+                                try:
+                                    for o in load_vocab_cached(0):
+                                        _m = str(o.get("meaning", "") or "").strip()
+                                        if _m and _m not in seen:
+                                            seen.add(_m)
+                                            options.append(_m)
+                                        if len(options) >= 4:
+                                            break
+                                except BaseException:
+                                    pass
                             random.shuffle(options)
                             correct = meaning
                             opt_btns = []
                             result_text = ft.Text("", size=14)
+                            next_btn = ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+                                                         bgcolor="#7AA2F7", color="#FFFFFF", disabled=True)
 
-                            def make_click(opt, is_correct):
+                            def make_click(opt):
                                 def click(e):
                                     if state["answered"]:
                                         return
                                     state["answered"] = True
                                     score["total"] += 1
+                                    is_correct = (opt == correct)
+                                    # 作答后禁用所有选项，防连点/重复计分
+                                    for _b in opt_btns:
+                                        _b.disabled = True
+                                    next_btn.disabled = False
                                     if is_correct:
                                         score["correct"] += 1
                                         update_word_learning(word, "quiz_correct")
@@ -5584,7 +5607,7 @@ def main(page: ft.Page):
                                 return click
 
                             for opt in options:
-                                b = ft.ElevatedButton(opt, on_click=make_click(opt, opt == correct),
+                                b = ft.ElevatedButton(opt, on_click=make_click(opt),
                                                       expand=True, bgcolor="#24283B", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
@@ -5596,27 +5619,48 @@ def main(page: ft.Page):
                                 ft.Container(height=10),
                                 result_text,
                                 ft.Container(height=10),
-                                ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                          bgcolor="#7AA2F7", color="#FFFFFF")],
-                                       alignment=ft.MainAxisAlignment.CENTER),
+                                ft.Row([next_btn], alignment=ft.MainAxisAlignment.CENTER),
                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
                         elif mode == "meaning2word":
+                            # 干扰项按单词去重：避免重复按钮/两个“正确答案”；不足 4 项时从全词库补齐
                             options = [word]
-                            others = random.sample([x for x in queue if x.get("word", "") != word],
-                                                   min(3, max(0, len(queue) - 1))) if len(queue) > 1 else []
-                            for o in others:
-                                options.append(o.get("word", ""))
+                            seen = {word}
+                            for o in (x for x in queue if x.get("word", "") != word):
+                                _w = str(o.get("word", "") or "").strip()
+                                if _w and _w not in seen:
+                                    seen.add(_w)
+                                    options.append(_w)
+                                if len(options) >= 4:
+                                    break
+                            if len(options) < 4:
+                                try:
+                                    for o in load_vocab_cached(0):
+                                        _w = str(o.get("word", "") or "").strip()
+                                        if _w and _w not in seen:
+                                            seen.add(_w)
+                                            options.append(_w)
+                                        if len(options) >= 4:
+                                            break
+                                except BaseException:
+                                    pass
                             random.shuffle(options)
                             correct = word
                             opt_btns = []
                             result_text = ft.Text("", size=14)
+                            next_btn = ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+                                                         bgcolor="#7AA2F7", color="#FFFFFF", disabled=True)
 
-                            def make_click2(opt, is_correct):
+                            def make_click2(opt):
                                 def click(e):
                                     if state["answered"]:
                                         return
                                     state["answered"] = True
                                     score["total"] += 1
+                                    is_correct = (opt == correct)
+                                    # 作答后禁用所有选项，防连点/重复计分
+                                    for _b in opt_btns:
+                                        _b.disabled = True
+                                    next_btn.disabled = False
                                     if is_correct:
                                         score["correct"] += 1
                                         update_word_learning(word, "quiz_correct")
@@ -5632,7 +5676,7 @@ def main(page: ft.Page):
                                 return click
 
                             for opt in options:
-                                b = ft.ElevatedButton(opt, on_click=make_click2(opt, opt == correct),
+                                b = ft.ElevatedButton(opt, on_click=make_click2(opt),
                                                       expand=True, bgcolor="#24283B", color="#FFFFFF")
                                 opt_btns.append(b)
                             quiz_area.content = ft.Column([
@@ -5643,9 +5687,7 @@ def main(page: ft.Page):
                                 ft.Container(height=10),
                                 result_text,
                                 ft.Container(height=10),
-                                ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                          bgcolor="#7AA2F7", color="#FFFFFF")],
-                                       alignment=ft.MainAxisAlignment.CENTER),
+                                ft.Row([next_btn], alignment=ft.MainAxisAlignment.CENTER),
                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
                         else:
                             input_field = ft.TextField(label="输入英文单词", autofocus=True)
@@ -5655,6 +5697,9 @@ def main(page: ft.Page):
                                 if state["answered"]:
                                     return
                                 state["answered"] = True
+                                # 作答后禁提交、解锁下一题：防止重复提交/跳过未答
+                                submit_btn.disabled = True
+                                next_btn.disabled = False
                                 user_ans = input_field.value.strip().lower()
                                 score["total"] += 1
                                 is_correct = user_ans == word.lower()
@@ -5671,6 +5716,11 @@ def main(page: ft.Page):
                                                    detail="spelling", correct=is_correct)
                                 page.update()
 
+                            submit_btn = ft.ElevatedButton("提交", on_click=check,
+                                                           bgcolor="#7AA2F7", color="#FFFFFF")
+                            next_btn = ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+                                                         bgcolor="#24283B", color="#FFFFFF", disabled=True)
+
                             quiz_area.content = ft.Column([
                                 ft.Text("根据释义拼写单词", size=13, color=ft.Colors.GREY_500),
                                 ft.Text(meaning, size=20, weight=ft.FontWeight.BOLD),
@@ -5678,9 +5728,8 @@ def main(page: ft.Page):
                                 input_field,
                                 ft.Container(height=10),
                                 ft.Row([
-                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#7AA2F7", color="#FFFFFF"),
-                                    ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
-                                                      bgcolor="#24283B", color="#FFFFFF"),
+                                    submit_btn,
+                                    next_btn,
                                 ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
                                 ft.Container(height=10),
                                 result_text,
