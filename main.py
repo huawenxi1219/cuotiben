@@ -1339,9 +1339,12 @@ def save_ai_config(config):
 
 
 def resolve_deepseek_model(cfg):
-    """统一 DeepSeek 模型名：全文件只认 deepseek-flash 这一种写法（旧名已由 load_ai_config 迁移）。
-    禁止再出现 deepseek-v4-flash 之类的第二套写法。"""
-    return (cfg.get("deepseek_model") or "deepseek-flash").strip() or "deepseek-flash"
+    """统一 DeepSeek 模型名：全文件只认 deepseek-flash 这一种写法。
+    旧名（deepseek-v4-flash 等）一律归一化为 deepseek-flash，与 load_ai_config 迁移一致。"""
+    _m = (cfg.get("deepseek_model") or "deepseek-flash").strip() or "deepseek-flash"
+    if _m in ("", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
+        return "deepseek-flash"
+    return _m
 
 
 def get_gaokao_days_left():
@@ -6510,6 +6513,19 @@ def main(page: ft.Page):
                     up_files = []
                     up_picker_col, up_files, reset_picker = make_file_picker_button(
                         "📷 图片（可多选）", "image", on_complete=None)
+                    _up_committed = {"v": False}   # 保存成功后才置 True；未保存关闭弹窗时清理已复制未入库的图片
+
+                    def _cleanup_uncommitted():
+                        if _up_committed["v"]:
+                            return
+                        for _p in list(up_files):
+                            try:
+                                _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
+                                if os.path.exists(_full):
+                                    os.remove(_full)
+                            except BaseException:
+                                pass
+                        up_files.clear()
 
                     def do_upload(e):
                         nonlocal up_files
@@ -6518,6 +6534,8 @@ def main(page: ft.Page):
                             show_toast("请输入内容或选图片", "red")
                             return
                         save_note(up_subject, content, list(up_files))
+                        _up_committed["v"] = True   # 文件已随 save_note 入库，关闭弹窗时不再清理
+                        reset_picker(keep=True)
                         page.close(up_dlg)
                         show_toast(f"✅ {up_subject} 笔记已保存（已置顶）", "green")
                         open_function_page(up_subject, "笔记本")
@@ -6532,7 +6550,8 @@ def main(page: ft.Page):
                         actions=[
                             ft.TextButton("取消", on_click=lambda e: page.close(up_dlg)),
                             ft.ElevatedButton("💾 保存", on_click=do_upload),
-                        ])
+                        ],
+                        on_dismiss=lambda e: _cleanup_uncommitted())
                     page.open(up_dlg)
                     page.update()
 
