@@ -6867,9 +6867,9 @@ def main(page: ft.Page):
                     else:
                         view_state["open"].add(t)
                     # 重建视图（保持当前缩放/平移），刷新折叠状态；折叠=数据变更，强制重建内容
-                    viewport.content = ft.Transform(
+                    viewport.content = ft.Container(
                         scale=view_state["scale"],
-                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                        offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
                         content=rebuild_mindmap_view(force=True))
                     viewport.update()
 
@@ -6979,23 +6979,24 @@ def main(page: ft.Page):
 
                 def _apply_transform():
                     # 双指缩放/拖动 → 更新真正显示的 viewport（历史版本曾更新未挂载的 content_holder 导致手势无效）
-                    viewport.content = ft.Transform(
+                    # flet 0.28.3 无 ft.Transform：用 Container 原生 scale/offset（offset 为相对自身尺寸比例）
+                    viewport.content = ft.Container(
                         scale=view_state["scale"],
-                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                        offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
                         content=rebuild_mindmap_view())
                     viewport.update()
 
                 def zoom_by(delta):
                     view_state["scale"] = min(2.6, max(0.4, view_state["scale"] + delta))
-                    viewport.content = ft.Transform(
+                    viewport.content = ft.Container(
                         scale=view_state["scale"],
-                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
+                        offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
                         content=rebuild_mindmap_view())
                     viewport.update()
 
                 def reset_view():
                     view_state.update({"scale": 1.0, "dx": 0.0, "dy": 0.0})
-                    viewport.content = ft.Transform(scale=1.0, translate=ft.Offset(0, 0),
+                    viewport.content = ft.Container(scale=1.0, offset=ft.Offset(0, 0),
                                                     content=rebuild_mindmap_view())
                     viewport.update()
 
@@ -7031,16 +7032,16 @@ def main(page: ft.Page):
                     _th.Thread(target=_job, daemon=True).start()
                     show_toast("🔍 正在让 AI 理解图片（每张约几秒）...", "orange")
                 viewport = ft.Container(
-                    content=ft.Transform(
-                        scale=1.0, translate=ft.Offset(0, 0),
+                    content=ft.Container(
+                        scale=1.0, offset=ft.Offset(0, 0),
                         content=rebuild_mindmap_view()),
                     expand=True,
                     bgcolor="#12121A",
                     clip_behavior=ft.ClipBehavior.HARD_EDGE,
                     border_radius=12,
                     border=ft.border.all(1, "#2A2E44"))
-                viewport.content = ft.Transform(
-                    scale=view_state["scale"], translate=ft.Offset(0, 0),
+                viewport.content = ft.Container(
+                    scale=view_state["scale"], offset=ft.Offset(0, 0),
                     content=rebuild_mindmap_view())
                 _mm_root_ref["v"] = viewport
 
@@ -7062,10 +7063,11 @@ def main(page: ft.Page):
                     view_state["dy"] = -(pos[1]) + (LAYOUT_H - NODE_H) / 2.0
                     view_state["hl"] = target
                     try:
-                        viewport.content = ft.Transform(
+                        # P2-10：force=True 让高亮样式重算（否则命中内容缓存返回旧节点树，hl 不生效）
+                        viewport.content = ft.Container(
                             scale=view_state["scale"],
-                            translate=ft.Offset(view_state["dx"], view_state["dy"]),
-                            content=rebuild_mindmap_view())
+                            offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
+                            content=rebuild_mindmap_view(force=True))
                         viewport.update()
                         show_toast(f"🧭 已定位知识点：{target}", "orange")
                     except BaseException:
