@@ -206,11 +206,6 @@ def ensure_learning_field(word_data):
     return word_data
 
 
-def schedule_next_review(level):
-    idx = min(max(level, 0), len(REVIEW_INTERVALS) - 1)
-    return REVIEW_INTERVALS[idx]
-
-
 def update_word_learning(word, result, review_time=None):
     """SM-2 间隔重复算法：记录每次选择的确切时间，按难度系数动态安排复习
     review_time: 可选，手环同步时传入原始选择时间（格式 YYYY-MM-DD HH:MM:SS）
@@ -543,16 +538,6 @@ def stop_band_http_server():
             pass
         band_http_server = None
     band_http_running = False
-
-
-def get_today_new_words(limit):
-    all_words = load_jsonl(VOCAB_FILE)
-    new_words = []
-    for w in all_words:
-        ensure_learning_field(w)
-        if w["learning"].get("status") == "new":
-            new_words.append(w)
-    return new_words[:limit]
 
 
 def get_today_review_words(limit):
@@ -2840,14 +2825,6 @@ def clean_latex(text):
     return text.strip()
 
 
-def convert_chemical_formula(text):
-    text = re.sub(r'([A-Z][a-z]?)(\d+[+-])(?![^{])', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
-    text = re.sub(r'([A-Z][a-z]?)([+-])(?![^{])', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
-    text = re.sub(r'\)(\d+)(?![_{])', r')_{\1}', text)
-    text = re.sub(r'([A-Z][a-z]?)(\d+)(?![_{^])', lambda m: f"{m.group(1)}_{{{m.group(2)}}}", text)
-    return text
-
-
 CONTENT_LIB_FILES = {
     "语文": "chinese.json", "数学": "math.json", "英语": "english.json",
     "物理": "physics.json", "化学": "chemistry.json", "生物": "biology.json",
@@ -2872,22 +2849,6 @@ def init_content_lib():
         if not os.path.exists(filepath):
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(defaults.get(subject, {"subject": subject}), f, ensure_ascii=False, indent=2)
-
-
-def load_content_lib(subject):
-    filename = CONTENT_LIB_FILES.get(subject)
-    if not filename:
-        return {"subject": subject}
-    filepath = os.path.join(CONTENT_LIB_DIR, filename)
-    if not os.path.exists(filepath):
-        init_content_lib()
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except BaseException as _be:
-        _diag_log(_be, "L2625")
-
-        return {"subject": subject}
 
 
 def main(page: ft.Page):
@@ -3064,14 +3025,6 @@ def main(page: ft.Page):
 
                 threading.Thread(target=fade_out, daemon=True).start()
 
-            def show_message(target_text, text, color="green"):
-                target_text.value = text
-                target_text.color = color
-                page.update()
-                threading.Thread(
-                    target=lambda: (time.sleep(2), setattr(target_text, 'value', ''), page.update()),
-                    daemon=True
-                ).start()
 
             def show_image_gallery(image_paths, start_index=0, on_close=None):
                 if not image_paths:
@@ -6655,7 +6608,32 @@ def main(page: ft.Page):
                                         _MM_HIGHLIGHT["kp"] = kp_title
                                         open_function_page(item_data.get("subject", subject), "思维导图")
 
+                                    def open_redo(e):
+                                        """重做：把题丢回对话，让 AI 先别给答案，自己再做一遍"""
+                                        page.close(detail_dlg)
+                                        subj_redo = item_data.get("subject", "总AI")
+                                        q_redo = item_data.get("original", "") or item_data.get("question", "")
+                                        prompt = f"""这道题我之前做错过，现在想自己重做一遍。请你**先不要给答案**：
+
+📝 题目：{q_redo}
+
+请按这个节奏来：
+1. 先问我「你打算从哪入手」，让我自己说思路
+2. 我说不出来时，只给一句提示，不要直接讲解法
+3. 我写出答案后，你再判对错、讲清楚关键那一步
+4. 最后出一道同类型的变式题，让我当场练"""
+                                        try:
+                                            log_learning_event("redo", subj_redo,
+                                                               kp=(item_data.get("tags") or [""])[0],
+                                                               detail=f"重做：{q_redo[:60]}")
+                                        except BaseException:
+                                            pass
+                                        open_chat(subj_redo, initial_message=prompt, auto_send=True)
+
                                     action_row = ft.Row([
+                                        ft.ElevatedButton("🔄 重做", on_click=open_redo,
+                                                          icon=ft.Icons.REPLAY,
+                                                          bgcolor="#E0AF68", color="#1A1B26"),
                                         ft.ElevatedButton("🎓 问老师", on_click=open_ask_teacher,
                                                           icon=ft.Icons.SCHOOL, bgcolor="#7AA2F7",
                                                           color=ft.Colors.WHITE),
