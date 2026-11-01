@@ -1975,61 +1975,92 @@ def save_mindmap(subject, tree):
 
 
 def build_mindmap(subject):
-    """从错题自动聚类生成学科知识树；已有人工编辑的树则增量合并新知识点。"""
+    """按「掌握情况」分成三组再往下钻，像商场楼层导航：
+       学科 → ⚠️我不会的 / 📓我记过的 / 📚其他知识点 → 知识点 → 笔记·错题
+    同名知识点只出现在一个组里，不会出现"两个节点同名打架"。"""
     errors = load_jsonl(ERRORS_FILE)
     subj_errors = [e for e in errors if e.get("subject") == subject]
-    # 按知识点标签聚类（每个错题的主要标签）
-    clusters = {}
+
+    kp_err = {}          # 知识点 -> 错题数
     for e in subj_errors:
         tags = [str(t) for t in (e.get("tags") or []) if str(t).strip()] or ["未分类"]
-        main_tag = tags[0]
-        kp = (e.get("kp") or main_tag).strip()
-        clusters.setdefault(kp, {"title": kp, "children": [], "kp": kp, "count": 0})
-        clusters[kp]["count"] += 1
-    # 笔记的知识点标签也并入知识树：长按收录的笔记（带 tags）能长出自己的节点
+        kp = (e.get("kp") or tags[0]).strip()
+        kp_err[kp] = kp_err.get(kp, 0) + 1
+
+    kp_note = {}         # 知识点 -> 笔记数
     try:
-        _notes_all = load_jsonl(NOTES_FILE)
-        for _n in _notes_all:
+        for _n in load_jsonl(NOTES_FILE):
             if _n.get("subject") != subject:
                 continue
             for _tg in (_n.get("tags") or []):
-                _tg_s = str(_tg).strip()
-                if _tg_s and _tg_s not in clusters:
-                    clusters[_tg_s] = {"title": _tg_s, "children": [], "kp": _tg_s, "count": 0}
+                _s = str(_tg).strip()
+                if _s:
+                    kp_note[_s] = kp_note.get(_s, 0) + 1
     except BaseException as _be:
-        _diag_log(_be, "L1961")
-
+        _diag_log(_be, "L1990")
         pass
-    # 分层：每个知识点节点下自动挂「笔记层 / 错题层」两个子层（像导航分层）
-    for kp, nd in clusters.items():
-        nd.setdefault("children", []).insert(0, {"title": "📓 笔记", "kind": "notes", "kp": kp})
-        nd.setdefault("children", []).append({"title": "📕 错题", "kind": "errors", "kp": kp})
-    # 一级主题：优先用学科常见模块名兜底
-    root_children = []
-    for kp in sorted(clusters.keys()):
-        root_children.append(clusters[kp])
-    tree = {"title": subject, "children": root_children}
-    # 与已有手动树合并：保留已有结构，补充新聚类出来的知识点
-    old = load_mindmap(subject)
-    if old and old.get("children"):
-        old_titles = {c.get("title") for c in old["children"]}
-        for c in root_children:
-            if c["title"] not in old_titles:
-                old["children"].append(c)
-        # 已有节点也补充新错题计数 + 补齐分层子节点
-        old_by_title = {c.get("title"): c for c in old["children"]}
-        for c in root_children:
-            if c["title"] in old_by_title:
-                nd0 = old_by_title[c["title"]]
-                nd0["count"] = c.get("count", 0)
-                kinds = {x.get("kind") for x in nd0.get("children", [])}
-                if "notes" not in kinds:
-                    nd0.setdefault("children", []).insert(0, {"title": "📓 笔记", "kind": "notes", "kp": c["title"]})
-                if "errors" not in kinds:
-                    nd0.setdefault("children", []).append({"title": "📕 错题", "kind": "errors", "kp": c["title"]})
-        tree = old
+
+    # 画像里的薄弱点也算"我不会的"
+    try:
+        _wk = (load_user_profile().get("weak_knowledge") or {})
+    except BaseException:
+        _wk = {}
+
+    def _mk_node(kp, cnt_err, cnt_note):
+        nd = {"title": kp, "kp": kp, "count": cnt_err,
+              "children": [
+                  {"title": "📓 笔记", "kind": "notes", "kp": kp},
+                  {"title": "📕 错题", "kind": "errors", "kp": kp},
+              ]}
+        if cnt_note:
+            nd["count"] = cnt_err + cnt_note
+        return nd
+
+    weak_nodes, note_nodes, other_nodes = [], [], []
+    all_kps = set(kp_err) | set(kp_note) | set(_wk)
+    for kp in sorted(all_kps):
+        if not kp:
+            continue
+        ce, cn = kp_err.get(kp, 0), kp_note.get(kp, 0)
+        nd = _mk_node(kp, ce, cn)
+        if ce > 0 or kp in _wk:
+            weak_nodes.append(nd)
+        elif cn > 0:
+            note_nodes.append(nd)
+        else:
+            other_nodes.append(nd)
+
+    # 手动添加过、但现在既没错题也没笔记的知识点，收进"其他"，别丢
+    try:
+        old = load_mindmap(subject) or {}
+        _known = all_kps
+        for c in (old.get("children") or []):
+            t = c.get("title")
+            # 兼容旧结构（扁平知识点）和新结构（分组）
+            if c.get("children") and all((x.get("title") or "").startswith(("📓", "📕", "📚", "📝", "⚠️"))
+                                         for x in c["children"]):
+                continue
+            if t and t not in _known and t != subject and not t.startswith(("📚", "📓", "⚠️")):
+                other_nodes.append(_mk_node(t, 0, 0))
+    except BaseException as _be:
+        _diag_log(_be, "L2030")
+        pass
+
+    groups = []
+    if weak_nodes:
+        groups.append({"title": f"⚠️ 我不会的（{len(weak_nodes)}）", "kind": "group",
+                       "children": weak_nodes, "count": len(weak_nodes)})
+    if note_nodes:
+        groups.append({"title": f"📓 我记过的（{len(note_nodes)}）", "kind": "group",
+                       "children": note_nodes, "count": len(note_nodes)})
+    if other_nodes:
+        groups.append({"title": f"📚 其他知识点（{len(other_nodes)}）", "kind": "group",
+                       "children": other_nodes, "count": len(other_nodes)})
+
+    tree = {"title": subject, "children": groups}
     save_mindmap(subject, tree)
     return tree
+
 
 
 @retry_request(max_retries=3, base_delay=2)
@@ -7173,6 +7204,12 @@ def main(page: ft.Page):
                               "layout": {}, "open": set(), "grown": False,
                               "grow_nodes": [], "hl": highlight_kp,
                               "rebuild_count": 0}
+                # 默认把三个分组收起来，先看到"楼层导航"，点一下再展开
+                try:
+                    view_state["open"] = set(c.get("title") for c in tree.get("children", [])
+                                             if c.get("kind") == "group")
+                except BaseException:
+                    pass
                 # 掌握度：画像薄弱度 + 复习卡熟练度 + 错题数 综合（0~1，越高越熟）
                 def mastery_for(kp_title):
                     try:
@@ -7357,7 +7394,7 @@ def main(page: ft.Page):
                         bg, border, fg = "#2A1F22", "#F7768E", "#FFB3C1"  # 错题层：玫红
                     else:
                         bg, border, fg = "#1A1B26", colors[min(depth, len(colors) - 1)], "#E0E3F0"
-                    badge = f"  ·{count}题" if count else ""
+                    badge = (f"  ·{count}个" if kind == "group" else f"  ·{count}题") if count else ""
                     if is_hl:
                         border, fg = "#FFD54F", "#FFECB3"
                         bg = "#3B3110"
