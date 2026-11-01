@@ -3756,6 +3756,10 @@ def main(page: ft.Page):
                 chat_dialog.offset = ft.Offset(0, 0.04)
                 chat_dialog.opacity = 0
                 chat_dialog.visible = True
+                try:
+                    ball_container.visible = False   # 层级：聊天窗盖住悬浮球，别让它飘在对话上
+                except BaseException:
+                    pass
                 page.update()
                 chat_dialog.offset = ft.Offset(0, 0)
                 chat_dialog.opacity = 1
@@ -3834,24 +3838,36 @@ def main(page: ft.Page):
                 memory_context = get_memory_context(subject if subject != "总AI" else None)
                 profile_summary = get_profile_summary()
                 strategy = get_teaching_strategy(subject if subject != "总AI" else None)
-                system_prompt = f"""你是「池鱼」里的{display_name}老师——一位真正了解{display_name}的私教。请像真人老师一样自然地和学生对话，别端着、别啰嗦、别用"作为AI"这类开头。
+                system_prompt = f"""你是「池鱼」里给高中生上课的{display_name}老师。你的任务不是"显得专业"，而是让他听完能自己做出来。
 
-回答风格（像豆包 / DeepSeek 手机版那样好聊）：
-- 自然口语化，但保持专业；句子短一点，多用"你/咱们"，少用机械的"第一、第二"模板。
-- 简洁优先：先直接给结论/答案，再展开解释；能一句话说清就别写三段；别堆砌"首先/其次/最后"。
-- 下方注入的记忆（画像/错题/笔记/摘要/联网）是让你更懂他的背景，不是任务清单——自然融入回答即可，不要逐条复述。
-- 知识类问题：讲清原理与关键点，能串上他学过的内容就主动提一句。
-- 解题类问题：先讲思路（为什么这么做），再给步骤，最后点出易错点；不要一上来甩答案。
-- 学生卡壳时：主动降难度、换个角度、举个生活化的例子再讲一遍。
-- 讲解完随手问一句"这步明白吗？"，让学生能接话。
+【第一条铁律：不许说空话】
+下面这些话一律不准出现，想到就换成具体内容：
+"夯实基础""多练习""加强理解""注意审题""掌握方法""培养思维""这个问题比较复杂，需要综合考虑"。
+凡是"建议"，必须点明：哪个知识点、哪一步、练几道、错在哪。
+写不出具体的，说明这一遍没讲清楚，回去重讲这一步。
 
-你真正了解这个学生：下方附有他的学习画像、薄弱点、错题、历史对话等真实记忆。回答时自然引用这些记忆（比如"上次你在这个知识点错过""你最近在练XX"），让他感到你真的记得他——但不要生硬复述标签和数据。
+【讲题必须按这个结构】
+1. 一句话点破：考的是哪个知识点，要用哪个公式/方法。
+2. 拆步骤：一步一行，每行写"做什么 + 为什么"，代入的数字或式子要写出来。
+3. 单独拎出最关键的一步：这题最容易卡住或最容易错的地方，说清为什么会错。
+4. 算到底：必须把结果算出来，不许停在"代入可得""化简即可"。
+5. 结尾一句自测题，让他能立刻动手验证。
 
-【教学法（借鉴港大 DeepTutor 深度辅导思路）】
-- 先诊断后讲解：回答前先想学生当前水平，讲解按"他听得懂"的难度来。
-- 引导式：题目类问题先让他自己想/说，再判对错讲解；不要直接给答案。
-- 主动关联：他问的东西如果和你记得的薄弱点/错题有关，主动串联旧知识。
-- 学情闭环：讲完给他一句"下一步建议练什么"，让他能持续进步。"""
+【讲概念必须按这个结构】
+1. 先用一句大白话说清它是什么。
+2. 给一个具体例子（数字或生活场景），不要只给定义。
+3. 说清它和最容易混的那个概念的差别。
+4. 一句话说明考试里会怎么考这个点。
+
+【硬性要求】
+- 学生只问一句，就答这一句，别硬凑成小作文；但讲题该展开时必须展开，不许为了"简洁"把步骤省掉。
+- 不确定的（超纲、版本差异、题目信息不全）直接说"这题信息不够"或"这个我不确定"，绝不编造。
+- 少用"首先/其次/最后"这类模板词，用自然的连接。
+- 不喊口号、不写励志鸡汤，除非他明确要。
+- 公式用标准写法；能用文字讲清的就不堆符号。
+
+【你的学生】
+你面对的是一个具体的人，不是调查问卷。下面会给他的画像、错题、笔记、教材原文——用得上就用，用不上别硬塞。提到他的旧问题时用自然说法（"你上次在XX也卡过"），不要念数据。"""
                 
                 custom_skill = load_custom_skill()
                 if custom_skill:
@@ -3972,6 +3988,16 @@ def main(page: ft.Page):
                 drawer_error_fields = ft.Column([drawer_q_input, drawer_m_input, drawer_a_input], spacing=8)
                 drawer_note_fields = ft.Column([drawer_note_input], spacing=8)
 
+                # 分派按钮：把"已加入的片段"一键塞进指定字段
+                drawer_assign_row = ft.Row([
+                    ft.TextButton("⤵ 收进题目", on_click=lambda e: _field_append(drawer_q_input)),
+                    ft.TextButton("⤵ 收进错因", on_click=lambda e: _field_append(drawer_m_input)),
+                    ft.TextButton("⤵ 收进解答", on_click=lambda e: _field_append(drawer_a_input)),
+                ], spacing=0, wrap=True)
+                drawer_assign_note_row = ft.Row([
+                    ft.TextButton("⤵ 收进笔记", on_click=lambda e: _field_append(drawer_note_input)),
+                ], spacing=0)
+
                 def _refresh_drawer_items():
                     drawer_items_col.controls.clear()
                     for i, it in enumerate(_drawer["items"]):
@@ -4005,6 +4031,17 @@ def main(page: ft.Page):
                     _refresh_drawer_items()
                     page.update()
 
+                def _field_append(field):
+                    """把已加入的片段追加到某个字段（题目/错因/解答/笔记）"""
+                    _txt = "\n".join(str(it).strip() for it in _drawer["items"] if str(it).strip())
+                    if not _txt:
+                        show_toast("先到对话里长按，把要用的段落加进来", "grey")
+                        return
+                    _cur = (field.value or "").strip()
+                    field.value = (_cur + "\n" + _txt).strip() if _cur else _txt
+                    page.update()
+                    show_toast("已收进去，可在框里继续改", "green")
+
                 def _drawer_remove_item(idx):
                     if 0 <= idx < len(_drawer["items"]):
                         _drawer["items"].pop(idx)
@@ -4018,6 +4055,8 @@ def main(page: ft.Page):
                     drawer_mode_title.value = "📕 收录错题" if mode == "error" else "📓 收录笔记"
                     drawer_error_fields.visible = (mode == "error")
                     drawer_note_fields.visible = (mode == "note")
+                    drawer_assign_row.visible = (mode == "error")
+                    drawer_assign_note_row.visible = (mode == "note")
                     drawer_q_input.value = q_hint or ""
                     drawer_m_input.value = ""
                     drawer_a_input.value = ""
@@ -4044,14 +4083,41 @@ def main(page: ft.Page):
                         show_toast("这条消息还没有内容", "grey")
                         return
                     _q = _t if source == "我的提问" else str(last_user_msg.get("text", "") or "")
+                    # 按空行/句号切段，让用户自己挑要收哪几段
+                    _segs = [s.strip() for s in re.split(r"\n{2,}|(?<=[。！？；])|(?<=[.!?] )", _t) if s.strip()]
+                    if not _segs:
+                        _segs = [_t]
+                    _segs = _segs[:20]
+                    _checks = []
+                    _seg_col = ft.Column([], spacing=0, scroll=ft.ScrollMode.AUTO)
+                    for _i, _s in enumerate(_segs):
+                        _label = _s.replace("\n", " ")
+                        if len(_label) > 34:
+                            _label = _label[:34] + "…"
+                        _cb = ft.Checkbox(label=_label, value=True)
+                        _checks.append((_cb, _s))
+                        _seg_col.controls.append(_cb)
+
+                    def _go(_mode):
+                        _picked = [s for cb, s in _checks if cb.value]
+                        page.close(dlg)
+                        if not _picked:
+                            show_toast("至少选一段", "red")
+                            return
+                        _drawer_open(_mode, "\n\n".join(_picked), _q)
+
                     dlg = ft.AlertDialog(
-                        title=ft.Text("收录到哪里？"),
-                        content=ft.Text(f"来自「{source}」气泡 · {len(_t)} 字\n将自动识别题目 / 错因 / 知识点", size=13, color="#888888"),
+                        title=ft.Text("选要收哪几段？"),
+                        content=ft.Column([
+                            ft.Text(f"来自「{source}」· 勾选后收录，可再改", size=12, color="#888888"),
+                            ft.Container(content=_seg_col, height=min(260, 30 * len(_segs) + 8),
+                                         width=330, padding=2),
+                        ], spacing=6),
                         actions=[
-                            ft.ElevatedButton("📕 收录错题", icon=ft.Icons.EDIT_NOTE,
-                                              on_click=lambda e: (page.close(dlg), _drawer_open("error", _t, _q))),
-                            ft.ElevatedButton("📓 收录笔记", icon=ft.Icons.BOOKMARK_ADD,
-                                              on_click=lambda e: (page.close(dlg), _drawer_open("note", _t, _q))),
+                            ft.ElevatedButton("📕 收错题", icon=ft.Icons.EDIT_NOTE,
+                                              on_click=lambda e: _go("error")),
+                            ft.ElevatedButton("📓 收笔记", icon=ft.Icons.BOOKMARK_ADD,
+                                              on_click=lambda e: _go("note")),
                             ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
                         ],
                         actions_alignment=ft.MainAxisAlignment.END)
@@ -4139,8 +4205,14 @@ def main(page: ft.Page):
                         if not content:
                             show_toast("笔记内容不能为空", "red")
                             return
-                        save_note(_subj, content, media=[], tags=[_kp] if _kp else None)
-                        show_toast(f"✅ 已收录笔记{(' · 已挂知识树：' + _kp) if _kp else ''}", "green")
+                        # 知识点为空时用科目名兜底，保证思维导图里一定能长出节点
+                        _tags_final = [_kp] if _kp else [_subj]
+                        save_note(_subj, content, media=[], tags=_tags_final)
+                        try:
+                            build_mindmap(_subj)   # 立刻并入知识树，不用等下次打开导图
+                        except BaseException as _be:
+                            _diag_log(_be, "L4001")
+                        show_toast(f"✅ 已收录笔记 · 已挂到「{_tags_final[0]}」", "green")
                     _drawer_close()
 
                 drawer_header = ft.Row([
@@ -4168,6 +4240,8 @@ def main(page: ft.Page):
                         drawer_items_head,
                         ft.Container(content=drawer_items_col, height=110, padding=2,
                                      border=ft.border.all(1, "#33414868"), border_radius=10),
+                        drawer_assign_row,
+                        drawer_assign_note_row,
                         drawer_error_fields,
                         drawer_note_fields,
                         ft.Row([
@@ -4178,6 +4252,18 @@ def main(page: ft.Page):
                         ], alignment=ft.MainAxisAlignment.END),
                     ], spacing=8, scroll=ft.ScrollMode.AUTO),
                 )
+
+                def _pop_in(ctl):
+                    """气泡入场：从下方 8% 处淡入，30ms 后触发，只跑一次线程"""
+                    def _run():
+                        time.sleep(0.03)
+                        try:
+                            ctl.opacity = 1.0
+                            ctl.offset = ft.Offset(0, 0)
+                            page.update()
+                        except BaseException:
+                            pass
+                    threading.Thread(target=_run, daemon=True).start()
 
                 def make_user_bubble(text):
                     # 支持多模态图片：消息里以【图】标记携带本地图片路径，拆出文本+图片渲染
@@ -4205,9 +4291,14 @@ def main(page: ft.Page):
                             border=ft.border.all(1, "#557AA2F7"),
                             shadow=ft.BoxShadow(blur_radius=10, color="#44000000"),
                             width=300,
+                            opacity=0,
+                            offset=ft.Offset(0, 0.08),
+                            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+                            animate_offset=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
                         ),
                     ], alignment=ft.MainAxisAlignment.END)
                     # 长按我的提问 → 弹收录菜单（错题/笔记）
+                    _pop_in(_row.controls[-1])
                     return ft.GestureDetector(
                         content=_row,
                         on_long_press=lambda e: _ask_collect_menu(_bubble_text, "我的提问"))
@@ -4306,7 +4397,12 @@ def main(page: ft.Page):
                         border=ft.border.all(1, "#55414868"),
                         shadow=ft.BoxShadow(blur_radius=10, color="#33000000"),
                         width=300,
+                        opacity=0,
+                        offset=ft.Offset(0, 0.08),
+                        animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+                        animate_offset=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
                     )
+                    _pop_in(bubble)
                     avatar = ft.Container(
                         content=ft.Text(display_name[:1] if display_name != "总AI" else "AI",
                                         size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
@@ -5048,6 +5144,7 @@ def main(page: ft.Page):
                                           tooltip="返回",
                                           on_click=lambda e: (_cleanup_pending_chat_imgs(),
                                                               setattr(chat_dialog, 'visible', False),
+                                                              setattr(ball_container, 'visible', True),
                                                               page.update())),
                             ft.Column([
                                 ft.Text(f"💬 {display_name}", size=18, weight=ft.FontWeight.BOLD),
@@ -5164,6 +5261,15 @@ def main(page: ft.Page):
                 phrases = word_data.get("phrases", [])
                 content_children = []
                 content_children.append(ft.Text(f"📖 {word}", size=24, weight=ft.FontWeight.BOLD))
+                if word_data.get("core") is not None:
+                    _is_core = word_data.get("core") == 1
+                    content_children.append(ft.Container(
+                        content=ft.Text("🎯 高考核心词" if _is_core else "📎 扩展词",
+                                        size=13, weight=ft.FontWeight.BOLD,
+                                        color="#7AA2F7" if _is_core else "#E0AF68"),
+                        padding=ft.Padding(left=10, right=10, top=4, bottom=4),
+                        border_radius=10,
+                        bgcolor="#1F2A44" if _is_core else "#3A2F22"))
                 if phonetic:
                     content_children.append(ft.Text(f"🔊 {phonetic}", size=16, color="#A9B1D6"))
                 if meaning:
@@ -5404,7 +5510,11 @@ def main(page: ft.Page):
                     all_words = sorted(all_vocab, key=lambda x: x.get("word", "").lower())
                     vocab_list_view = ft.ListView(spacing=2, expand=True)
                     search_field = ft.TextField(label="🔍 搜索单词", hint_text="英文前缀或中文关键词", expand=True)
-                    count_text = ft.Text(f"共 {len(all_words)} 词", size=13, color=ft.Colors.GREY_500)
+                    _core_n = sum(1 for w in all_words if w.get("core") == 1)
+                    _extra_n = len(all_words) - _core_n
+                    _scope_info = f" · 核心 {_core_n} / 扩展 {_extra_n}"
+                    count_text = ft.Text(f"共 {len(all_words)} 词{_scope_info}", size=13,
+                                         color=ft.Colors.GREY_500)
 
                     _offset = [0]
 
@@ -5430,9 +5540,9 @@ def main(page: ft.Page):
                         offset = _offset[0]
                         shown = min(offset + BATCH, total)
                         if total > BATCH:
-                            count_text.value = f"共 {total} 词（显示 {offset + 1}-{shown}）"
+                            count_text.value = f"共 {total} 词（显示 {offset + 1}-{shown}）{_scope_info}"
                         else:
-                            count_text.value = f"共 {total} 词"
+                            count_text.value = f"共 {total} 词{_scope_info}"
 
                         def load_more():
                             _offset[0] += BATCH
@@ -5444,6 +5554,7 @@ def main(page: ft.Page):
                             phonetic = w.get("phonetic", "")
                             meaning_short = w.get("meaning", "")[:50]
                             is_new = word in nw_set
+                            _scope = "核心" if w.get("core") == 1 else "扩展"
 
                             def _show_detail(e, wd=w):
                                 _open_word_detail(wd, on_close=lambda: _render_list(search_field.value))
@@ -5451,8 +5562,9 @@ def main(page: ft.Page):
                             tile = ft.ListTile(
                                 leading=ft.Icon(ft.Icons.BOOKMARK if is_new else ft.Icons.CIRCLE, size=16,
                                                 color="#E0AF68" if is_new else ft.Colors.GREY_500),
-                                title=ft.Text(f"{word}  {phonetic}", size=15),
-                                subtitle=ft.Text(meaning_short, size=12, color=ft.Colors.GREY_400),
+                                title=ft.Text(f"{'◆ ' if w.get('core') == 1 else ''}{word}  {phonetic}", size=15),
+                                subtitle=ft.Text(f"[{_scope}] {meaning_short}", size=12,
+                                                color="#7AA2F7" if w.get("core") == 1 else ft.Colors.GREY_400),
                                 trailing=ft.IconButton(icon=ft.Icons.PLAY_ARROW, icon_size=20,
                                                        tooltip="查看详情", on_click=_show_detail),
                                 on_click=_show_detail, dense=True)
@@ -8800,6 +8912,9 @@ def main(page: ft.Page):
                     pass
                 try:
                     chat_dialog.visible = False
+                    ball_container.visible = True
+                    # 注：_drawer / drawer_container 是聊天窗内的局部对象，这里拿不到；
+                    # 聊天窗整体隐藏即可，状态随下次 build_chat_window 重建
                 except BaseException as _be:
                     _diag_log(_be, "L8564")
 
