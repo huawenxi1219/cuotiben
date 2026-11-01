@@ -2521,6 +2521,64 @@ def render_chart_from_spec(spec):
     return ""
 
 
+def build_study_export_md():
+    """把错题、笔记、画像、单词进度导出成一份 Markdown"""
+    errs = load_jsonl(ERRORS_FILE)
+    notes = load_jsonl(NOTES_FILE)
+    prof = load_user_profile()
+    vocab = load_jsonl(VOCAB_FILE)
+
+    L = ["# 池鱼学习档案", "", f"导出时间：{time.strftime('%Y-%m-%d %H:%M')}", "",
+         f"- 错题 **{len(errs)}** 道",
+         f"- 笔记 **{len(notes)}** 条",
+         f"- 词库 **{len(vocab)}** 词", ""]
+
+    wk = sorted((prof.get("weak_knowledge") or {}).items(), key=lambda x: -x[1])[:12]
+    if wk:
+        L += ["## 薄弱知识点", ""]
+        for k, v in wk:
+            bar = "█" * max(1, min(10, int(float(v) * 20)))
+            L.append(f"- **{k}**  {bar}  ({round(float(v), 2)})")
+        L.append("")
+
+    by_subject = {}
+    for e in errs:
+        by_subject.setdefault(e.get("subject", "未分类"), []).append(e)
+    if by_subject:
+        L += ["## 错题本", ""]
+        for subj in sorted(by_subject):
+            items = sorted(by_subject[subj], key=lambda x: x.get("timestamp", 0), reverse=True)
+            L += [f"### {subj}（{len(items)} 道）", ""]
+            for i, e in enumerate(items, 1):
+                q = (e.get("original") or e.get("question") or "").strip()
+                m = (e.get("mistake") or "").strip()
+                a = (e.get("answer") or "").strip()
+                tags = "、".join(str(x) for x in (e.get("tags") or [])[:6])
+                L.append(f"**{i}. {q[:200] or '（无题目内容）'}**")
+                if tags:
+                    L.append(f"标签：{tags}")
+                if m:
+                    L.append(f"> 错因：{m[:200]}")
+                if a:
+                    L.append(f"> 答案：{a[:300]}")
+                L.append("")
+
+    if notes:
+        L += ["## 笔记本", ""]
+        for n in sorted(notes, key=lambda x: str(x.get("time", "")), reverse=True):
+            body = (n.get("content") or "").strip()
+            if not body:
+                continue
+            tags = "、".join(str(x) for x in (n.get("tags") or [])[:5])
+            L.append(f"### {n.get('subject','')} · {n.get('time','')}" + (f"（{tags}）" if tags else ""))
+            L.append("")
+            L.append(body[:1200])
+            L.append("")
+
+    L += ["---", "由「池鱼Study」自动生成。"]
+    return "\n".join(L)
+
+
 def extract_chart_block(text):
     if not text:
         return text, None
@@ -6697,10 +6755,17 @@ def main(page: ft.Page):
 
                                     def delete_item(e):
                                         all_items = load_jsonl(ERRORS_FILE)
+                                        # 先放进回收站，再从列表移除（之前直接删，回收站永远是空的）
+                                        for _d in all_items:
+                                            if _same_item(_d):
+                                                try:
+                                                    move_to_recycle(_d)
+                                                except BaseException:
+                                                    pass
                                         filtered = [d for d in all_items if not _same_item(d)]
                                         save_jsonl(ERRORS_FILE, filtered)
                                         page.close(edit_dlg)
-                                        show_toast("🗑️ 已删除", "green")
+                                        show_toast("🗑️ 已删除（可在回收站找回）", "green")
                                         open_function_page(subject, "错题本")
                                         page.update()
 
@@ -7016,10 +7081,17 @@ def main(page: ft.Page):
 
                                     def delete_item(e):
                                         all_items = load_jsonl(NOTES_FILE)
+                                        # 先放进回收站，再从列表移除（之前直接删，回收站永远是空的）
+                                        for _d in all_items:
+                                            if _same_item(_d):
+                                                try:
+                                                    move_to_recycle(_d)
+                                                except BaseException:
+                                                    pass
                                         filtered = [d for d in all_items if not _same_item(d)]
                                         save_jsonl(NOTES_FILE, filtered)
                                         page.close(edit_dlg)
-                                        show_toast("🗑️ 已删除", "green")
+                                        show_toast("🗑️ 已删除（可在回收站找回）", "green")
                                         open_function_page(subject, "笔记本")
                                         page.update()
 
@@ -8949,6 +9021,14 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
                                   icon=ft.Icons.PERSON_OUTLINE),
+                ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
+                                  icon=ft.Icons.INSIGHTS),
+                ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
+                                  on_click=lambda e: _use_picker(page, on_export_md).save_file(
+                                      dialog_title="导出学习档案",
+                                      file_name="池鱼学习档案.md",
+                                      file_type=ft.FilePickerFileType.CUSTOM,
+                                      allowed_extensions=["md"])),
                 ft.ElevatedButton("🏷️ 批量重打标签", on_click=lambda e: batch_retag(e),
                                   icon=ft.Icons.LABEL),
                 retag_status,
@@ -9042,6 +9122,27 @@ def main(page: ft.Page):
                                         animate_opacity=ft.Animation(240, ft.AnimationCurve.EASE_OUT),
                                         animate_scale=ft.Animation(260, ft.AnimationCurve.EASE_OUT),
                                         scale=1.0)
+
+            def on_export_md(e):
+
+                if not getattr(e, "path", ""):
+
+                    return
+
+                _p = e.path if str(e.path).lower().endswith(".md") else str(e.path) + ".md"
+
+                try:
+
+                    with open(_p, "w", encoding="utf-8") as _f:
+
+                        _f.write(build_study_export_md())
+
+                    show_toast(f"✅ 已导出：{os.path.basename(_p)}", "green")
+
+                except Exception as _ex:
+
+                    show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
+
 
             def switch_page(index):
                 # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
