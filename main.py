@@ -2945,8 +2945,9 @@ def main(page: ft.Page):
 
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
             if not is_mobile:
-                page.window.width = 900
-                page.window.height = 700
+                _sim = os.environ.get("DSH_PHONE_SIM") == "1"
+                page.window.width = 360 if _sim else 900
+                page.window.height = 780 if _sim else 700
                 page.window.min_width = 360
                 page.window.min_height = 450
             else:
@@ -3735,6 +3736,8 @@ def main(page: ft.Page):
                 panel_y = max(8, min(panel_y, h - panel_h - 8))
                 contact_panel.left = panel_x
                 contact_panel.top = panel_y
+                contact_panel.width = panel_w
+                contact_panel.height = panel_h      # 之前没设高度，Stack 里会撑成一大块半透明挡板
                 contact_panel.right = None
                 contact_panel.bottom = None
                 contact_panel.visible = True
@@ -3948,7 +3951,21 @@ def main(page: ft.Page):
                 _cleanup_pending_chat_imgs()   # 切聊天窗口前清掉未发送的临时图
                 current_chat_subject = subject
                 close_contact_panel()
-                chat_dialog.content = build_chat_window(subject, initial_message, auto_send)
+                try:
+                    chat_dialog.content = build_chat_window(subject, initial_message, auto_send)
+                except Exception as _ex:
+                    _tb = traceback.format_exc()
+                    try:
+                        with open(os.path.join(DATA_DIR, "crash.log"), "a", encoding="utf-8") as _lf:
+                            _lf.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 打开聊天 {subject} 失败\n{_tb}\n")
+                    except BaseException:
+                        pass
+                    chat_dialog.content = ft.Column([
+                        ft.Text(f"⚠️ 打开「{subject}」对话失败", size=16, color="#EF5350",
+                                weight=ft.FontWeight.BOLD),
+                        ft.Text(str(_ex)[:300], size=13, color="#EF5350", selectable=True),
+                        ft.Text(_tb[-1200:], size=10, color="#9E9E9E", selectable=True),
+                    ], spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
                 # 弹入动画：先下沉+透明，再滑上来淡入
                 chat_dialog.offset = ft.Offset(0, 0.04)
                 chat_dialog.opacity = 0
@@ -4481,7 +4498,7 @@ def main(page: ft.Page):
                             pass
                     threading.Thread(target=_run, daemon=True).start()
 
-                def make_user_bubble(text):
+                def make_user_bubble(text, animate=False):
                     # 支持多模态图片：消息里以【图】标记携带本地图片路径，拆出文本+图片渲染
                     txt = re.sub(r"(\n)?【图】\S+", "", text).strip()
                     img_paths = re.findall(r"【图】(\S+)", text)
@@ -4514,12 +4531,13 @@ def main(page: ft.Page):
                         ),
                     ], alignment=ft.MainAxisAlignment.END)
                     # 长按我的提问 → 弹收录菜单（错题/笔记）
-                    _pop_in(_row.controls[-1])
+                    if animate:
+                        _pop_in(_row.controls[-1])
                     return ft.GestureDetector(
                         content=_row,
                         on_long_press=lambda e: _ask_collect_menu(_bubble_text, "我的提问"))
 
-                def make_ai_bubble(text, can_regenerate=True, content_ref=None):
+                def make_ai_bubble(text, can_regenerate=True, content_ref=None, animate=False):
                     if content_ref is None:
                         content_ref = {"col": None, "md": None, "stream": None, "row": None, "actions": None}
                     stream_text = ft.Text(text or "▌", size=14, selectable=True, color="#EEEEEE")
@@ -4627,7 +4645,8 @@ def main(page: ft.Page):
                         animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
                         animate_offset=ft.Animation(220, ft.AnimationCurve.EASE_OUT),
                     )
-                    _pop_in(bubble)
+                    if animate:
+                        _pop_in(bubble)
                     avatar = ft.Container(
                         content=ft.Text(display_name[:1] if display_name != "总AI" else "AI",
                                         size=11, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
@@ -4648,10 +4667,10 @@ def main(page: ft.Page):
 
                 for msg in history:
                     if msg["role"] == "user":
-                        chat_history_display.controls.append(make_user_bubble(msg["content"]))
+                        chat_history_display.controls.append(make_user_bubble(msg["content"], animate=False))
                     else:
                         clean_text, chart_html = extract_chart_block(msg["content"])
-                        bubble_row, content_col = make_ai_bubble(clean_text if clean_text else msg["content"])
+                        bubble_row, content_col = make_ai_bubble(clean_text if clean_text else msg["content"], animate=False)
                         if chart_html and content_col:
                             def make_view(h=chart_html):
                                 def view(e):
@@ -4897,7 +4916,7 @@ def main(page: ft.Page):
                     gen_token["id"] += 1
                     my_gen = gen_token["id"]
                     if insert_user_bubble:
-                        chat_history_display.controls.append(make_user_bubble(content))
+                        chat_history_display.controls.append(make_user_bubble(content, animate=True))
                     send_btn.visible = False
                     stop_btn.visible = True
                     page.update()
@@ -5037,7 +5056,7 @@ def main(page: ft.Page):
                     ai_response = {"text": ""}
 
                     content_ref = {"col": None, "md": None, "stream": None, "row": None, "actions": None}
-                    bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref)
+                    bubble_row, content_col = make_ai_bubble("▌", can_regenerate=False, content_ref=content_ref, animate=True)
                     last_ai_content_ref["col"] = content_col
                     last_ai_content_ref["ref"] = content_ref
                     chat_history_display.controls.append(bubble_row)
@@ -8137,7 +8156,23 @@ def main(page: ft.Page):
                     "金句": lambda: build_sentence_page(subject),
                 }
                 _builder = func_pages.get(function_name)
-                func_content = _builder() if _builder else None
+                try:
+                    func_content = _builder() if _builder else None
+                except Exception as _ex:
+                    _tb = traceback.format_exc()
+                    try:
+                        with open(os.path.join(DATA_DIR, "crash.log"), "a", encoding="utf-8") as _lf:
+                            _lf.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 打开 {function_name} 失败\n{_tb}\n")
+                    except BaseException:
+                        pass
+                    func_content = ft.Column([
+                        ft.Text(f"⚠️ 打开「{function_name}」失败", size=16, color="#EF5350",
+                                weight=ft.FontWeight.BOLD),
+                        ft.Text(str(_ex)[:300], size=13, color="#EF5350", selectable=True),
+                        ft.Divider(),
+                        ft.Text("把下面这段发给开发者即可定位：", size=12, color="#888888"),
+                        ft.Text(_tb[-1200:], size=10, color="#9E9E9E", selectable=True),
+                    ], spacing=8, scroll=ft.ScrollMode.AUTO)
                 full_page = ft.Column([
                     ft.Row([
                         ft.IconButton(icon=ft.Icons.ARROW_BACK, on_click=go_back),
@@ -8154,10 +8189,20 @@ def main(page: ft.Page):
                 full_page.opacity = 0
                 full_page.offset = ft.Offset(0, 0.015)
                 subject_page_content.content = full_page
-                page.update()
-                full_page.opacity = 1
-                full_page.offset = ft.Offset(0, 0)
-                page.update()
+                try:
+                    page.update()
+                    full_page.opacity = 1
+                    full_page.offset = ft.Offset(0, 0)
+                    page.update()
+                finally:
+                    # 兜底：任何异常都不能把页面留在 opacity=0（会看起来"点了没反应"）
+                    if full_page.opacity != 1:
+                        full_page.opacity = 1
+                        full_page.offset = ft.Offset(0, 0)
+                        try:
+                            page.update()
+                        except BaseException:
+                            pass
 
             def build_subject_left_panel(subj):
                 subjects = ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]
@@ -9309,6 +9354,14 @@ def main(page: ft.Page):
                     ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="我的"),
                 ])
             switch_page(0)
+            # 自测钩子：DSH_OPEN_TEST=1 时自动打开思维导图页，用于在无 UI 交互下复现构建错误
+            if os.environ.get("DSH_OPEN_TEST") == "1":
+                try:
+                    open_function_page("数学", "思维导图")
+                    print("[selftest] 思维导图页构建成功")
+                except Exception:
+                    print("[selftest] 思维导图页构建失败：")
+                    traceback.print_exc()
             _gradient_bg = ft.Stack([
                 # 液态玻璃底色：深蓝黑渐变（iOS 动态壁纸质感）
                 ft.Container(expand=True, gradient=ft.LinearGradient(
