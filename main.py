@@ -162,6 +162,30 @@ for d in [DATA_DIR, IMAGES_DIR, VIDEOS_DIR, DOCS_DIR, CHAT_HISTORY_DIR, CONTENT_
     os.makedirs(d, exist_ok=True)
 
 
+def _dlg_w(page, want=420, margin=56):
+    """弹窗内容宽度：不超过屏幕宽度 - 边距（手机 360dp 也不会溢出）"""
+    try:
+        pw = page.width or (page.window.width if page.window else None) or 360
+    except BaseException:
+        pw = 360
+    try:
+        return max(220, min(int(want), int(pw) - margin))
+    except BaseException:
+        return int(want)
+
+
+def _dlg_h(page, want=480, margin=150):
+    """弹窗内容高度：不超过屏幕高度 - 边距"""
+    try:
+        ph = page.height or (page.window.height if page.window else None) or 640
+    except BaseException:
+        ph = 640
+    try:
+        return max(200, min(int(want), int(ph) - margin))
+    except BaseException:
+        return int(want)
+
+
 def load_vocab_settings():
     if not os.path.exists(VOCAB_SETTINGS_FILE):
         return dict(DEFAULT_VOCAB_SETTINGS)
@@ -3249,7 +3273,7 @@ def main(page: ft.Page):
                                 min_scale=1.0, max_scale=6.0,
                                 pan_enabled=True, scale_enabled=True, expand=True,
                             ),
-                            width=420, height=620, bgcolor="#1A1B26",
+                            width=_dlg_w(page, 420), height=620, bgcolor="#1A1B26",
                         ),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))],
                     )
@@ -4303,7 +4327,7 @@ def main(page: ft.Page):
                         content=ft.Column([
                             ft.Text(f"来自「{source}」· 勾选后收录，可再改", size=12, color="#888888"),
                             ft.Container(content=_seg_col, height=min(260, 30 * len(_segs) + 8),
-                                         width=330, padding=2),
+                                         width=_dlg_w(page, 330), padding=2),
                         ], spacing=6),
                         actions=[
                             ft.ElevatedButton("📕 收错题", icon=ft.Icons.EDIT_NOTE,
@@ -5667,7 +5691,7 @@ def main(page: ft.Page):
                     title=ft.Text(""),
                     content=ft.Container(
                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                        width=400, height=None, padding=10),
+                        width=_dlg_w(page, 400), height=None, padding=10),
                     # R2-P0-4：关闭按钮只 page.close 不会触发 on_close → 关闭后列表不刷新；手动补调
                     actions=[ft.TextButton("关闭", on_click=lambda e: (page.close(dialog), on_close and on_close()))])
                 page.open(dialog)
@@ -6070,7 +6094,7 @@ def main(page: ft.Page):
                                                   bgcolor="#E0AF68", color="#FFFFFF", expand=True),
                                 ft.ElevatedButton("✅ 认识", on_click=lambda e: mark("know"),
                                                   bgcolor="#66BB6A", color="#FFFFFF", expand=True),
-                            ], spacing=10)
+                            ], spacing=10, wrap=True)
                         page.update()
 
                     def mark(result):
@@ -6681,13 +6705,13 @@ def main(page: ft.Page):
                                                           icon=ft.Icons.ACCOUNT_TREE),
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
                                         ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
-                                    ], alignment=ft.MainAxisAlignment.END, spacing=8)
+                                    ], alignment=ft.MainAxisAlignment.END, spacing=8, wrap=True)
                                     detail_dlg = ft.AlertDialog(
                                         title=ft.Text(""),
                                         content=ft.Container(
                                             content=ft.Column(detail_children, spacing=8,
                                                               scroll=ft.ScrollMode.AUTO),
-                                            width=450, height=500, padding=10),
+                                            width=_dlg_w(page, 450), height=_dlg_h(page, 500), padding=10),
                                         actions=[action_row])
                                     page.open(detail_dlg)
                                     page.update()
@@ -6797,7 +6821,7 @@ def main(page: ft.Page):
                                             idea_input,
                                             tags_input_edit,
                                             status_dropdown,
-                                        ], scroll=ft.ScrollMode.AUTO, width=400, height=480),
+                                        ], scroll=ft.ScrollMode.AUTO, width=_dlg_w(page, 400), height=480),
                                         actions=[
                                             ft.TextButton("🗑️ 删除", on_click=delete_item),
                                             ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
@@ -7057,13 +7081,13 @@ def main(page: ft.Page):
                                                           icon=ft.Icons.ACCOUNT_TREE),
                                         ft.ElevatedButton("✏️ 编辑", on_click=open_edit, icon=ft.Icons.EDIT),
                                         ft.TextButton("关闭", on_click=lambda ev: page.close(detail_dlg)),
-                                    ], alignment=ft.MainAxisAlignment.END)
+                                    ], alignment=ft.MainAxisAlignment.END, wrap=True)
                                     detail_dlg = ft.AlertDialog(
                                         title=ft.Text(""),
                                         content=ft.Container(
                                             content=ft.Column(detail_children, spacing=8,
                                                               scroll=ft.ScrollMode.AUTO),
-                                            width=450, height=500, padding=10),
+                                            width=_dlg_w(page, 450), height=_dlg_h(page, 500), padding=10),
                                         actions=[action_row])
                                     page.open(detail_dlg)
                                     page.update()
@@ -7116,7 +7140,7 @@ def main(page: ft.Page):
                                     edit_dlg = ft.AlertDialog(
                                         title=ft.Text("编辑笔记"),
                                         content=ft.Column([content_input], scroll=ft.ScrollMode.AUTO,
-                                                          width=400, height=300),
+                                                          width=_dlg_w(page, 400), height=300),
                                         actions=[
                                             ft.TextButton("🗑️ 删除", on_click=delete_item),
                                             ft.TextButton("取消", on_click=lambda e: page.close(edit_dlg)),
@@ -7189,7 +7213,7 @@ def main(page: ft.Page):
                         content=ft.Column([
                             ft.Text(f"学科：{up_subject}", size=14, color=ft.Colors.GREY_400),
                             up_content, up_picker_col,
-                        ], width=420, spacing=8, scroll=ft.ScrollMode.AUTO),
+                        ], width=_dlg_w(page, 420), spacing=8, scroll=ft.ScrollMode.AUTO),
                         actions=[
                             ft.TextButton("取消", on_click=lambda e: page.close(up_dlg)),
                             ft.ElevatedButton("💾 保存", on_click=do_upload),
@@ -7320,7 +7344,7 @@ def main(page: ft.Page):
                         title=ft.Text("🧩 知识点错题"),
                         content=ft.Container(
                             content=ft.Column(children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                            width=460, height=500, padding=10),
+                            width=_dlg_w(page, 460), height=_dlg_h(page, 500), padding=10),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                     page.open(dlg)
                     page.update()
@@ -7355,7 +7379,7 @@ def main(page: ft.Page):
                         title=ft.Text(f"错题 {idx2+1}"),
                         content=ft.Container(
                             content=ft.Column(body, spacing=6, scroll=ft.ScrollMode.AUTO),
-                            width=480, height=520, padding=10),
+                            width=_dlg_w(page, 480), height=_dlg_h(page, 520), padding=10),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                     page.open(dlg)
                     page.update()
@@ -7384,7 +7408,7 @@ def main(page: ft.Page):
                         page.update()
                     dlg = ft.AlertDialog(
                         title=ft.Text("➕ 添加知识点（挂到「" + parent_title + "」）"),
-                        content=ft.Column([kp_input], width=360),
+                        content=ft.Column([kp_input], width=_dlg_w(page, 360)),
                         actions=[
                             ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
                             ft.ElevatedButton("添加", on_click=do_add)])
@@ -7483,7 +7507,7 @@ def main(page: ft.Page):
                         title=ft.Text("📓 笔记层"),
                         content=ft.Container(
                             content=ft.Column(children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                            width=480, height=500, padding=10),
+                            width=_dlg_w(page, 480), height=_dlg_h(page, 500), padding=10),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                     page.open(dlg)
                     page.update()
@@ -7513,7 +7537,7 @@ def main(page: ft.Page):
                         title=ft.Text("📝 笔记详情"),
                         content=ft.Container(
                             content=ft.Column(body, spacing=8, scroll=ft.ScrollMode.AUTO),
-                            width=480, height=460, padding=10),
+                            width=_dlg_w(page, 480), height=_dlg_h(page, 460), padding=10),
                         actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                     page.open(dlg)
                     page.update()
@@ -7677,7 +7701,7 @@ def main(page: ft.Page):
                     ft.IconButton(icon=ft.Icons.CENTER_FOCUS_STRONG, on_click=lambda e: reset_view()),
                     ft.Text(f"{subject} 思维导图 · 双指/按钮缩放 · 拖动平移 · 点知识分层看内容",
                             size=12, color=ft.Colors.GREY_500),
-                ], spacing=10, alignment=ft.MainAxisAlignment.START)
+                ], spacing=10, alignment=ft.MainAxisAlignment.START, wrap=True)
 
                 def _run_understand():
                     def _job():
@@ -7850,7 +7874,7 @@ def main(page: ft.Page):
 
                     dialog = ft.AlertDialog(
                         title=ft.Text("编辑金句" if is_edit else "添加金句"),
-                        content=ft.Column([cat_drop, sent_input, trans_input], spacing=10, width=400),
+                        content=ft.Column([cat_drop, sent_input, trans_input], spacing=10, width=_dlg_w(page, 400)),
                         actions=[ft.TextButton("取消", on_click=lambda e: page.close(dialog)),
                                  ft.ElevatedButton("保存", on_click=do_save)])
                     page.open(dialog)
@@ -7934,7 +7958,7 @@ def main(page: ft.Page):
 
                     dialog = ft.AlertDialog(
                         title=ft.Text("🤖 AI生成金句"),
-                        content=ft.Column([topic_input, count_row], spacing=10, width=400),
+                        content=ft.Column([topic_input, count_row], spacing=10, width=_dlg_w(page, 400)),
                         actions=[ft.TextButton("取消", on_click=lambda e: page.close(dialog)),
                                  ft.ElevatedButton("生成并添加", on_click=do_generate)])
                     page.open(dialog)
@@ -7993,8 +8017,8 @@ def main(page: ft.Page):
                                         ft.IconButton(
                                             icon=ft.Icons.DELETE, icon_size=18,
                                             on_click=lambda e, sid=sid: (delete_sentence(sid), refresh_list())),
-                                    ], spacing=2),
-                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                    ], spacing=2, wrap=True),
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, wrap=True),
                                 ft.Text(sentence, size=15, selectable=True),
                                 ft.Text(translation, size=13, color=ft.Colors.GREY_400,
                                         italic=True, selectable=True) if translation else ft.Text(""),
@@ -8545,7 +8569,7 @@ def main(page: ft.Page):
                         content_children.append(
                             ft.Text(f"{kp}（{events_count}次，掌握 {level:.0%}）", size=13))
                         content_children.append(
-                            ft.ProgressBar(value=level, width=300, height=6,
+                            ft.ProgressBar(value=level, width=_dlg_w(page, 300), height=6,
                                            color=bar_color, bgcolor="#2A2E44"))
                         if summary:
                             content_children.append(
@@ -8607,7 +8631,7 @@ def main(page: ft.Page):
                     title=ft.Text("🎯 学习画像"),
                     content=ft.Container(
                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                        width=420, height=500, padding=10),
+                        width=_dlg_w(page, 420), height=_dlg_h(page, 500), padding=10),
                     actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                 page.open(dlg)
                 page.update()
@@ -8644,7 +8668,7 @@ def main(page: ft.Page):
                     title=ft.Text("📊 知识框架"),
                     content=ft.Container(
                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
-                        width=400, height=300, padding=10),
+                        width=_dlg_w(page, 400), height=_dlg_h(page, 300), padding=10),
                     actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dlg))])
                 page.open(dlg)
                 page.update()
@@ -9033,7 +9057,7 @@ def main(page: ft.Page):
                 dlg = ft.AlertDialog(
                     title=ft.Text("⚙️ 单词本设置"),
                     content=ft.Column([daily_new_field, review_limit_field, mode_dropdown],
-                                      spacing=10, width=350),
+                                      spacing=10, width=_dlg_w(page, 350)),
                     actions=[ft.TextButton("取消", on_click=lambda e: page.close(dlg)),
                              ft.ElevatedButton("保存", on_click=do_save)])
                 page.open(dlg)
