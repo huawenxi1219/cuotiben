@@ -4572,11 +4572,20 @@ def main(page: ft.Page):
 
                             return content_ref.get("raw", "") or ""
 
+                    retry_btn = ft.IconButton(
+                        icon=ft.Icons.SWAP_HORIZ, icon_size=16,
+                        tooltip="换个讲法：用另一种思路重讲",
+                        icon_color="#A9B1D6",
+                        on_click=lambda e: handle_send(
+                            "换个讲法：请换一种思路把刚才的问题重新讲一遍，"
+                            "换更直观的切入角度（能举例举例、能画图就画图），"
+                            "不要重复上一条回答里的说法。"))
+
                     collect_btn = ft.IconButton(
                         icon=ft.Icons.ADD_CIRCLE_OUTLINE, icon_size=16, tooltip="➕ 收录到错题/笔记（侧边小窗）",
                         icon_color="#4DB6AC",
                         on_click=lambda e: _drawer_add_item(_bubble_now(), "AI 解答"))
-                    action_row = ft.Row([copy_btn, regen_btn, del_btn, add_btn, collect_btn],
+                    action_row = ft.Row([copy_btn, retry_btn, regen_btn, del_btn, add_btn, collect_btn],
                                         spacing=2, tight=True)
                     content_ref["actions"] = (regen_btn, del_btn, add_btn)
 
@@ -9029,6 +9038,64 @@ def main(page: ft.Page):
                              ft.ElevatedButton("保存", on_click=do_save)])
                 page.open(dlg)
 
+            # 一键切换：省心模式（智谱免费额度） ↔ 深度模式（DeepSeek V4.1 Pro + High）
+
+            def _set_ai_mode(mode):
+
+                cfg = load_ai_config()
+
+                if mode == "light":
+
+                    cfg["provider"] = "zhipu"
+
+                    cfg["deepseek_thinking"] = False
+
+                else:
+
+                    cfg["provider"] = "deepseek"
+
+                    cfg["deepseek_model"] = "deepseek-v4-pro"
+
+                    cfg["deepseek_reasoning"] = "high"
+
+                    cfg["deepseek_thinking"] = True
+
+                save_ai_config(cfg)
+
+                try:
+
+                    provider_dropdown.value = cfg.get("provider", "zhipu")
+
+                    deepseek_model_input.value = cfg.get("deepseek_model", "deepseek-flash")
+
+                    deepseek_reasoning_dropdown.value = cfg.get("deepseek_reasoning", "medium")
+
+                    deepseek_thinking_switch.value = bool(cfg.get("deepseek_thinking", True))
+
+                    page.update()
+
+                except BaseException:
+
+                    pass
+
+                show_toast("已切到省心模式（智谱免费）" if mode == "light" else "已切到深度模式（V4.1 Pro · High）",
+
+                           "green")
+
+
+            mode_switch_row = ft.Row([
+
+                ft.ElevatedButton("🪶 省心模式", icon=ft.Icons.ECO,
+
+                                  on_click=lambda e: _set_ai_mode("light")),
+
+                ft.ElevatedButton("🚀 深度模式", icon=ft.Icons.ROCKET_LAUNCH,
+
+                                  on_click=lambda e: _set_ai_mode("deep")),
+
+            ], spacing=8, wrap=True)
+
+
             mine_page = ft.Column([
                 ft.Container(height=10),
                 ft.Text("⚙️ 个人中心", size=24, weight=ft.FontWeight.BOLD),
@@ -9087,6 +9154,7 @@ def main(page: ft.Page):
                     ],
                     value=str(ai_config.get("ctx_chars", "auto")),
                     width=280),
+                mode_switch_row,
                 provider_dropdown,
                 free_key_input,
                 deepseek_key_input,
