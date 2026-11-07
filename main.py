@@ -9814,14 +9814,21 @@ def main(page: ft.Page):
             # 自测钩子：DSH_SMOKE=1 时把主要页面/对话逐个构建一遍，输出 [SMOKE] 结果
             if os.environ.get("DSH_SMOKE") == "1" or os.environ.get("DSH_OPEN_TEST") == "1":
                 _smoke_steps = [
-                    ("思维导图-数学", lambda: open_function_page("数学", "思维导图")),
+                    ("知识页-数学", lambda: build_knowledge_page("数学")),
+                    ("知识页-化学", lambda: build_knowledge_page("化学")),
+                    ("知识页-英语", lambda: build_knowledge_page("英语")),
+                    ("学科卡片-数学", lambda: build_function_card_grid("数学")),
+                    ("学科左栏-数学", lambda: build_subject_left_panel("数学")),
                     ("错题本-数学", lambda: open_function_page("数学", "错题本")),
+                    ("错题本-化学", lambda: open_function_page("化学", "错题本")),
                     ("笔记本-数学", lambda: open_function_page("数学", "笔记本")),
                     ("单词本-英语", lambda: open_function_page("英语", "单词本")),
                     ("金句-英语", lambda: open_function_page("英语", "金句")),
+                    ("旧导图-数学", lambda: build_mindmap_page("数学")),
+                    ("学习画像", lambda: show_learning_profile(None)),
+                    ("知识框架", lambda: show_knowledge_framework(None)),
                     ("对话-总AI", lambda: open_chat("总AI")),
-                    ("对话-数学", lambda: open_chat("数学")),
-                    ("导图页重建", lambda: build_mindmap_page("数学")),
+                    ("对话-化学", lambda: open_chat("化学")),
                 ]
                 _ok = 0
                 for _name, _fn in _smoke_steps:
