@@ -4822,7 +4822,7 @@ def main(page: ft.Page):
                         _pop_in(_row.controls[-1])
                     return ft.GestureDetector(
                         content=_row,
-                        on_long_press=lambda e: _ask_collect_menu(_bubble_text, "我的提问"))
+                        on_long_press_start=lambda e: _ask_collect_menu(_bubble_text, "我的提问"))
 
                 def make_ai_bubble(text, can_regenerate=True, content_ref=None, animate=False):
                     if content_ref is None:
@@ -4948,7 +4948,7 @@ def main(page: ft.Page):
                     # 长按 AI 回答 → 弹收录菜单（错题/笔记）；内部按钮点击不受影响
                     _gd = ft.GestureDetector(
                         content=row,
-                        on_long_press=lambda e: _ask_collect_menu(_bubble_now(), "AI 解答"))
+                        on_long_press_start=lambda e: _ask_collect_menu(_bubble_now(), "AI 解答"))
                     content_ref["row"] = _gd
                     return _gd, content_col
 
@@ -6831,7 +6831,7 @@ def main(page: ft.Page):
                                                 content=thumb_img, width=80, height=80,
                                                 border_radius=10,
                                                 clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
-                                            on_long_press=lambda e, paths=q_media: show_image_gallery(paths, 0))
+                                            on_long_press_start=lambda e, paths=q_media: show_image_gallery(paths, 0))
                                     except Exception as e:
                                         print(f"缩略图加载失败: {e}")
                                 else:
@@ -7317,7 +7317,7 @@ def main(page: ft.Page):
                                                 content=thumb_img, width=80, height=80,
                                                 border_radius=10,
                                                 clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
-                                            on_long_press=lambda e, paths=images: show_image_gallery(paths, 0))
+                                            on_long_press_start=lambda e, paths=images: show_image_gallery(paths, 0))
                                     except BaseException as _be:
                                         _diag_log(_be, "L6441")
 
@@ -7916,7 +7916,7 @@ def main(page: ft.Page):
                             return ft.Container(content=content, left=pos[0], top=pos[1])
                         c = ft.Container(content=content, left=pos[0], top=pos[1],
                                          opacity=0.0,
-                                         animate_opacity=ft.animation.Animation(
+                                         animate_opacity=ft.Animation(
                                              360, ft.AnimationCurve.EASE_OUT_CUBIC))
                         view_state["grow_nodes"].append(c)
                         return c
