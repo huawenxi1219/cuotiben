@@ -2561,6 +2561,66 @@ def render_chart_from_spec(spec):
     return ""
 
 
+def build_error_cards_html(subject=None, per_page=6):
+    """生成 A4 错题卡 HTML：每页 per_page 个小方块，一格一题。
+    用浏览器/WPS/Word 打开即可打印；Word 里每个格子都能自由改。"""
+    import html as _html
+    errs = load_jsonl(ERRORS_FILE)
+    if subject:
+        errs = [e for e in errs if e.get("subject") == subject]
+    errs = sorted(errs, key=lambda x: x.get("timestamp", 0), reverse=True)
+
+    def esc(s):
+        return _html.escape(str(s or "")).replace("\n", "<br>")
+
+    cards = []
+    for e in errs:
+        q = (e.get("original") or e.get("question") or "").strip()
+        if not q:
+            continue
+        m = (e.get("mistake") or "").strip()
+        a = (e.get("answer") or "").strip()
+        tags = "、".join(str(x) for x in (e.get("tags") or [])[:4])
+        subj = e.get("subject", "")
+        cards.append(f"""
+        <div class="card">
+          <div class="head"><span class="subj">{esc(subj)}</span><span class="tags">{esc(tags)}</span></div>
+          <div class="q">{esc(q[:420])}</div>
+          <div class="line"><b>错因</b>{esc(m[:160])}</div>
+          <div class="line"><b>答案</b>{esc(a[:220])}</div>
+          <div class="foot">□ 已会　□ 还需练</div>
+        </div>""")
+
+    pages = []
+    for i in range(0, len(cards), per_page):
+        pages.append("".join(cards[i:i + per_page]))
+
+    body = "".join(f'<div class="page">{"".join(chunk)}</div>' for chunk in pages) if pages else \
+        '<div class="page"><div class="card"><div class="q">暂无错题</div></div></div>'
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>池鱼错题卡</title>
+<style>
+  @page {{ size: A4; margin: 10mm; }}
+  * {{ box-sizing: border-box; }}
+  body {{ margin: 0; font-family: "Source Han Sans SC", "Microsoft YaHei", sans-serif; color: #111; }}
+  .page {{ width: 190mm; height: 277mm; display: grid; grid-template-columns: 1fr 1fr;
+           grid-template-rows: repeat(3, 1fr); gap: 4mm; page-break-after: always; }}
+  .card {{ border: 1px solid #999; border-radius: 3mm; padding: 3mm; overflow: hidden;
+           display: flex; flex-direction: column; }}
+  .head {{ display: flex; justify-content: space-between; font-size: 8pt; color: #666;
+           border-bottom: 1px dashed #ccc; padding-bottom: 1mm; margin-bottom: 1.5mm; }}
+  .subj {{ font-weight: bold; color: #1a6; }}
+  .q {{ font-size: 11pt; line-height: 1.45; flex: 1; overflow: hidden; }}
+  .line {{ font-size: 8.5pt; color: #333; margin-top: 1.5mm; line-height: 1.4; }}
+  .line b {{ color: #a33; margin-right: 2mm; }}
+  .foot {{ font-size: 8pt; color: #888; margin-top: auto; padding-top: 1.5mm; }}
+  @media print {{ .page {{ page-break-after: always; }} }}
+</style></head>
+<body>{body}</body></html>"""
+
+
 def build_study_export_md():
     """把错题、笔记、画像、单词进度导出成一份 Markdown"""
     errs = load_jsonl(ERRORS_FILE)
@@ -9174,6 +9234,12 @@ def main(page: ft.Page):
                                   icon=ft.Icons.PERSON_OUTLINE),
                 ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
                                   icon=ft.Icons.INSIGHTS),
+                ft.ElevatedButton("🖨 导出 A4 错题卡", icon=ft.Icons.PRINT,
+                                  on_click=lambda e: _use_picker(page, on_export_cards).save_file(
+                                      dialog_title="导出 A4 错题卡",
+                                      file_name="池鱼错题卡.html",
+                                      file_type=ft.FilePickerFileType.CUSTOM,
+                                      allowed_extensions=["html"])),
                 ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
                                   on_click=lambda e: _use_picker(page, on_export_md).save_file(
                                       dialog_title="导出学习档案",
@@ -9295,6 +9361,17 @@ def main(page: ft.Page):
 
                     show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
 
+
+            def on_export_cards(e):
+                if not getattr(e, "path", ""):
+                    return
+                _p = e.path if str(e.path).lower().endswith(".html") else str(e.path) + ".html"
+                try:
+                    with open(_p, "w", encoding="utf-8") as _f:
+                        _f.write(build_error_cards_html())
+                    show_toast("✅ 已生成，用浏览器/WPS 打开即可打印", "green")
+                except Exception as _ex:
+                    show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
 
             def switch_page(index):
                 # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
