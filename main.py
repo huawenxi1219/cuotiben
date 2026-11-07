@@ -3062,7 +3062,8 @@ def main(page: ft.Page):
             print("=== load_ui 开始 ===")
             app_state = {"busy": None}
 
-            is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
+            is_mobile = (page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
+                         or os.environ.get("DSH_FORCE_MOBILE") == "1")
             if not is_mobile:
                 _sim = os.environ.get("DSH_PHONE_SIM") == "1"
                 page.window.width = 360 if _sim else 900
@@ -3070,7 +3071,11 @@ def main(page: ft.Page):
                 page.window.min_width = 360
                 page.window.min_height = 450
             else:
-                page.window.width = None
+                if os.environ.get("DSH_PHONE_SIM") == "1":
+                    page.window.width = 360
+                    page.window.height = 780
+                else:
+                    page.window.width = None
                 page.window.min_width = 320
                 page.padding = 0
                 page.spacing = 0
