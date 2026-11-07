@@ -4320,6 +4320,16 @@ def main(page: ft.Page):
 4. 算到底：必须把结果算出来，不许停在"代入可得""化简即可"。
 5. 结尾一句自测题，让他能立刻动手验证。
 
+【讲错题：必须顺着他的思路走（最重要的一条）】
+学生做错过一道题，他真正需要的不是"标准答案怎么写"，而是"我当时怎么想的、卡在哪、为什么卡"。
+所以讲一道错题，固定按这个顺序：
+1. 先复述他的思路："你当时是想……"——确认你没理解偏
+2. 顺着他的思路往下推，指出具体断在哪一步：概念错了？条件漏了？还是算不下去了？
+3. 判断这条路能不能修：能修就接着他的思路修下去；不能修就说清"为什么走不通"，别含糊
+4. 再给一条更稳的替代思路，并对比两条路的差别：什么情况下该走哪条
+5. 最后才是完整解法
+禁止：无视他的思路，直接甩标准答案的解法。
+
 【讲概念必须按这个结构】
 1. 先用一句大白话说清它是什么。
 2. 给一个具体例子（数字或生活场景），不要只给定义。
@@ -7860,6 +7870,17 @@ def main(page: ft.Page):
 
                 _mm_content_cache = {"content": None}   # P2-16：内容只构建一次，缩放/平移只改 Transform
 
+                def _conn(x1, y1, x2, y2, color):
+                    """两点之间的一条细线：用旋转的 2px 高 Container 顶替 canvas"""
+                    import math as _m
+                    dx, dy = float(x2) - float(x1), float(y2) - float(y1)
+                    L = max(2.0, _m.hypot(dx, dy))
+                    ang = _m.atan2(dy, dx)
+                    return ft.Container(
+                        left=(x1 + x2) / 2.0 - L / 2.0, top=(y1 + y2) / 2.0 - 1,
+                        width=L, height=2, bgcolor=color, rotate=ang,
+                        border_radius=1)
+
                 def rebuild_mindmap_view(force=False):
                     if not force and _mm_content_cache["content"] is not None:
                         return _mm_content_cache["content"]
@@ -7871,19 +7892,15 @@ def main(page: ft.Page):
                         p = view_state["layout"].get(tree["_uid"])
                         c = view_state["layout"].get(nd["_uid"])
                         if p and c:
-                            shapes.append(ft.canvas.Line(
-                                p[0] + NODE_W, p[1] + NODE_H / 2,
-                                c[0] - 8, c[1] + NODE_H / 2,
-                                paint=ft.canvas.Paint(stroke_width=2, color="#414868")))
+                            shapes.append(_conn(p[0] + NODE_W, p[1] + NODE_H / 2,
+                                                c[0] - 8, c[1] + NODE_H / 2, "#414868"))
                         for ch in nd.get("children", []):
                             cp = view_state["layout"].get(nd["_uid"])
                             cc = view_state["layout"].get(ch["_uid"])
                             if cp and cc:
-                                shapes.append(ft.canvas.Line(
-                                    cp[0] + NODE_W, cp[1] + NODE_H / 2,
-                                    cc[0] - 8, cc[1] + NODE_H / 2,
-                                    paint=ft.canvas.Paint(stroke_width=2, color="#33364D")))
-                    canvas = ft.canvas.Canvas(width=LAYOUT_W, height=LAYOUT_H, shapes=shapes)
+                                shapes.append(_conn(cp[0] + NODE_W, cp[1] + NODE_H / 2,
+                                                    cc[0] - 8, cc[1] + NODE_H / 2, "#33364D"))
+                    # flet 0.28 没有 canvas 组件：连线就是一堆旋转的细 Container
                     nodes = []
                     if not view_state.get("grown"):
                         view_state["grow_nodes"] = []
@@ -7928,7 +7945,7 @@ def main(page: ft.Page):
                                                            kp=ch.get("kp", "")),
                                           (chp[0], chp[1])),
                             ]))
-                    _mm_content_cache["content"] = ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
+                    _mm_content_cache["content"] = ft.Stack(shapes + nodes, width=LAYOUT_W, height=LAYOUT_H)
                     return _mm_content_cache["content"]
 
                 content_holder = ft.Container(content=rebuild_mindmap_view())
