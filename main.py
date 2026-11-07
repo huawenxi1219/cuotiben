@@ -4210,6 +4210,7 @@ def main(page: ft.Page):
                     chat_dialog.content = build_chat_window(subject, initial_message, auto_send)
                 except Exception as _ex:
                     _tb = traceback.format_exc()
+                    print("[CRASH]", _tb)
                     try:
                         with open(os.path.join(DATA_DIR, "crash.log"), "a", encoding="utf-8") as _lf:
                             _lf.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 打开聊天 {subject} 失败\n{_tb}\n")
@@ -8459,6 +8460,7 @@ def main(page: ft.Page):
                     func_content = _builder() if _builder else None
                 except Exception as _ex:
                     _tb = traceback.format_exc()
+                    print("[CRASH]", _tb)
                     try:
                         with open(os.path.join(DATA_DIR, "crash.log"), "a", encoding="utf-8") as _lf:
                             _lf.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 打开 {function_name} 失败\n{_tb}\n")
