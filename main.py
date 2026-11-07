@@ -4070,7 +4070,7 @@ def main(page: ft.Page):
                     h = page.height or (page.window.height if page.window else None) or 640
                 except Exception:
                     w, h = 360, 640
-                if ball_state["ball_x"] + 28 < w / 2:
+                if ball_state["ball_x"] + 22 < w / 2:
                     ball_state["ball_x"] = 8
                 else:
                     ball_state["ball_x"] = w - 56 - 8
@@ -4092,14 +4092,14 @@ def main(page: ft.Page):
                     open_contact_panel(e)
 
             ball_inner = ft.Container(
-                content=ft.Text("AI", size=20, color="white", weight=ft.FontWeight.BOLD),
-                width=56,
-                height=56,
-                border_radius=28,
-                bgcolor="#CC1C1C26",
-                blur=16,
-                border=ft.border.all(1, "#44FFFFFF"),
-                shadow=ft.BoxShadow(blur_radius=24, color="#887AA2F7", spread_radius=1),
+                content=ft.Text("AI", size=15, color="#E8EBF5", weight=ft.FontWeight.W_500),
+                width=44,
+                height=44,
+                border_radius=22,
+                bgcolor="#8C1C1C26",
+                blur=10,
+                border=ft.border.all(1, "#33FFFFFF"),
+                shadow=ft.BoxShadow(blur_radius=12, color="#447AA2F7", spread_radius=0),
                 alignment=ft.alignment.center,
                 ink=True,
                 animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
@@ -4112,6 +4112,13 @@ def main(page: ft.Page):
                 on_pan_update=on_ball_pan_update,
                 on_pan_end=on_ball_pan_end,
             )
+            try:
+                _bw = page.width or (page.window.width if page.window else None) or 360
+                _bh = page.height or (page.window.height if page.window else None) or 640
+                ball_state["ball_x"] = max(8, _bw - 44 - 6)
+                ball_state["ball_y"] = max(60, min(_bh * 0.62, _bh - 120))
+            except BaseException:
+                pass
             ball_container = ft.Container(
                 content=ai_ball,
                 left=ball_state["ball_x"],
@@ -8561,7 +8568,7 @@ def main(page: ft.Page):
                 ft.Container(height=10),
                 ft.Text("学科", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 ft.Container(content=subject_page_content, expand=True),
-            ], spacing=15, scroll=ft.ScrollMode.AUTO)
+            ], spacing=15, expand=True)   # 有 expand 子控件时不能再开 scroll，否则撑不满、底部留白
 
             @retry_request(max_retries=3, base_delay=2)
             def generate_today_plan(result_text=None):
