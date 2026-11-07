@@ -3097,9 +3097,9 @@ def main(page: ft.Page):
                 page.theme = ft.Theme(
                     font_family="Segoe UI, -apple-system, Roboto, sans-serif",
                     color_scheme=ft.ColorScheme(
-                        primary=C_ACCENT,        # Tokyo Night 蓝紫（主操作色）
-                        primary_container="#24283B",
-                        secondary="#BB9AF7",      # 紫（辅助强调）
+                        primary=C_ACCENT,
+                        primary_container=C_SURF2,
+                        secondary="#BB9AF7",
                         tertiary="#73DACA",
                         surface=C_SURF,
                         surface_variant=C_SURF2,
@@ -3108,27 +3108,21 @@ def main(page: ft.Page):
                         on_background=C_TEXT,
                     ),
                     visual_density=ft.VisualDensity.STANDARD,
-                    navigation_bar_theme=ft.NavigationBarThemeData(
-                        background_color="#D914141C",
-                        indicator_color="#7AA2F7",
-                        height=72,
-                    ),
-                    elevated_button_theme=ft.ElevatedButtonThemeData(style=_shared_btn_style),
-                    text_button_theme=ft.TextButtonThemeData(style=ft.ButtonStyle(
+                    navigation_bar_theme=ft.NavigationBarTheme(
+                        bgcolor="#D914141C", indicator_color=C_ACCENT, height=72),
+                    elevated_button_theme=ft.ElevatedButtonTheme(
+                        shape=ft.RoundedRectangleBorder(radius=14),
+                        padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+                        elevation=0.5, overlay_color="#267AA2F7"),
+                    text_button_theme=ft.TextButtonTheme(
                         shape=ft.RoundedRectangleBorder(radius=12),
-                        padding=ft.Padding(left=16, right=16, top=10, bottom=10))),
-                    input_decoration_theme=ft.InputDecorationThemeData(
-                        filled=True, fill_color=C_SURF,
-                        border_radius=14, border=ft.border.all(1, C_LINE)),
-                    card_theme=ft.CardThemeData(
-                        color="#B31A1B26", elevation=6,
-                        shape=ft.RoundedRectangleBorder(radius=18)),
-                    dialog_theme=ft.DialogThemeData(
-                        backgroundColor="#F21A1B26", elevation=24,
-                        shape=ft.RoundedRectangleBorder(radius=26)),
-                    snack_bar_theme=ft.SnackBarThemeData(
-                        bgcolor="#E61A1B26", elevation=6,
-                        shape=ft.RoundedRectangleBorder(radius=14)),
+                        padding=ft.Padding(left=16, right=16, top=10, bottom=10)),
+                    card_theme=ft.CardTheme(color="#B31A1B26", elevation=6,
+                                            shape=ft.RoundedRectangleBorder(radius=18)),
+                    dialog_theme=ft.DialogTheme(bgcolor="#F21A1B26", elevation=24,
+                                                shape=ft.RoundedRectangleBorder(radius=26)),
+                    snackbar_theme=ft.SnackBarTheme(bgcolor="#E61A1B26", elevation=6,
+                                                    shape=ft.RoundedRectangleBorder(radius=14)),
                 )
                 page.dark_theme = page.theme
             except BaseException as _be:
@@ -3842,14 +3836,8 @@ def main(page: ft.Page):
                 ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
             # 能力探测：旧版 Flet 可能不支持 Container.on_hover / animate_shadow，提前检测避免启动崩溃
+            # Flet 0.28 的 Container 没有 animate_shadow，悬停动效不可用，直接关闭
             _HOVER_OK = False
-            try:
-                ft.Container(on_hover=lambda e: None, animate_shadow=ft.Animation(150, ft.AnimationCurve.EASE_OUT))
-                _HOVER_OK = True
-            except BaseException as _be:
-                _diag_log(_be, "L3305")
-
-                _HOVER_OK = False
 
             def u_card(content, padding=18, radius=R_CARD, bg=C_SURF):
                 """统一卡片：实色底 + 1px 细边 + 极轻阴影（不用 blur，省性能也更干净）"""
