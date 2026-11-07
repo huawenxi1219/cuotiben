@@ -3717,6 +3717,17 @@ def main(page: ft.Page):
                 )
                 return card
 
+            def u_empty(icon, title, hint=""):
+                """统一的空状态：图标 + 一句话 + 补充说明"""
+                _kids = [ft.Text(icon, size=38, opacity=0.55),
+                         ft.Text(title, size=15, color=C_TEXT2, weight=ft.FontWeight.W_500)]
+                if hint:
+                    _kids.append(ft.Text(hint, size=12, color=C_TEXT2, opacity=0.7))
+                return ft.Container(
+                    content=ft.Column(_kids, spacing=8,
+                                      horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    alignment=ft.alignment.center, padding=36)
+
             def u_primary_btn(text, on_click, icon=None, color="#7AA2F7"):
                 """全宽圆角主按钮"""
                 return ft.ElevatedButton(
@@ -6561,7 +6572,7 @@ def main(page: ft.Page):
                         display_list = [(it, None) for it in subject_items]
                     if not display_list:
                         list_view.controls.append(ft.Container(
-                            content=ft.Text("  暂无错题", size=16, color=ft.Colors.GREY_500),
+                            content=u_empty("📕", "还没有错题", "回首页拍一张，AI 会帮你录进来"),
                             padding=20))
                         page.update()
                         return
@@ -7074,7 +7085,7 @@ def main(page: ft.Page):
                 list_view = ft.ListView(spacing=10, expand=True)
                 if not subject_items:
                     list_view.controls.append(ft.Container(
-                        content=ft.Text("  暂无笔记", size=16, color=ft.Colors.GREY_500),
+                        content=u_empty("📓", "还没有笔记", "点右上角「+」写第一条"),
                         padding=20))
                 else:
                     for item in subject_items:
@@ -8312,7 +8323,7 @@ def main(page: ft.Page):
             subject_page_content.content = main_subject_page
             subject_page = ft.Column([
                 ft.Container(height=10),
-                ft.Text("📚 学科浏览", size=24, weight=ft.FontWeight.BOLD),
+                ft.Text("学科", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 ft.Container(content=subject_page_content, expand=True),
             ], spacing=15, scroll=ft.ScrollMode.AUTO)
 
@@ -8433,7 +8444,7 @@ def main(page: ft.Page):
                 task_list.controls.clear()
                 tasks = load_jsonl(TASKS_FILE)
                 if not tasks:
-                    task_list.controls.append(ft.Text("  暂无任务", size=16))
+                    task_list.controls.append(u_empty("✅", "还没有任务", "写下今天要做的第一件事"))
                 else:
                     for task in tasks:
                         def toggle_task(e, t=task):
@@ -9239,9 +9250,9 @@ def main(page: ft.Page):
 
             mine_page = ft.Column([
                 ft.Container(height=10),
-                ft.Text("⚙️ 个人中心", size=24, weight=ft.FontWeight.BOLD),
+                ft.Text("我的", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 today_plan_card,
-                ft.Divider(),
+                u_card(ft.Column([
                 ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
                                   icon=ft.Icons.PERSON_OUTLINE),
                 ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
@@ -9264,6 +9275,7 @@ def main(page: ft.Page):
                 ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
                                   icon=ft.Icons.SETTINGS),
                 mine_msg,
+                ], spacing=10), radius=R_CARD),
                 ft.Divider(),
                 ft.Text("⌚ 手环背单词", size=20),
                 band_sync_status,
@@ -9349,8 +9361,8 @@ def main(page: ft.Page):
             ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
             current_page = ft.Container(expand=True,
-                                        animate_opacity=ft.Animation(240, ft.AnimationCurve.EASE_OUT),
-                                        animate_scale=ft.Animation(260, ft.AnimationCurve.EASE_OUT),
+                                        animate_opacity=ft.Animation(260, ft.AnimationCurve.EASE_OUT),
+                                        animate_scale=ft.Animation(260, ft.AnimationCurve.EASE_OUT_BACK),
                                         scale=1.0)
 
             def on_export_md(e):
