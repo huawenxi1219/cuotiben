@@ -3536,7 +3536,9 @@ def main(page: ft.Page):
             answer_input = ft.TextField(label="标准答案", multiline=True, min_lines=2,
                                         border_radius=14, filled=True, fill_color="#1F1F26",
                                         border_color="#414868", focused_border_color="#7AA2F7")
-            idea_input = ft.TextField(label="我的理解", multiline=True, min_lines=2,
+            idea_input = ft.TextField(label="我的思路：当时怎么想的、卡在哪一步（很重要）",
+                                      hint_text="例：我一开始想先求导找极值，但没想清楚端点要不要带进去",
+                                      multiline=True, min_lines=3,
                                       border_radius=14, filled=True, fill_color="#1F1F26",
                                       border_color="#414868", focused_border_color="#7AA2F7")
             tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False,
@@ -4434,7 +4436,9 @@ def main(page: ft.Page):
 - 画完图，接下来的讲解必须指着图说（"看图，顶点在 x=2"），不要画完就丢一边
 
 【按学科选讲法（必须遵守）】
-- 化学：先抓「有什么物质、什么条件」，再推「发生什么反应」，最后用守恒（电子/原子/电荷）算。禁止一上来堆公式。遇到实验题先说清装置和目的。
+- 化学：**先说清"化学不是物理那套"**——物理有少数公理能推到底，化学是"物质性质 + 反应条件 + 守恒关系"织成的网，靠一条公式通吃必然崩。
+  固定四步：① 有什么物质（状态、酸碱性、氧化性/还原性）→ ② 什么条件（浓度、温度、催化剂）→ ③ 发生什么反应（能不能发生、谁过量）→ ④ 用守恒算（电子守恒/原子守恒/电荷守恒）。
+  如果学生说"想用物理的方法学化学"，先直接告诉他这条路错在哪，再给上面这套框架。禁止一上来堆方程式。
 - 地理：按「位置 → 地形/气候/水文 → 影响 → 结论」的因果链走，每一环都要说"为什么"，不许只给结论。选择题要把每个选项错在哪说清。
 - 数学：先画图或举特例把"长什么样"讲明白，再谈解法；抽象函数先给一个具体满足条件的例子。
 - 物理：先受力/过程分析（能画图就画），再列方程。
