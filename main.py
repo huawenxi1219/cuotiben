@@ -1492,6 +1492,12 @@ def endpoint_for(task="smart"):
     if task == "cheap":
         key = cfg.get(info["key_field"], "").strip()
         return key, info["url"], info["model"], info.get("vision_model", "")
+    # 先尊重用户选择的 provider；只有它没填 key 时才回退
+    key_sel = cfg.get(info["key_field"], "").strip()
+    if key_sel:
+        if provider == "deepseek":
+            return key_sel, info["url"], resolve_deepseek_model(cfg), info.get("vision_model", "")
+        return key_sel, info["url"], info["model"], info.get("vision_model", "")
     key_enh = cfg.get("api_key_enhanced", "").strip()
     if key_enh:
         zi = PROVIDERS["zhipu"]
@@ -4354,7 +4360,10 @@ def main(page: ft.Page):
                     _cfg = load_ai_config()
                     _provider_key = _cfg.get("provider", "zhipu")
                     _provider_name = PROVIDERS.get(_provider_key, PROVIDERS["zhipu"])["name"]
-                    _model_name = PROVIDERS.get(_provider_key, PROVIDERS["zhipu"])["model"]
+                    # 显示"实际会被调用"的模型，而不是下拉里的默认值
+                    _rk, _ru, _rm, _rv = endpoint_for("smart")
+                    _model_name = _rm or PROVIDERS.get(_provider_key, PROVIDERS["zhipu"])["model"]
+                    print(f"[CHAT] 实际接口 provider={_provider_key} model={_model_name} url={_ru}")
                 except Exception:
                     _provider_name = "AI"
                     _model_name = ""
@@ -9804,13 +9813,11 @@ def main(page: ft.Page):
                     ],
                     value=str(ai_config.get("ctx_chars", "auto")),
                     width=280),
-                mode_switch_row,
                 provider_dropdown,
                 free_key_input,
                 deepseek_key_input,
                 deepseek_model_input,
                 deepseek_reasoning_dropdown,
-                deepseek_thinking_switch,
                 fast_mode_switch,
                 gaokao_date_input,
                 ft.ElevatedButton("保存密钥", on_click=save_keys),
