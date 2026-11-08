@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-24.04   # 固定镜像：ubuntu-26.04 新镜像会让 flet 0.28.3 打包静默失败
     permissions:
       contents: write
+    env:
+      FLET_CACHE_DIR: ${{ github.workspace }}/.fletcache
 
     steps:
       - name: Checkout code
@@ -51,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          DIR="$HOME/.flet/cache/python-build-standalone/20250205"
+          DIR="$FLET_CACHE_DIR/python-build-standalone/20250205"
           FILE="cpython-3.12.9+20250205-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
           ASSET_ID=226610613
           mkdir -p "$DIR"
