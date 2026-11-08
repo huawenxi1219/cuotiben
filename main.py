@@ -4394,6 +4394,12 @@ def main(page: ft.Page):
 3. 说清它和最容易混的那个概念的差别。
 4. 一句话说明考试里会怎么考这个点。
 
+【回答要有条理（默认按这个排版）】
+- 用 Markdown：先一行结论，再用「## 小标题」分段，必要时用 1. 2. 3. 列步骤
+- 关键术语、公式、结论用 **粗体** 标出来
+- 每题最多 3 个小标题，别写成一整坨
+- 对比类内容用短句分行，别塞成一段
+
 【硬性要求】
 - 学生只问一句，就答这一句，别硬凑成小作文；但讲题该展开时必须展开，不许为了"简洁"把步骤省掉。
 - 不确定的（超纲、版本差异、题目信息不全）直接说"这题信息不够"或"这个我不确定"，绝不编造。
@@ -9483,7 +9489,7 @@ def main(page: ft.Page):
             def on_backup_result(e: ft.FilePickerResultEvent):
                 if not e.path:
                     return
-                dest_dir = e.path
+                _sel = e.path
                 backup_status.value = "⏳ 正在打包..."
                 backup_status.color = "#A9B1D6"
                 page.update()
@@ -9491,7 +9497,10 @@ def main(page: ft.Page):
                 def do_backup():
                     try:
                         ts = time.strftime("%Y%m%d_%H%M%S")
-                        zip_path = os.path.join(dest_dir, f"池鱼Study备份_{ts}.zip")
+                        if str(_sel).lower().endswith(".zip"):
+                            zip_path = _sel
+                        else:
+                            zip_path = os.path.join(_sel, f"池鱼Study备份_{ts}.zip")
                         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                             for root, dirs, files in os.walk(DATA_DIR):
                                 if "_restore_tmp" in root.split(os.sep):
@@ -9826,7 +9835,11 @@ def main(page: ft.Page):
                 ft.Text("💾 数据备份与恢复", size=18, weight=ft.FontWeight.BOLD),
                 ft.Row([
                     ft.ElevatedButton("📤 备份数据",
-                                      on_click=lambda e: _use_picker(page, on_backup_result).get_directory_path(),
+                                      on_click=lambda e: _use_picker(page, on_backup_result).save_file(
+                                          dialog_title="保存备份文件",
+                                          file_name="池鱼备份_%s.zip" % time.strftime("%Y%m%d"),
+                                          file_type=ft.FilePickerFileType.CUSTOM,
+                                          allowed_extensions=["zip"]),
                                       icon=ft.Icons.BACKUP),
                     ft.ElevatedButton("📥 覆盖恢复",
                                       on_click=lambda e: _use_picker(page, on_restore_result).pick_files(
