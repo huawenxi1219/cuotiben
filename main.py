@@ -1423,9 +1423,11 @@ def save_ai_config(config):
 def resolve_deepseek_model(cfg):
     """统一 DeepSeek 模型名：全文件只认 deepseek-flash 这一种写法。
     旧名（deepseek-v4-flash 等）一律归一化为 deepseek-flash，与 load_ai_config 迁移一致。"""
-    _m = (cfg.get("deepseek_model") or "deepseek-flash").strip() or "deepseek-flash"
-    if _m in ("", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
-        return "deepseek-flash"
+    _m = (cfg.get("deepseek_model") or "deepseek-chat").strip()
+    if _m in ("", "deepseek-flash", "deepseek-v4-flash", "deepseek-chat"):
+        return "deepseek-chat"
+    if _m in ("deepseek-v4-pro", "deepseek-pro", "deepseek-reasoner"):
+        return "deepseek-reasoner"
     return _m
 
 
@@ -1462,9 +1464,9 @@ PROVIDERS = {
         "url": "https://api.deepseek.com/chat/completions",
         # deepseek-flash = DeepSeek-V4.1-Flash-1017（官方最新），原生支持图片理解
         "model": "deepseek-flash",
-        "vision_model": "deepseek-flash",
+        "vision_model": "",
         "key_field": "api_key_deepseek",
-        "supports_vision": True,
+        "supports_vision": False,
     },
 }
 
@@ -1489,7 +1491,19 @@ def endpoint_for(task="smart"):
     cfg = load_ai_config()
     provider = cfg.get("provider", "zhipu")
     info = PROVIDERS.get(provider, PROVIDERS["zhipu"])
+    if task == "vision":
+        # 图像识别只有智谱 GLM-4V 能做，DeepSeek 官方 API 不支持图片
+        zi = PROVIDERS["zhipu"]
+        for kf in ("api_key_free", "api_key_enhanced"):
+            k = cfg.get(kf, "").strip()
+            if k:
+                return k, zi["url"], zi.get("vision_model", "glm-4v"), zi.get("vision_model", "")
+        return "", zi["url"], "", ""
     if task == "cheap":
+        _ds = cfg.get("api_key_deepseek", "").strip()
+        if _ds:
+            dk = PROVIDERS["deepseek"]
+            return _ds, dk["url"], resolve_deepseek_model(cfg), ""
         key = cfg.get(info["key_field"], "").strip()
         return key, info["url"], info["model"], info.get("vision_model", "")
     # 先尊重用户选择的 provider；只有它没填 key 时才回退
@@ -1513,7 +1527,12 @@ def endpoint_for(task="smart"):
 def provider_supports_vision():
     cfg = load_ai_config()
     provider = cfg.get("provider", "zhipu")
-    return PROVIDERS.get(provider, PROVIDERS["zhipu"]).get("supports_vision", False)
+    p = PROVIDERS.get(provider, PROVIDERS["zhipu"])
+    if p.get("supports_vision") and cfg.get(p.get("key_field", ""), "").strip() \
+            and provider != "deepseek":
+        return True
+    # DeepSeek 没有视觉能力，但只要智谱有 key，识图就能用
+    return bool(cfg.get("api_key_free", "").strip() or cfg.get("api_key_enhanced", "").strip())
 
 
 # —— DeepSeek 自研网络搜索 / 网页抓取（Search & Fetch API，官方文档 guides/search）——
@@ -3676,8 +3695,9 @@ def main(page: ft.Page):
                 if not provider_supports_vision():
                     show_toast("当前 API 不支持图像识别，请切换到智谱 GLM", "red")
                     return None
-                api_key, api_url, _m, vision_model = endpoint_for("cheap")
+                api_key, api_url, _m, vision_model = endpoint_for("vision")
                 if not api_key:
+                    show_toast("识图需要智谱的免费 Key，请在设置里填上", "red")
                     return None
                 try:
                     with open(image_path, "rb") as f:
@@ -4302,7 +4322,7 @@ def main(page: ft.Page):
                     if not provider_supports_vision():
                         on_chunk("❌ 当前模型不支持图片识别，请在设置中切换智谱 GLM（视觉模型）")
                         return None
-                    api_key, api_url, _m, vision_model = endpoint_for("cheap")
+                    api_key, api_url, _m, vision_model = endpoint_for("vision")
                     if not api_key:
                         on_chunk("❌ 未配置API密钥")
                         return None
@@ -4317,13 +4337,10 @@ def main(page: ft.Page):
                            "temperature": 0.7, "max_tokens": 2048, "stream": True}
                 # DeepSeek：按设置开关思考模式 + 推理程度档位（同官方 Harness：low/medium/high/max）
                 if api_model.startswith("deepseek"):
-                    _cfg = load_ai_config()
-                    if _cfg.get("deepseek_thinking", True):
-                        payload["thinking"] = {"type": "enabled"}
-                        _eff = str(_cfg.get("deepseek_reasoning", "medium") or "medium").strip().lower()
-                        if _eff not in ("low", "medium", "high", "max"):
-                            _eff = "medium"
-                        payload["reasoning_effort"] = _eff
+                    # 官方 API 只认 deepseek-chat / deepseek-reasoner，
+                    # 不支持 thinking / reasoning_effort 这类私有参数，别再发。
+                    payload.pop("thinking", None)
+                    payload.pop("reasoning_effort", None)
                 try:
                     resp = requests.post(
                         api_url,
