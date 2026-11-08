@@ -12,6 +12,10 @@ jobs:
       contents: write
     env:
       FLET_CACHE_DIR: ${{ github.workspace }}/.fletcache
+      GRADLE_OPTS: >-
+        -Dorg.gradle.internal.http.socketTimeout=180000
+        -Dorg.gradle.internal.http.connectionTimeout=180000
+        -Dorg.gradle.daemon=false
 
     steps:
       - name: Checkout code
@@ -91,22 +95,32 @@ jobs:
 
       - name: 打包 APK（用命令行参数传签名）
         run: |
-          set -euo pipefail
+          set -uo pipefail
           df -h /home/runner
-          flet build apk --verbose \
-            --build-number ${{ github.run_number }} \
-            --build-version 1.0.${{ github.run_number }} \
-            --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
-            --android-signing-key-alias "${{ secrets.ALIAS }}" \
-            --android-signing-key-password "${{ secrets.ALIAS_PASSWORD }}" \
-            --android-signing-key-store-password "${{ secrets.KEYSTORE_PASSWORD }}"
+          ok=0
+          for attempt in 1 2 3; do
+            echo "===== 第 $attempt 次打包 ====="
+            rm -rf build
+            if flet build apk \
+              --build-number ${{ github.run_number }} \
+              --build-version 1.0.${{ github.run_number }} \
+              --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
+              --android-signing-key-alias "${{ secrets.ALIAS }}" \
+              --android-signing-key-password "${{ secrets.ALIAS_PASSWORD }}" \
+              --android-signing-key-store-password "${{ secrets.KEYSTORE_PASSWORD }}"; then
+              ok=1
+              echo "✅ 第 $attempt 次打包成功"
+              break
+            fi
+            echo "⚠️ 第 $attempt 次失败，30s 后重试"
+            sleep 30
+          done
           echo "=== 产物检查 ==="
-          ls -la build/apk/ || true
-          APK=$(find build -name '*.apk' -type f | head -1)
-          if [ -z "$APK" ]; then echo "❌ 没有生成任何 APK"; exit 1; fi
+          APK=$(find build -name '*.apk' -type f | head -1 || true)
+          if [ -z "$APK" ]; then echo "❌ 没有生成任何 APK（ok=$ok）"; exit 1; fi
           echo "✅ 生成: $APK ($(stat -c%s "$APK") bytes)"
           mkdir -p build/apk
-          cp "$APK" build/apk/ || true
+          cp "$APK" build/apk/
           ls -la build/apk/
 
       - name: 检查 APK 签名指纹（关键！）
