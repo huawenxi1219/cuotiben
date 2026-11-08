@@ -46,27 +46,48 @@ jobs:
           echo "🔑 keystore 自检（记住这个 SHA-256）："
           keytool -list -keystore my-release-key.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" 2>&1 || true
 
-      - name: 打包 APK（用命令行参数传签名）
+      - name: 预置 CPython 运行时（serious_python 下载不校验完整性）
         run: |
-          df -h /home/runner
-          flet --version || true
-          for attempt in 1 2 3; do
-            echo "===== 第 $attempt 次打包尝试 ====="
-            rm -rf build
-            if flet build apk \
-              --build-number ${{ github.run_number }} \
-              --build-version 1.0.${{ github.run_number }} \
-              --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
-              --android-signing-key-alias "${{ secrets.ALIAS }}" \
-              --android-signing-key-password "${{ secrets.ALIAS_PASSWORD }}" \
-              --android-signing-key-store-password "${{ secrets.KEYSTORE_PASSWORD }}"; then
-              echo "打包成功（第 $attempt 次）"
+          set -euo pipefail
+          DIR="$HOME/.flet/cache/python-build-standalone/20250205"
+          FILE="cpython-3.12.9+20250205-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+          URL="https://github.com/astral-sh/python-build-standalone/releases/download/20250205/$FILE"
+          mkdir -p "$DIR"
+          ok=0
+          for i in 1 2 3 4 5; do
+            echo "===== 下载 CPython 第 $i 次 ====="
+            if curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
+                 --connect-timeout 20 --max-time 600 \
+                 -o "$DIR/$FILE.part" "$URL" && tar tzf "$DIR/$FILE.part" > /dev/null 2>&1; then
+              mv "$DIR/$FILE.part" "$DIR/$FILE"
+              echo "✅ CPython 包校验通过：$(stat -c%s "$DIR/$FILE") bytes"
+              ok=1
               break
             fi
-            echo "第 $attempt 次失败，清理后重试"
-            sleep 15
+            rm -f "$DIR/$FILE.part"
+            sleep 10
           done
-          ls -la build/flutter/app/app.zip build/apk 2>/dev/null || true
+          if [ "$ok" != "1" ]; then echo "❌ 无法获取完整 CPython 包"; exit 1; fi
+
+      - name: 打包 APK（用命令行参数传签名）
+        run: |
+          set -euo pipefail
+          df -h /home/runner
+          flet build apk \
+            --build-number ${{ github.run_number }} \
+            --build-version 1.0.${{ github.run_number }} \
+            --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
+            --android-signing-key-alias "${{ secrets.ALIAS }}" \
+            --android-signing-key-password "${{ secrets.ALIAS_PASSWORD }}" \
+            --android-signing-key-store-password "${{ secrets.KEYSTORE_PASSWORD }}"
+          echo "=== 产物检查 ==="
+          ls -la build/apk/ || true
+          APK=$(find build -name '*.apk' -type f | head -1)
+          if [ -z "$APK" ]; then echo "❌ 没有生成任何 APK"; exit 1; fi
+          echo "✅ 生成: $APK ($(stat -c%s "$APK") bytes)"
+          mkdir -p build/apk
+          cp "$APK" build/apk/ || true
+          ls -la build/apk/
 
       - name: 检查 APK 签名指纹（关键！）
         run: |
