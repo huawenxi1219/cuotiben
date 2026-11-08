@@ -3717,6 +3717,7 @@ def main(page: ft.Page):
 {
   "question": "【最重要】完整、逐字抄录图片中的题目原文，包括题干和全部选项（A. B. C. D. 等）以及图表中的关键文字，一字不差，不要省略、不要概括、不要翻译；如果一张图有多道题，只识别最完整、最清晰的一道题",
   "answer": "如果图片中可见标准答案或解析，照录答案内容；没有则填空字符串",
+  "subject": "这道题属于哪一科，只能从这些里选一个：语文、数学、英语、物理、化学、生物、历史、政治、地理",
   "knowledge_point": "该题涉及的知识点（如：三角函数、力学、非谓语动词等）",
   "error_type": "学生可能的错因（如：公式记错、审题不清、计算错误）",
   "difficulty": 1-5 的整数（1最简单，5最难）
@@ -3826,6 +3827,7 @@ def main(page: ft.Page):
                                     "a": str(r.get("answer") or "").strip(),
                                     "et": str(r.get("error_type") or "").strip(),
                                     "kp": str(r.get("knowledge_point") or "").strip(),
+                                    "subj": str(r.get("subject") or "").strip(),
                                     "media": rel,
                                 })
                                 ok += 1
@@ -3852,41 +3854,51 @@ def main(page: ft.Page):
                     options=[ft.dropdown.Option(s) for s in ["数学", "语文", "英语", "物理", "化学",
                                                              "生物", "历史", "政治", "地理"]],
                     value=subj_dd.value, width=150)
+                _SUBJ_LIST = ["数学", "语文", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]
                 checks = []
                 col = ft.Column([], spacing=2, scroll=ft.ScrollMode.AUTO)
                 for i, r in enumerate(results):
                     cb = ft.Checkbox(value=True)
-                    checks.append((cb, r))
+                    _guess = r.get("subj") or ""
+                    if _guess not in _SUBJ_LIST:
+                        _guess = subj_batch.value if subj_batch.value in _SUBJ_LIST else "数学"
+                    sd = ft.Dropdown(options=[ft.dropdown.Option(x) for x in _SUBJ_LIST],
+                                     value=_guess, width=96, dense=True, text_size=12)
+                    checks.append((cb, r, sd))
                     col.controls.append(ft.Row([
                         cb,
                         ft.Column([
-                            ft.Text(r["q"][:46].replace("\n", " "), size=13, color=C_TEXT),
+                            ft.Text(r["q"][:40].replace("\n", " "), size=13, color=C_TEXT),
                             ft.Text((r["kp"] or "未识别知识点"), size=11, color=C_TEXT2),
                         ], spacing=1, expand=True),
-                    ], spacing=6))
+                        sd,
+                    ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER))
 
                 def do_save(ev):
-                    picked = [r for cb, r in checks if cb.value]
+                    picked = [(r, sd) for cb, r, sd in checks if cb.value]
                     if not picked:
                         show_toast("一道都没选", "red")
                         return
-                    subj = subj_batch.value or "数学"
                     n = 0
-                    for r in picked:
+                    by_subj = {}
+                    for r, sd in picked:
+                        subj = (sd.value or subj_batch.value or "数学")
                         try:
                             save_error(subj, r["q"], [r["media"]] if r["media"] else [],
                                        r["a"], [], r["et"], "", [], r["kp"])
                             n += 1
+                            by_subj[subj] = by_subj.get(subj, 0) + 1
                         except BaseException:
                             pass
                     page.close(dlg2)
-                    show_toast(f"✅ 已入库 {n} 道（{subj}）", "green")
+                    detail = "、".join(f"{k}{v}道" for k, v in by_subj.items())
+                    show_toast(f"✅ 已入库 {n} 道：{detail}", "green")
 
                 dlg2 = ft.AlertDialog(
                     title=ft.Text(f"识别到 {ok} 道（共 {total} 张）"),
                     content=ft.Container(content=ft.Column([
                         subj_batch,
-                        ft.Text("勾掉不要的，确认后按这个科目入库", size=12, color=C_TEXT2),
+                        ft.Text("勾掉不要的；科目是 AI 猜的，可逐条改", size=12, color=C_TEXT2),
                         ft.Container(content=col, height=_dlg_h(page, 320), width=_dlg_w(page, 380)),
                     ], spacing=8), width=_dlg_w(page, 400)),
                     actions=[
@@ -4341,7 +4353,7 @@ def main(page: ft.Page):
                         return None
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 payload = {"model": api_model, "messages": messages,
-                           "temperature": 0.7, "max_tokens": 2048, "stream": True}
+                           "temperature": 0.7, "max_tokens": 4096, "stream": True}
                 # DeepSeek：按设置开关思考模式 + 推理程度档位（同官方 Harness：low/medium/high/max）
                 if api_model.startswith("deepseek"):
                     # 官方支持 reasoning_effort: low / high / max（默认 high），
