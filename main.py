@@ -1420,6 +1420,32 @@ def save_ai_config(config):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
+def _install_deepseek_post_shim():
+    """DeepSeek 默认开启思考，会把小 max_tokens 全吃掉导致 content 为空。
+    这里统一兜底：非流式请求自动 reasoning_effort=none 且 max_tokens 至少 1200。
+    覆盖识图、打标签、分析、计划等所有调用点，避免逐个漏改。"""
+    if getattr(requests, "_chiyu_shim", False):
+        return
+    _orig_post = requests.post
+
+    def _post(url, *args, **kwargs):
+        payload = kwargs.get("json")
+        if isinstance(payload, dict):
+            model = str(payload.get("model") or "")
+            if model.startswith("deepseek"):
+                if "reasoning_effort" not in payload:
+                    payload["reasoning_effort"] = "none"
+                if not payload.get("stream"):
+                    try:
+                        payload["max_tokens"] = max(int(payload.get("max_tokens") or 0), 1200)
+                    except BaseException:
+                        payload["max_tokens"] = 1200
+        return _orig_post(url, *args, **kwargs)
+
+    requests.post = _post
+    requests._chiyu_shim = True
+
+
 def resolve_deepseek_model(cfg):
     """统一 DeepSeek 模型名：全文件只认 deepseek-flash 这一种写法。
     旧名（deepseek-v4-flash 等）一律归一化为 deepseek-flash，与 load_ai_config 迁移一致。"""
@@ -3112,6 +3138,7 @@ def init_content_lib():
 
 
 def main(page: ft.Page):
+    _install_deepseek_post_shim()
     page.padding = 0
     page.spacing = 0
     try:
@@ -3574,7 +3601,7 @@ def main(page: ft.Page):
 
                 def pick_files(e):
                     _use_picker(page, handle_picker_result).pick_files(
-                        file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+                        allow_multiple=True)
 
                 complete_btn = ft.ElevatedButton(
                     "✅ 完成上传", icon=ft.Icons.DONE,
@@ -4372,7 +4399,12 @@ def main(page: ft.Page):
                         api_url,
                         headers=headers, json=payload, stream=True, timeout=60)
                     if resp.status_code != 200:
-                        on_chunk(f"❌ API错误 {resp.status_code}")
+                        _b = ""
+                        try:
+                            _b = (resp.text or "")[:160].replace(chr(10), " ")
+                        except BaseException:
+                            pass
+                        on_chunk(f"❌ API错误 {resp.status_code} {_b}")
                         return
                     accumulated = ""
                     _reasoning_len = 0
@@ -5774,7 +5806,7 @@ def main(page: ft.Page):
 
                 def pick_chat_image():
                     _use_picker(page, on_chat_img_picked).pick_files(
-                        file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+                        allow_multiple=True)
 
                 def pick_chat_camera():
                     """调用本机摄像头拍照：拍题 → 自动插入对话（与相册同一发送链路）"""
