@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           df -h /home/runner
-          flet build apk \
+          flet build apk --verbose \
             --build-number ${{ github.run_number }} \
             --build-version 1.0.${{ github.run_number }} \
             --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
