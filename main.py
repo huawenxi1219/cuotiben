@@ -3842,8 +3842,11 @@ def main(page: ft.Page):
 
                     threading.Thread(target=_work, daemon=True).start()
 
-                _use_picker(page, _on_files).pick_files(
-                    file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+                try:
+                    # Android 上带 IMAGE 过滤的多选有时直接静默失败，改用 ANY 多选更稳
+                    _use_picker(page, _on_files).pick_files(allow_multiple=True)
+                except Exception as _ex:
+                    show_toast(f"打开相册失败：{str(_ex)[:60]}", "red")
 
             def _show_confirm(results, total, ok):
                 if not results:
@@ -4372,13 +4375,21 @@ def main(page: ft.Page):
                         on_chunk(f"❌ API错误 {resp.status_code}")
                         return
                     accumulated = ""
+                    _reasoning_len = 0
                     for line in resp.iter_lines(decode_unicode=True):
                         if stop_flag:
                             break
                         if line and line.startswith('data: ') and line[6:].strip() != '[DONE]':
                             try:
                                 data = json.loads(line[6:])
-                                delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                _d = data.get("choices", [{}])[0].get("delta", {}) or {}
+                                delta = _d.get("content") or ""
+                                # DeepSeek 思考模式会先吐 reasoning_content，之前被完全忽略 → 看着像没反应
+                                _rs = _d.get("reasoning_content") or _d.get("reasoning") or ""
+                                if _rs:
+                                    _reasoning_len += len(_rs)
+                                    if not accumulated:
+                                        on_chunk(f"⏳ 正在思考…（已推理 {_reasoning_len} 字）")
                                 if delta:
                                     accumulated += delta
                                     on_chunk(accumulated)
@@ -9046,7 +9057,10 @@ def main(page: ft.Page):
                                    "Content-Type": "application/json"}
                         payload = {"model": api_model,
                                    "messages": [{"role": "user", "content": "仅回复OK"}],
-                                   "max_tokens": 5, "temperature": 0}
+                                   "max_tokens": 64, "temperature": 0}
+                        if str(api_model).startswith("deepseek"):
+                            # 不关思考的话，64 个 token 可能全被推理吃掉，content 就是空的
+                            payload["reasoning_effort"] = "none"
                         resp = requests.post(api_url,
                                              headers=headers, json=payload, timeout=10)
                         if resp.status_code == 200:
@@ -9058,7 +9072,8 @@ def main(page: ft.Page):
                                 test_conn_result.value = "⚠️ 连接成功但返回为空"
                                 test_conn_result.color = "#E0AF68"
                         else:
-                            test_conn_result.value = f"❌ 连接失败 (HTTP {resp.status_code})"
+                            _body = (resp.text or "")[:80].replace("\n", " ")
+                            test_conn_result.value = f"❌ 连接失败 (HTTP {resp.status_code}) {_body}"
                             test_conn_result.color = "#EF5350"
                     except requests.exceptions.Timeout:
                         test_conn_result.value = "❌ 连接超时"
