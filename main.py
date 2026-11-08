@@ -4359,7 +4359,7 @@ def main(page: ft.Page):
                     _provider_name = "AI"
                     _model_name = ""
                 history = load_chat_history(subject)
-                context_messages = build_ctx(history, max_chars=20000)
+                context_messages = build_ctx(history, max_chars=8000 if load_ai_config().get("fast_mode") else 20000)
                 memory_context = get_memory_context(subject if subject != "总AI" else None)
                 profile_summary = get_profile_summary()
                 strategy = get_teaching_strategy(subject if subject != "总AI" else None)
@@ -4423,7 +4423,8 @@ def main(page: ft.Page):
                                 _tq = str(_m.get("content", ""))[:80]
                                 break
                         if _tq:
-                            _tb = search_textbook(subject, _tq)
+                            _tb = search_textbook(subject, _tq,
+                                              top=0 if load_ai_config().get("fast_mode") else 3)
                             if _tb:
                                 system_prompt += (f"\n\n【教材参考（人教版{subject}）】\n"
                                                   "以下为教材原文摘录（含页码），回答时优先遵循教材定义与表述：\n"
@@ -5249,6 +5250,7 @@ def main(page: ft.Page):
 
                 def _send_internal(content, insert_user_bubble=True):
                     nonlocal generation_active, stop_flag
+                    _fast = bool(load_ai_config().get("fast_mode"))
                     _send_t0 = {"t": time.time()}
                     # 如果正在生成，先停掉旧生成，防止并发线程串台
                     if generation_active:
@@ -5311,7 +5313,8 @@ def main(page: ft.Page):
                     if (not rebuilt) or rebuilt[-1].get("role") != "user" or rebuilt[-1].get("content") != content:
                         rebuilt.append({"role": "user", "content": content})
                     try:
-                        rel = pick_relevant_errors(content, subject if subject != "总AI" else None, limit=5)
+                        rel = pick_relevant_errors(content, subject if subject != "总AI" else None,
+                                                    limit=0 if _fast else 5)
                         if rel:
                             lines = ["【学生错题本中的相关错题（请务必结合这些具体内容回答，不要泛泛而谈）】"]
                             for i, e in enumerate(rel):
@@ -5333,7 +5336,8 @@ def main(page: ft.Page):
                         pass
                     # 笔记检索注入：让 AI 能读取学生自己的笔记内容
                     try:
-                        rel_notes = pick_relevant_notes(content, subject if subject != "总AI" else None, limit=3)
+                        rel_notes = pick_relevant_notes(content, subject if subject != "总AI" else None,
+                                                        limit=0 if _fast else 3)
                         if rel_notes:
                             nlines = ["【学生笔记本中的相关笔记（回答时优先呼应笔记里的知识要点与写法）】"]
                             for i, n in enumerate(rel_notes):
@@ -8939,6 +8943,11 @@ def main(page: ft.Page):
                 label="DeepSeek 思考模式",
                 value=ai_config.get("deepseek_thinking", True),
                 tooltip="开启后模型先深度思考再回答（更强但稍慢）")
+            fast_mode_switch = ft.Switch(
+                label="快速模式（关掉教材/错题检索，回答更快）",
+                value=bool(ai_config.get("fast_mode")),
+                tooltip="赶时间时打开：不注入教材原文、相关错题和笔记，响应更快但个性化变弱")
+
             gaokao_date_input = ft.TextField(
                 label="高考日期（可选，YYYY-MM-DD）",
                 hint_text="留空自动按「下一个 6 月 7 日」计算",
@@ -8953,6 +8962,7 @@ def main(page: ft.Page):
                 cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
                 cfg["deepseek_thinking"] = deepseek_thinking_switch.value
                 cfg["deepseek_reasoning"] = str(deepseek_reasoning_dropdown.value or "medium")
+                cfg["fast_mode"] = bool(fast_mode_switch.value)
                 cfg["gaokao_date"] = gaokao_date_input.value.strip()
                 try:
                     cfg["ctx_chars"] = memory_dropdown.value or "auto"
@@ -9792,6 +9802,7 @@ def main(page: ft.Page):
                 deepseek_model_input,
                 deepseek_reasoning_dropdown,
                 deepseek_thinking_switch,
+                fast_mode_switch,
                 gaokao_date_input,
                 ft.ElevatedButton("保存密钥", on_click=save_keys),
                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
