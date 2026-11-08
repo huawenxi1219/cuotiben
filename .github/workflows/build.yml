@@ -12,6 +12,9 @@ jobs:
       contents: write
     env:
       FLET_CACHE_DIR: ${{ github.workspace }}/.fletcache
+      SERIOUS_PYTHON_VERSION: "3.12"
+      SERIOUS_PYTHON_FULL_VERSION: "3.12.16"
+      SERIOUS_PYTHON_BUILD_DATE: "20261027"
       GRADLE_OPTS: >-
         -Dorg.gradle.internal.http.socketTimeout=180000
         -Dorg.gradle.internal.http.connectionTimeout=180000
