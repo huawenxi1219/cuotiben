@@ -4087,7 +4087,7 @@ def main(page: ft.Page):
                     expand=True)
 
             home_page = ft.Column([
-                ft.Container(height=6),
+                ft.Container(height=26),
                 ft.Text("拍照录题", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 ft.Text("拍下题目，AI 自动读取原文并分析错因", size=13, color=C_TEXT2),
                 u_card(ft.Column([
@@ -4124,7 +4124,8 @@ def main(page: ft.Page):
                 ft.Container(height=4),
                 u_primary_btn("保存笔记", submit_note, ft.Icons.SAVE_OUTLINED),
                 ft.Container(height=24),
-            ], spacing=14, scroll=ft.ScrollMode.AUTO)
+            ], spacing=14, scroll=ft.ScrollMode.AUTO,
+               horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
 
             AI_SUBJECTS = [("总AI", "🤖"), ("数学", "📐"), ("语文", "📜"), ("英语", "📝"),
                            ("物理", "⚛️"), ("化学", "🧪"), ("生物", "🧬"),
@@ -4300,8 +4301,8 @@ def main(page: ft.Page):
             try:
                 _bw = page.width or (page.window.width if page.window else None) or 360
                 _bh = page.height or (page.window.height if page.window else None) or 640
-                ball_state["ball_x"] = max(8, _bw - 44 - 6)
-                ball_state["ball_y"] = max(60, min(_bh * 0.62, _bh - 120))
+                ball_state["ball_x"] = max(8, _bw - 44 - 8)
+                ball_state["ball_y"] = max(80, _bh - 150)
             except BaseException:
                 pass
             ball_container = ft.Container(
@@ -8888,10 +8889,11 @@ def main(page: ft.Page):
             main_subject_page = build_subject_page()
             subject_page_content.content = main_subject_page
             subject_page = ft.Column([
-                ft.Container(height=10),
+                ft.Container(height=26),
                 ft.Text("学科", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 ft.Container(content=subject_page_content, expand=True),
-            ], spacing=15, expand=True)   # 有 expand 子控件时不能再开 scroll，否则撑不满、底部留白
+            ], spacing=15, expand=True,
+               horizontal_alignment=ft.CrossAxisAlignment.STRETCH)   # 撑满宽度，别留右侧黑边
 
             @retry_request(max_retries=3, base_delay=2)
             def generate_today_plan(result_text=None):
@@ -9902,7 +9904,7 @@ def main(page: ft.Page):
 
 
             mine_page = ft.Column([
-                ft.Container(height=10),
+                ft.Container(height=26),
                 ft.Text("我的", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 today_plan_card,
                 u_card(ft.Column([
@@ -10007,7 +10009,8 @@ def main(page: ft.Page):
                 ], spacing=10, wrap=True),
                 dav_status,
                 ft.Container(height=20),
-            ], spacing=20, scroll=ft.ScrollMode.AUTO)
+            ], spacing=20, scroll=ft.ScrollMode.AUTO,
+               horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
 
             current_page = ft.Container(expand=True,
                                         animate_opacity=ft.Animation(260, ft.AnimationCurve.EASE_OUT),
