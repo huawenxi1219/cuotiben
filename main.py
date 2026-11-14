@@ -8623,7 +8623,8 @@ def main(page: ft.Page):
                     ("💬", "金句", "#3A2233"),
                 ]
                 cards_config = all_cards if subject == "英语" else all_cards[:3]
-                grid = ft.ResponsiveRow(spacing=20, run_spacing=20, expand=True)
+                # 手机端纵向排布，三张卡平分高度，避免底部大片留白
+                grid = ft.Column(spacing=14, expand=True)
                 for i, (icon, name, bg) in enumerate(cards_config):
                     def _card_hover(e, _card=None):
                         try:
@@ -8667,9 +8668,7 @@ def main(page: ft.Page):
                         **hover_kw,
                         on_click=lambda e, subj=subject, fn=name: open_function_page(subj, fn),
                         expand=True)
-                    grid.controls.append(
-                        ft.Container(content=card,
-                                     col={"xs": 12, "sm": 6, "md": 6, "lg": 4, "xl": 3}))
+                    grid.controls.append(card)
                 return grid
 
             def open_function_page(subject, function_name):
@@ -9890,6 +9889,11 @@ def main(page: ft.Page):
                            "green")
 
 
+            def _row_btn(btn):
+                """把按钮包成整行宽（Flet 里按钮本身不随列拉伸）"""
+                btn.expand = True
+                return ft.Row([btn], spacing=0)
+
             mode_switch_row = ft.Row([
 
                 ft.ElevatedButton("🪶 省心模式", icon=ft.Icons.ECO,
@@ -9908,25 +9912,25 @@ def main(page: ft.Page):
                 ft.Text("我的", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 today_plan_card,
                 u_card(ft.Column([
-                ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
-                                  icon=ft.Icons.PERSON_OUTLINE),
-                ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
-                                  icon=ft.Icons.INSIGHTS),
-                ft.ElevatedButton("📅 导出本周错题卡", icon=ft.Icons.DATE_RANGE,
-                                  on_click=lambda e: open_card_options(True)),
-                ft.ElevatedButton("🖨 导出 A4 错题卡", icon=ft.Icons.PRINT,
-                                  on_click=lambda e: open_card_options(False)),
+                _row_btn(ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
+                                  icon=ft.Icons.PERSON_OUTLINE)),
+                _row_btn(ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
+                                  icon=ft.Icons.INSIGHTS)),
+                _row_btn(ft.ElevatedButton("📅 导出本周错题卡", icon=ft.Icons.DATE_RANGE,
+                                  on_click=lambda e: open_card_options(True))),
+                _row_btn(ft.ElevatedButton("🖨 导出 A4 错题卡", icon=ft.Icons.PRINT,
+                                  on_click=lambda e: open_card_options(False))),
                 ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
                                   on_click=lambda e: _use_picker(page, on_export_md).save_file(
                                       dialog_title="导出学习档案",
                                       file_name="池鱼学习档案.md",
                                       file_type=ft.FilePickerFileType.CUSTOM,
                                       allowed_extensions=["md"])),
-                ft.ElevatedButton("🏷️ 批量重打标签", on_click=lambda e: batch_retag(e),
-                                  icon=ft.Icons.LABEL),
+                _row_btn(ft.ElevatedButton("🏷️ 批量重打标签", on_click=lambda e: batch_retag(e),
+                                  icon=ft.Icons.LABEL)),
                 retag_status,
-                ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
-                                  icon=ft.Icons.SETTINGS),
+                _row_btn(ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
+                                  icon=ft.Icons.SETTINGS)),
                 mine_msg,
                 ], spacing=10), radius=R_CARD),
                 ft.Divider(),
