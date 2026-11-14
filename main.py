@@ -5932,7 +5932,7 @@ def main(page: ft.Page):
                             ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_size=20,
                                           tooltip="清除历史", on_click=clear_history),
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                        padding=ft.Padding(left=4, right=4, top=10, bottom=8),
+                        padding=ft.Padding(left=4, right=4, top=38, bottom=10),
                         bgcolor="#26FFFFFF",
                         blur=ft.Blur(8, 8, ft.BlurTileMode.CLAMP),
                         border_radius=ft.BorderRadius(0, 0, 16, 16),
