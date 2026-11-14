@@ -2691,6 +2691,31 @@ def build_error_cards_html(subject=None, per_page=6, days=None, blank=False):
     def esc(s):
         return _html.escape(str(s or "")).replace("\n", "<br>")
 
+    # 卡片尺寸按信息量自动决定：
+    #   s  = 1 格（一页最多 6 道，选择题/小题）
+    #   m  = 2 格（一页 3 道，中等题）
+    #   l  = 6 格（半页，需推算的大题）
+    #   xl = 12 格（整页，超长题/带图题）
+    CELLS = {"s": 1, "m": 2, "l": 6, "xl": 12}
+    PROFILE = {"s": 0, "m": 1, "l": 2, "xl": 3}
+    BACK = {0: "s", 1: "m", 2: "l", 3: "xl"}
+
+    def _size_of(q, has_img):
+        n = len(q)
+        if has_img:
+            n += 260
+        if n <= 110:
+            lv = 0
+        elif n <= 240:
+            lv = 1
+        elif n <= 520:
+            lv = 2
+        else:
+            lv = 3
+        if blank:            # 要留演算区时整体升一级
+            lv = min(3, lv + 1)
+        return BACK[lv]
+
     cards = []
     for e in errs:
         q = (e.get("original") or e.get("question") or "").strip()
@@ -2700,27 +2725,42 @@ def build_error_cards_html(subject=None, per_page=6, days=None, blank=False):
         a = (e.get("answer") or "").strip()
         tags = "、".join(str(x) for x in (e.get("tags") or [])[:4])
         subj = e.get("subject", "")
+        media = e.get("media") or []
+        has_img = bool(media)
         _no = len(cards) + 1
+        _size = _size_of(q, has_img)
         _blank = '<div class="work"></div>' if blank else ''
-        cards.append(f"""
-        <div class="card">
+        _img = '<div class="imgnote">［原题有图，见手机］</div>' if has_img else ''
+        cards.append({
+            "cells": CELLS[_size],
+            "html": f"""
+        <div class="card {_size}">
           <div class="head"><span class="no">#{_no:03d}</span><span class="subj">{esc(subj)}</span><span class="tags">{esc(tags)}</span></div>
-          <div class="q">{esc(q[:420])}</div>
+          <div class="q">{esc(q[:900])}</div>
+          {_img}
           {_blank}
-          <div class="line"><b>错因</b>{esc(m[:160])}</div>
-          <div class="line"><b>答案</b>{esc(a[:220])}</div>
+          <div class="line"><b>错因</b>{esc(m[:200])}</div>
+          <div class="line"><b>答案</b>{esc(a[:300])}</div>
           <div class="keyline">🔑 这题的钥匙：<span class="dots"></span></div>
           <div class="foot">□ 已会　□ 还需练</div>
-        </div>""")
+        </div>""",
+        })
 
+    # 自动分页：每页 12 格，贪心装填，装不下就换页
     pages = []
-    for i in range(0, len(cards), per_page):
-        pages.append("".join(cards[i:i + per_page]))
+    cur, used = [], 0
+    for c in cards:
+        if used + c["cells"] > 12 and cur:
+            pages.append(cur)
+            cur, used = [], 0
+        cur.append(c["html"])
+        used += c["cells"]
+    if cur:
+        pages.append(cur)
 
     body = "".join(f'<div class="page">{"".join(chunk)}</div>' for chunk in pages) if pages else \
         '<div class="page"><div class="card"><div class="q">暂无错题</div></div></div>'
 
-    _rows = max(1, (int(per_page) + 1) // 2)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <title>池鱼错题卡</title>
@@ -2729,7 +2769,14 @@ def build_error_cards_html(subject=None, per_page=6, days=None, blank=False):
   * {{ box-sizing: border-box; }}
   body {{ margin: 0; font-family: "Source Han Sans SC", "Microsoft YaHei", sans-serif; color: #111; }}
   .page {{ width: 190mm; height: 277mm; display: grid; grid-template-columns: 1fr 1fr;
-           grid-template-rows: repeat({_rows}, 1fr); gap: 4mm; page-break-after: always; }}
+           grid-template-rows: repeat(6, 1fr); grid-auto-flow: dense;
+           gap: 3mm; page-break-after: always; }}
+  .card.s {{ grid-column: span 1; grid-row: span 1; }}
+  .card.m {{ grid-column: span 1; grid-row: span 2; }}
+  .card.l {{ grid-column: span 2; grid-row: span 3; }}
+  .card.xl {{ grid-column: span 2; grid-row: span 6; }}
+  .card.l .q, .card.xl .q {{ font-size: 12pt; }}
+  .imgnote {{ font-size: 7.5pt; color: #a60; margin-top: 1mm; }}
   .card {{ border: 1px solid #999; border-radius: 3mm; padding: 3mm; overflow: hidden;
            display: flex; flex-direction: column; }}
   .head {{ display: flex; justify-content: space-between; font-size: 8pt; color: #666;
