@@ -2676,7 +2676,7 @@ def run_ai_actions(text, subject=""):
     return done
 
 
-def build_error_cards_html(subject=None, per_page=6, days=None):
+def build_error_cards_html(subject=None, per_page=6, days=None, blank=False):
     """生成 A4 错题卡 HTML：每页 per_page 个小方块，一格一题。
     用浏览器/WPS/Word 打开即可打印；Word 里每个格子都能自由改。"""
     import html as _html
@@ -2700,12 +2700,16 @@ def build_error_cards_html(subject=None, per_page=6, days=None):
         a = (e.get("answer") or "").strip()
         tags = "、".join(str(x) for x in (e.get("tags") or [])[:4])
         subj = e.get("subject", "")
+        _no = len(cards) + 1
+        _blank = '<div class="work"></div>' if blank else ''
         cards.append(f"""
         <div class="card">
-          <div class="head"><span class="subj">{esc(subj)}</span><span class="tags">{esc(tags)}</span></div>
+          <div class="head"><span class="no">#{_no:03d}</span><span class="subj">{esc(subj)}</span><span class="tags">{esc(tags)}</span></div>
           <div class="q">{esc(q[:420])}</div>
+          {_blank}
           <div class="line"><b>错因</b>{esc(m[:160])}</div>
           <div class="line"><b>答案</b>{esc(a[:220])}</div>
+          <div class="keyline">🔑 这题的钥匙：<span class="dots"></span></div>
           <div class="foot">□ 已会　□ 还需练</div>
         </div>""")
 
@@ -2716,6 +2720,7 @@ def build_error_cards_html(subject=None, per_page=6, days=None):
     body = "".join(f'<div class="page">{"".join(chunk)}</div>' for chunk in pages) if pages else \
         '<div class="page"><div class="card"><div class="q">暂无错题</div></div></div>'
 
+    _rows = max(1, (int(per_page) + 1) // 2)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <title>池鱼错题卡</title>
@@ -2724,7 +2729,7 @@ def build_error_cards_html(subject=None, per_page=6, days=None):
   * {{ box-sizing: border-box; }}
   body {{ margin: 0; font-family: "Source Han Sans SC", "Microsoft YaHei", sans-serif; color: #111; }}
   .page {{ width: 190mm; height: 277mm; display: grid; grid-template-columns: 1fr 1fr;
-           grid-template-rows: repeat(3, 1fr); gap: 4mm; page-break-after: always; }}
+           grid-template-rows: repeat({_rows}, 1fr); gap: 4mm; page-break-after: always; }}
   .card {{ border: 1px solid #999; border-radius: 3mm; padding: 3mm; overflow: hidden;
            display: flex; flex-direction: column; }}
   .head {{ display: flex; justify-content: space-between; font-size: 8pt; color: #666;
@@ -2733,6 +2738,10 @@ def build_error_cards_html(subject=None, per_page=6, days=None):
   .q {{ font-size: 11pt; line-height: 1.45; flex: 1; overflow: hidden; }}
   .line {{ font-size: 8.5pt; color: #333; margin-top: 1.5mm; line-height: 1.4; }}
   .line b {{ color: #a33; margin-right: 2mm; }}
+  .no {{ font-weight: bold; color: #333; margin-right: 2mm; font-family: monospace; }}
+  .work {{ flex: 2; border-bottom: 1px dashed #bbb; margin: 1.5mm 0; min-height: 18mm; }}
+  .keyline {{ font-size: 8.5pt; color: #333; margin-top: 1.5mm; }}
+  .dots {{ display: inline-block; width: 60%; border-bottom: 1px dotted #666; }}
   .foot {{ font-size: 8pt; color: #888; margin-top: auto; padding-top: 1.5mm; }}
   @media print {{ .page {{ page-break-after: always; }} }}
 </style></head>
@@ -9855,17 +9864,9 @@ def main(page: ft.Page):
                 ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
                                   icon=ft.Icons.INSIGHTS),
                 ft.ElevatedButton("📅 导出本周错题卡", icon=ft.Icons.DATE_RANGE,
-                                  on_click=lambda e: _use_picker(page, on_export_cards_week).save_file(
-                                      dialog_title="导出本周错题卡",
-                                      file_name="本周错题卡.html",
-                                      file_type=ft.FilePickerFileType.CUSTOM,
-                                      allowed_extensions=["html"])),
+                                  on_click=lambda e: open_card_options(True)),
                 ft.ElevatedButton("🖨 导出 A4 错题卡", icon=ft.Icons.PRINT,
-                                  on_click=lambda e: _use_picker(page, on_export_cards).save_file(
-                                      dialog_title="导出 A4 错题卡",
-                                      file_name="池鱼错题卡.html",
-                                      file_type=ft.FilePickerFileType.CUSTOM,
-                                      allowed_extensions=["html"])),
+                                  on_click=lambda e: open_card_options(False)),
                 ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
                                   on_click=lambda e: _use_picker(page, on_export_md).save_file(
                                       dialog_title="导出学习档案",
@@ -9987,13 +9988,44 @@ def main(page: ft.Page):
                     show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
 
 
+            _card_opts = {"per_page": 6, "blank": False}
+
+            def open_card_options(week=False):
+                _pp = ft.Dropdown(
+                    label="每页题数",
+                    options=[ft.dropdown.Option("4", "4 题（格子最大）"),
+                             ft.dropdown.Option("6", "6 题（默认）"),
+                             ft.dropdown.Option("5", "5 题（折中）")],
+                    value=str(_card_opts["per_page"]), width=200, dense=True)
+                _bk = ft.Switch(label="留出「演算空白区」", value=_card_opts["blank"])
+                _hint = ft.Text("留白适合在纸上重做；不留白适合只写批注", size=11, color=C_TEXT2)
+
+                def _go(ev):
+                    _card_opts["per_page"] = int(_pp.value or 6)
+                    _card_opts["blank"] = bool(_bk.value)
+                    page.close(_dlg)
+                    _fn = on_export_cards_week if week else on_export_cards
+                    _use_picker(page, _fn).save_file(
+                        dialog_title=("导出本周错题卡" if week else "导出 A4 错题卡"),
+                        file_name=("本周错题卡.html" if week else "池鱼错题卡.html"),
+                        file_type=ft.FilePickerFileType.CUSTOM,
+                        allowed_extensions=["html"])
+
+                _dlg = ft.AlertDialog(
+                    title=ft.Text("错题卡设置"),
+                    content=ft.Container(content=ft.Column([_pp, _bk, _hint], spacing=12),
+                                         width=_dlg_w(page, 300)),
+                    actions=[ft.TextButton("取消", on_click=lambda ev: page.close(_dlg)),
+                             ft.ElevatedButton("导出", icon=ft.Icons.PRINT, on_click=_go)])
+                page.open(_dlg)
+
             def on_export_cards_week(e):
                 if not getattr(e, "path", ""):
                     return
                 _p = e.path if str(e.path).lower().endswith(".html") else str(e.path) + ".html"
                 try:
                     with open(_p, "w", encoding="utf-8") as _f:
-                        _f.write(build_error_cards_html(days=7))
+                        _f.write(build_error_cards_html(days=7, per_page=_card_opts['per_page'], blank=_card_opts['blank']))
                     show_toast("✅ 本周错题卡已生成", "green")
                 except Exception as _ex:
                     show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
@@ -10004,7 +10036,7 @@ def main(page: ft.Page):
                 _p = e.path if str(e.path).lower().endswith(".html") else str(e.path) + ".html"
                 try:
                     with open(_p, "w", encoding="utf-8") as _f:
-                        _f.write(build_error_cards_html())
+                        _f.write(build_error_cards_html(per_page=_card_opts['per_page'], blank=_card_opts['blank']))
                     show_toast("✅ 已生成，用浏览器/WPS 打开即可打印", "green")
                 except Exception as _ex:
                     show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
