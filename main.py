@@ -4133,7 +4133,7 @@ def main(page: ft.Page):
 
             def _panel_size():
                 pw = 228
-                ph = min(470, max(250, 128 + len(AI_SUBJECTS) * 50))
+                ph = min(560, max(250, 108 + len(AI_SUBJECTS) * 46))
                 return pw, ph
 
             contact_panel = ft.Container(
