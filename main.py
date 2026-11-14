@@ -4345,7 +4345,7 @@ def main(page: ft.Page):
                 top=0,
                 right=0,
                 bottom=0,
-                bgcolor="#F616161E",
+                bgcolor="#16161E",
                 border_radius=0,
                 padding=0,
                 border=None,
