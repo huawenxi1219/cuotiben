@@ -4159,6 +4159,9 @@ def main(page: ft.Page):
                 except Exception:
                     w, h = 360, 640
                 panel_w, panel_h = _panel_size()
+                # 底部导航栏高约 76：面板不能压到它下面，否则会被切掉
+                _nav_h = 76
+                panel_h = min(panel_h, max(220, h - _nav_h - 24))
                 bx = ball_state["ball_x"]
                 by = ball_state["ball_y"]
                 if bx < w / 2:
@@ -4167,7 +4170,7 @@ def main(page: ft.Page):
                     panel_x = bx - panel_w - 8
                 panel_y = by
                 panel_x = max(8, min(panel_x, w - panel_w - 8))
-                panel_y = max(8, min(panel_y, h - panel_h - 8))
+                panel_y = max(8, min(panel_y, h - _nav_h - panel_h - 8))
                 contact_panel.left = panel_x
                 contact_panel.top = panel_y
                 contact_panel.width = panel_w
