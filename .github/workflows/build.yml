@@ -105,6 +105,8 @@ jobs:
             echo "===== 第 $attempt 次打包 ====="
             rm -rf build
             if flet build apk \
+              --splash-color "#FEFCF6" \
+              --splash-dark-color "#FEFCF6" \
               --build-number ${{ github.run_number }} \
               --build-version 1.0.${{ github.run_number }} \
               --android-signing-key-store "${{ github.workspace }}/my-release-key.keystore" \
