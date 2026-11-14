@@ -8624,7 +8624,8 @@ def main(page: ft.Page):
                 ]
                 cards_config = all_cards if subject == "英语" else all_cards[:3]
                 # 手机端纵向排布，三张卡平分高度，避免底部大片留白
-                grid = ft.Column(spacing=14, expand=True)
+                grid = ft.Column(spacing=14, expand=True,
+                                  horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
                 for i, (icon, name, bg) in enumerate(cards_config):
                     def _card_hover(e, _card=None):
                         try:
@@ -9920,12 +9921,12 @@ def main(page: ft.Page):
                                   on_click=lambda e: open_card_options(True))),
                 _row_btn(ft.ElevatedButton("🖨 导出 A4 错题卡", icon=ft.Icons.PRINT,
                                   on_click=lambda e: open_card_options(False))),
-                ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
+                _row_btn(ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
                                   on_click=lambda e: _use_picker(page, on_export_md).save_file(
                                       dialog_title="导出学习档案",
                                       file_name="池鱼学习档案.md",
                                       file_type=ft.FilePickerFileType.CUSTOM,
-                                      allowed_extensions=["md"])),
+                                      allowed_extensions=["md"]))),
                 _row_btn(ft.ElevatedButton("🏷️ 批量重打标签", on_click=lambda e: batch_retag(e),
                                   icon=ft.Icons.LABEL)),
                 retag_status,
