@@ -3685,7 +3685,8 @@ def main(page: ft.Page):
 
                 def pick_files(e):
                     _use_picker(page, handle_picker_result).pick_files(
-                        allow_multiple=True)
+                        allow_multiple=True,
+                        file_type=ft.FilePickerFileType.IMAGE)
 
                 complete_btn = ft.ElevatedButton(
                     "✅ 完成上传", icon=ft.Icons.DONE,
@@ -3954,8 +3955,8 @@ def main(page: ft.Page):
                     threading.Thread(target=_work, daemon=True).start()
 
                 try:
-                    # Android 上带 IMAGE 过滤的多选有时直接静默失败，改用 ANY 多选更稳
-                    _use_picker(page, _on_files).pick_files(allow_multiple=True)
+                    _use_picker(page, _on_files).pick_files(
+                        allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
                 except Exception as _ex:
                     show_toast(f"打开相册失败：{str(_ex)[:60]}", "red")
 
@@ -5935,7 +5936,7 @@ def main(page: ft.Page):
 
                 def pick_chat_image():
                     _use_picker(page, on_chat_img_picked).pick_files(
-                        allow_multiple=True)
+                        allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
 
                 def pick_chat_camera():
                     """调用本机摄像头拍照：拍题 → 自动插入对话（与相册同一发送链路）"""
@@ -10209,14 +10210,9 @@ def main(page: ft.Page):
             mine_page = ft.Column([
                 ft.Container(height=26),
                 ft.Text("我的", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
-                today_plan_card,
                 u_card(ft.Column([
                 _row_btn(ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
                                   icon=ft.Icons.PERSON_OUTLINE)),
-                _row_btn(ft.ElevatedButton("📊 知识框架", on_click=lambda e: show_knowledge_framework(e),
-                                  icon=ft.Icons.INSIGHTS)),
-                _row_btn(ft.ElevatedButton("📅 导出本周错题卡", icon=ft.Icons.DATE_RANGE,
-                                  on_click=lambda e: open_card_options(True))),
                 _row_btn(ft.ElevatedButton("🖨 导出 A4 错题卡", icon=ft.Icons.PRINT,
                                   on_click=lambda e: open_card_options(False))),
                 _row_btn(ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
@@ -10350,7 +10346,7 @@ def main(page: ft.Page):
                     show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
 
 
-            _card_opts = {"per_page": 6, "blank": False}
+            _card_opts = {"per_page": 6, "blank": False, "days": ""}
 
             def open_card_options(week=False):
                 _pp = ft.Dropdown(
@@ -10359,23 +10355,29 @@ def main(page: ft.Page):
                              ft.dropdown.Option("6", "6 题（默认）"),
                              ft.dropdown.Option("5", "5 题（折中）")],
                     value=str(_card_opts["per_page"]), width=200, dense=True)
+                _dr = ft.Dropdown(
+                    label="时间范围",
+                    options=[ft.dropdown.Option("", "全部错题"),
+                             ft.dropdown.Option("7", "最近 7 天"),
+                             ft.dropdown.Option("30", "最近 30 天")],
+                    value=str(_card_opts.get("days") or ""), width=200, dense=True)
                 _bk = ft.Switch(label="留出「演算空白区」", value=_card_opts["blank"])
                 _hint = ft.Text("留白适合在纸上重做；不留白适合只写批注", size=11, color=C_TEXT2)
 
                 def _go(ev):
                     _card_opts["per_page"] = int(_pp.value or 6)
                     _card_opts["blank"] = bool(_bk.value)
+                    _card_opts["days"] = _dr.value or ""
                     page.close(_dlg)
-                    _fn = on_export_cards_week if week else on_export_cards
-                    _use_picker(page, _fn).save_file(
-                        dialog_title=("导出本周错题卡" if week else "导出 A4 错题卡"),
-                        file_name=("本周错题卡.html" if week else "池鱼错题卡.html"),
+                    _use_picker(page, on_export_cards).save_file(
+                        dialog_title="导出 A4 错题卡",
+                        file_name="池鱼错题卡.html",
                         file_type=ft.FilePickerFileType.CUSTOM,
                         allowed_extensions=["html"])
 
                 _dlg = ft.AlertDialog(
                     title=ft.Text("错题卡设置"),
-                    content=ft.Container(content=ft.Column([_pp, _bk, _hint], spacing=12),
+                    content=ft.Container(content=ft.Column([_pp, _dr, _bk, _hint], spacing=12),
                                          width=_dlg_w(page, 300)),
                     actions=[ft.TextButton("取消", on_click=lambda ev: page.close(_dlg)),
                              ft.ElevatedButton("导出", icon=ft.Icons.PRINT, on_click=_go)])
@@ -10398,7 +10400,10 @@ def main(page: ft.Page):
                 _p = e.path if str(e.path).lower().endswith(".html") else str(e.path) + ".html"
                 try:
                     with open(_p, "w", encoding="utf-8") as _f:
-                        _f.write(build_error_cards_html(per_page=_card_opts['per_page'], blank=_card_opts['blank']))
+                        _d = str(_card_opts.get("days") or "").strip()
+                        _f.write(build_error_cards_html(
+                            per_page=_card_opts['per_page'], blank=_card_opts['blank'],
+                            days=int(_d) if _d.isdigit() else None))
                     show_toast("✅ 已生成，用浏览器/WPS 打开即可打印", "green")
                 except Exception as _ex:
                     show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
@@ -10478,7 +10483,6 @@ def main(page: ft.Page):
                     ("金句-英语", lambda: open_function_page("英语", "金句")),
                     ("旧导图-数学", lambda: build_mindmap_page("数学")),
                     ("学习画像", lambda: show_learning_profile(None)),
-                    ("知识框架", lambda: show_knowledge_framework(None)),
                     ("对话-总AI", lambda: open_chat("总AI")),
                     ("对话-化学", lambda: open_chat("化学")),
                 ]
