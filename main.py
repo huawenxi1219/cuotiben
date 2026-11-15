@@ -5919,16 +5919,6 @@ def main(page: ft.Page):
                     ink=True, tooltip="发图片（需要视觉模型）",
                 )
 
-                # —— 相机按钮：直接调用摄像头拍照插入对话（拍不会的题）——
-                cam_btn = ft.Container(
-                    content=ft.Icon(ft.Icons.PHOTO_CAMERA_OUTLINED, size=20, color="#BBBBBB"),
-                    width=38, height=38, border_radius=19,
-                    bgcolor="#24283B", border=ft.border.all(1, "#414868"),
-                    alignment=ft.alignment.center,
-                    on_click=lambda e: pick_chat_camera(),
-                    ink=True, tooltip="调用相机拍照（拍题直接问）",
-                )
-
                 def on_chat_img_picked(e: ft.FilePickerResultEvent):
                     if not e.files:
                         return
@@ -5959,53 +5949,6 @@ def main(page: ft.Page):
                     _use_picker(page, on_chat_img_picked).pick_files(
                         allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
 
-                def pick_chat_camera():
-                    """调用本机摄像头拍照：拍题 → 自动插入对话（与相册同一发送链路）"""
-                    try:
-                        import cv2
-                    except ImportError:
-                        show_toast("相机组件未安装，请先运行：pip install opencv-python", "red")
-                        return
-
-                    def _shot():
-                        cap = None
-                        try:
-                            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-                            if not cap.isOpened():
-                                show_toast("无法打开摄像头（请检查是否被占用/已授权）", "red")
-                                return
-                            ret, frame = cap.read()
-                            if not ret:
-                                show_toast("拍照失败，请重试", "red")
-                                return
-                            _chat_dir = os.path.join(IMAGES_DIR, "chat")
-                            os.makedirs(_chat_dir, exist_ok=True)
-                            _dest = os.path.join(_chat_dir, f"chat_tmp_cam_{gen_uid()}.jpg")
-                            cv2.imwrite(_dest, frame)
-                            _rel = os.path.relpath(_dest, DATA_DIR)
-                            _pending_chat_imgs.add(_rel)
-                            cur = chat_input.value or ""
-                            marks = f"\n【图】{_rel}"
-                            chat_input.value = (cur + marks) if cur else marks.lstrip("\n")
-                            try:
-                                page.update()
-                            except BaseException as _be:
-                                _diag_log(_be, "L4857")
-
-                                pass
-                            show_toast("📸 已拍照，按发送让 AI 看题", "green")
-                        except BaseException as _ex:
-                            show_toast(f"相机出错：{str(_ex)[:40]}", "red")
-                        finally:
-                            try:
-                                if cap is not None:
-                                    cap.release()
-                            except BaseException as _be:
-                                _diag_log(_be, "L4866")
-
-                                pass
-
-                    threading.Thread(target=_shot, daemon=True).start()
 
                 result_col = ft.Column([
                     ft.Container(
@@ -6034,7 +5977,6 @@ def main(page: ft.Page):
                     ft.Container(
                         content=ft.Row([
                             web_btn,
-                            cam_btn,
                             chat_img_btn,
                             chat_input,
                             send_btn,
@@ -10515,52 +10457,6 @@ def main(page: ft.Page):
 
 
             _card_opts = {"per_page": 6, "blank": False, "days": ""}
-
-            def open_card_options(week=False):
-                _pp = ft.Dropdown(
-                    label="每页题数",
-                    options=[ft.dropdown.Option("4", "4 题（格子最大）"),
-                             ft.dropdown.Option("6", "6 题（默认）"),
-                             ft.dropdown.Option("5", "5 题（折中）")],
-                    value=str(_card_opts["per_page"]), width=200, dense=True)
-                _dr = ft.Dropdown(
-                    label="时间范围",
-                    options=[ft.dropdown.Option("", "全部错题"),
-                             ft.dropdown.Option("7", "最近 7 天"),
-                             ft.dropdown.Option("30", "最近 30 天")],
-                    value=str(_card_opts.get("days") or ""), width=200, dense=True)
-                _bk = ft.Switch(label="留出「演算空白区」", value=_card_opts["blank"])
-                _hint = ft.Text("留白适合在纸上重做；不留白适合只写批注", size=11, color=C_TEXT2)
-
-                def _go(ev):
-                    _card_opts["per_page"] = int(_pp.value or 6)
-                    _card_opts["blank"] = bool(_bk.value)
-                    _card_opts["days"] = _dr.value or ""
-                    page.close(_dlg)
-                    _use_picker(page, on_export_cards).save_file(
-                        dialog_title="导出 A4 错题卡",
-                        file_name="池鱼错题卡.html",
-                        file_type=ft.FilePickerFileType.CUSTOM,
-                        allowed_extensions=["html"])
-
-                _dlg = ft.AlertDialog(
-                    title=ft.Text("错题卡设置"),
-                    content=ft.Container(content=ft.Column([_pp, _dr, _bk, _hint], spacing=12),
-                                         width=_dlg_w(page, 300)),
-                    actions=[ft.TextButton("取消", on_click=lambda ev: page.close(_dlg)),
-                             ft.ElevatedButton("导出", icon=ft.Icons.PRINT, on_click=_go)])
-                page.open(_dlg)
-
-            def on_export_cards_week(e):
-                if not getattr(e, "path", ""):
-                    return
-                _p = e.path if str(e.path).lower().endswith(".html") else str(e.path) + ".html"
-                try:
-                    with open(_p, "w", encoding="utf-8") as _f:
-                        _f.write(build_error_cards_html(days=7, per_page=_card_opts['per_page'], blank=_card_opts['blank']))
-                    show_toast("✅ 本周错题卡已生成", "green")
-                except Exception as _ex:
-                    show_toast(f"❌ 导出失败：{str(_ex)[:40]}", "red")
 
             def on_export_cards(e):
                 if not getattr(e, "path", ""):
