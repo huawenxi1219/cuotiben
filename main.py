@@ -2680,6 +2680,22 @@ def run_ai_actions(text, subject=""):
     return done
 
 
+CHEM_TREE_FILE = os.path.join(DATA_DIR, "chem_tree.json")
+
+
+def load_chem_tree():
+    """优先读数据目录里导入的版本，其次读打包内置的版本。"""
+    for p in (CHEM_TREE_FILE, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           "assets", "chem_tree.json")):
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except BaseException as _be:
+            _diag_log(_be, "chem_tree")
+    return None
+
+
 def build_error_cards_html(subject=None, per_page=6, days=None, blank=False):
     """生成 A4 错题卡 HTML：每页 per_page 个小方块，一格一题。
     用浏览器/WPS/Word 打开即可打印；Word 里每个格子都能自由改。"""
@@ -8842,6 +8858,74 @@ def main(page: ft.Page):
                             alignment=ft.alignment.center,
                             content=ft.Text(f"图谱生成失败：{str(_ex)[:60]}", color="#F7768E"))
 
+                _nav_box = ft.Container(expand=True, visible=False)
+
+                def _render_nav():
+                    tree = load_chem_tree()
+                    if not tree:
+                        _nav_box.content = ft.Container(
+                            alignment=ft.alignment.center,
+                            content=ft.Text("还没有知识图，点右上角「导入」", color="#8B93A7"))
+                        return
+                    _nav_box.content = _build_nav_column(tree)
+
+                def _build_nav_column(tree):
+                    cols = []
+                    for book in tree.get("books", []):
+                        book_tiles = []
+                        for chap in book.get("chapters", []):
+                            sec_tiles = []
+                            for sec in chap.get("sections", []):
+                                pt_col = []
+                                for pt in sec.get("points", []):
+                                    bg = "#221E1A"
+                                    lines = [
+                                        ft.Text(f"{pt.get('id','')}  {pt.get('title','')}",
+                                                size=13, weight=ft.FontWeight.W_600, color="#E8EBF5"),
+                                        ft.Text(pt.get("detail", ""), size=12, color="#B9C0D4",
+                                                selectable=True),
+                                    ]
+                                    for fact in pt.get("facts", []) or []:
+                                        lines.append(ft.Text("· " + str(fact), size=12, color="#9AA3B8"))
+                                    for pf in pt.get("pitfalls", []) or []:
+                                        lines.append(ft.Text("⚠ " + str(pf), size=12, color="#F7768E"))
+                                    pt_col.append(ft.Container(
+                                        content=ft.Column(lines, spacing=3),
+                                        padding=8, border_radius=8, bgcolor=bg,
+                                        margin=ft.margin.only(bottom=6)))
+                                if sec.get("equations"):
+                                    eq_txt = "　".join(e.get("eq", "") for e in sec["equations"])
+                                    pt_col.append(ft.Text("方程式：" + eq_txt, size=11,
+                                                          color="#7AA2F7", selectable=True))
+                                sec_tiles.append(ft.ExpansionTile(
+                                    title=ft.Text(f"{sec.get('section','')}", size=13, color="#D7DBEA"),
+                                    controls=[ft.Container(ft.Column(pt_col, spacing=4), padding=ft.Padding(left=8, right=8, top=0, bottom=6))],
+                                    tile_padding=ft.Padding(left=10, right=10, top=4, bottom=4),
+                                    controls_padding=ft.Padding(left=4, right=4, top=0, bottom=4)))
+                            if sec_tiles:
+                                book_tiles.append(ft.ExpansionTile(
+                                    title=ft.Text(chap.get("name", ""), size=14,
+                                                  weight=ft.FontWeight.W_600, color="#C9CFE0"),
+                                    controls=sec_tiles,
+                                    tile_padding=ft.Padding(left=10, right=10, top=6, bottom=6)))
+                        if book_tiles:
+                            cols.append(ft.ExpansionTile(
+                                title=ft.Text(book.get("name", ""), size=15,
+                                              weight=ft.FontWeight.BOLD, color="#E8EBF5"),
+                                controls=book_tiles,
+                                tile_padding=ft.Padding(left=10, right=10, top=8, bottom=8)))
+                    if not cols:
+                        return ft.Column([ft.Text("知识图为空", color="#8B93A7")])
+                    return ft.Column(cols, spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
+
+                def _switch_nav():
+                    body.visible = False
+                    _graph_box.visible = False
+                    _overview_box.visible = False
+                    _nav_box.visible = True
+                    _render_nav()
+                    page.update()
+
                 _overview_box = ft.Container(expand=True, visible=False,
                                              bgcolor="#0F0F16", border_radius=12, padding=4,
                                              content=ft.InteractiveViewer(
@@ -8853,6 +8937,7 @@ def main(page: ft.Page):
                 def _switch_overview():
                     body.visible = False
                     _graph_box.visible = False
+                    _nav_box.visible = False
                     _overview_box.visible = True
                     page.update()
 
@@ -8861,6 +8946,7 @@ def main(page: ft.Page):
                 def _switch_view(to_graph):
                     _view_state["graph"] = to_graph
                     _overview_box.visible = False
+                    _nav_box.visible = False
                     body.visible = not to_graph
                     _graph_box.visible = to_graph
                     if to_graph:
@@ -8874,6 +8960,9 @@ def main(page: ft.Page):
                                       on_click=lambda e: _switch_view(False)),
                 ]
                 if subject == "化学":
+                    _seg_items.append(ft.ElevatedButton(
+                        "📚 教材导航", icon=ft.Icons.MENU_BOOK,
+                        on_click=lambda e: _switch_nav()))
                     _seg_items.append(ft.ElevatedButton(
                         "🧪 三年总览", icon=ft.Icons.MAP,
                         on_click=lambda e: _switch_overview()))
@@ -8965,6 +9054,7 @@ def main(page: ft.Page):
                     ft.Divider(height=1, color="#262B3D"),
                     body,
                     _graph_box,
+                    _nav_box,
                     _overview_box,
                 ], spacing=10, expand=True)
 
@@ -10043,6 +10133,10 @@ def main(page: ft.Page):
                                       allowed_extensions=["md"]))),
                 _row_btn(ft.ElevatedButton("🏷️ 批量重打标签", on_click=lambda e: batch_retag(e),
                                   icon=ft.Icons.LABEL)),
+                _row_btn(ft.ElevatedButton("📚 导入化学知识图", icon=ft.Icons.UPLOAD_FILE,
+                                  on_click=lambda e: _use_picker(page, on_chem_tree_import).pick_files(
+                                      file_type=ft.FilePickerFileType.CUSTOM,
+                                      allowed_extensions=["json"]))),
                 retag_status,
                 _row_btn(ft.ElevatedButton("⚙️ 单词本设置", on_click=lambda e: show_vocab_settings_dialog(e),
                                   icon=ft.Icons.SETTINGS)),
@@ -10135,6 +10229,23 @@ def main(page: ft.Page):
                                         animate_opacity=ft.Animation(260, ft.AnimationCurve.EASE_OUT),
                                         animate_scale=ft.Animation(260, ft.AnimationCurve.EASE_OUT_BACK),
                                         scale=1.0)
+
+            def on_chem_tree_import(e):
+                try:
+                    files = getattr(e, "files", None) or []
+                    if not files or not getattr(files[0], "path", ""):
+                        return
+                    import shutil as _sh
+                    _sh.copyfile(files[0].path, CHEM_TREE_FILE)
+                    tree = load_chem_tree()
+                    n = 0
+                    for b in (tree or {}).get("books", []):
+                        for c in b.get("chapters", []):
+                            for s in c.get("sections", []):
+                                n += len(s.get("points", []))
+                    show_toast(f"✅ 已导入知识图：{n} 个知识点", "green")
+                except Exception as _ex:
+                    show_toast(f"导入失败：{str(_ex)[:50]}", "red")
 
             def on_export_md(e):
 
