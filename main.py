@@ -8647,12 +8647,7 @@ def main(page: ft.Page):
                     ("📖", "单词本", "#3A2F22"),
                     ("💬", "金句", "#3A2233"),
                 ]
-                if subject == "英语":
-                    cards_config = all_cards
-                elif subject == "化学":
-                    cards_config = all_cards[:3] + [("🧪", "化学总图", "#22303A")]
-                else:
-                    cards_config = all_cards[:3]
+                cards_config = all_cards if subject == "英语" else all_cards[:3]
                 # 手机端纵向排布，三张卡平分高度，避免底部大片留白
                 grid = ft.Column(spacing=14, expand=True,
                                   horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
@@ -8847,22 +8842,42 @@ def main(page: ft.Page):
                             alignment=ft.alignment.center,
                             content=ft.Text(f"图谱生成失败：{str(_ex)[:60]}", color="#F7768E"))
 
+                _overview_box = ft.Container(expand=True, visible=False,
+                                             bgcolor="#0F0F16", border_radius=12, padding=4,
+                                             content=ft.InteractiveViewer(
+                                                 content=ft.Image(src="assets/chem_map.png",
+                                                                  fit=ft.ImageFit.CONTAIN),
+                                                 min_scale=0.3, max_scale=8.0,
+                                                 constrained=True, expand=True))
+
+                def _switch_overview():
+                    body.visible = False
+                    _graph_box.visible = False
+                    _overview_box.visible = True
+                    page.update()
+
                 _view_state = {"graph": True}
 
                 def _switch_view(to_graph):
                     _view_state["graph"] = to_graph
+                    _overview_box.visible = False
                     body.visible = not to_graph
                     _graph_box.visible = to_graph
                     if to_graph:
                         _render_graph()
                     page.update()
 
-                _seg = ft.Row([
+                _seg_items = [
                     ft.ElevatedButton("🗺 图谱", icon=ft.Icons.ACCOUNT_TREE,
                                       on_click=lambda e: _switch_view(True)),
                     ft.ElevatedButton("📋 列表", icon=ft.Icons.LIST,
                                       on_click=lambda e: _switch_view(False)),
-                ], spacing=8)
+                ]
+                if subject == "化学":
+                    _seg_items.append(ft.ElevatedButton(
+                        "🧪 三年总览", icon=ft.Icons.MAP,
+                        on_click=lambda e: _switch_overview()))
+                _seg = ft.Row(_seg_items, spacing=8)
 
                 def _note_card(n):
                     txt = (n.get("content") or "").strip()
@@ -8950,6 +8965,7 @@ def main(page: ft.Page):
                     ft.Divider(height=1, color="#262B3D"),
                     body,
                     _graph_box,
+                    _overview_box,
                 ], spacing=10, expand=True)
 
             def build_subject_left_panel(subj):
