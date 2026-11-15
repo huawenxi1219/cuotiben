@@ -2688,6 +2688,21 @@ def run_ai_actions(text, subject=""):
     return done
 
 
+def _err_title(e):
+    """错题标题：兼容不同字段名，取不到就给可读的占位，避免出现「（无题目）」这种废信息。"""
+    for k in ("original", "question", "title", "q", "content", "text", "stem"):
+        v = e.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    tags = [str(x).strip() for x in (e.get("tags") or []) if str(x).strip()]
+    if tags:
+        return "（%s）" % tags[0]
+    if e.get("image") or e.get("img") or e.get("image_path"):
+        return "（图片题，见错题本）"
+    ts = e.get("time") or ""
+    return "（%s 录入，未填题干）" % (str(ts)[:16] if ts else "较早")
+
+
 CHEM_TREE_FILE = os.path.join(DATA_DIR, "chem_tree.json")
 
 
@@ -8872,18 +8887,18 @@ def main(page: ft.Page):
                     for name, data in sorted(buckets.items()):
                         kps.append({
                             "name": name,
-                            "notes": [(n.get("content") or "（空笔记）").strip() for n in data["note"]],
-                            "errors": [(e.get("original") or e.get("question") or "（无题目）").strip()
-                                       for e in data["err"]],
+                            "notes": [(str(n.get("content") or n.get("text") or "").strip()
+                                       or "（%s）" % ((n.get("tags") or ["空笔记"])[0])) for n in data["note"]],
+                            "errors": [_err_title(e) for e in data["err"]],
                         })
                     if not kps:
                         kps = [{"name": "还没有知识点", "notes": [], "errors": []}]
                     try:
-                        png = _render_mindmap(subject, kps)
+                        png = _render_mindmap(subject, kps, scale=2)
                         b64 = base64.b64encode(png).decode("ascii")
                         _graph_box.content = ft.InteractiveViewer(
                             content=ft.Image(src_base64=b64, fit=ft.ImageFit.CONTAIN),
-                            min_scale=0.3, max_scale=6.0,
+                            min_scale=0.25, max_scale=4.0,
                             constrained=True, expand=True)
                     except Exception as _ex:
                         _graph_box.content = ft.Container(
@@ -9953,7 +9968,22 @@ def main(page: ft.Page):
                             zip_path = _sel
                         else:
                             zip_path = os.path.join(_sel, f"池鱼Study备份_{ts}.zip")
+                        def _cnt(name):
+                            try:
+                                return len(load_jsonl(os.path.join(DATA_DIR, name)))
+                            except BaseException:
+                                return 0
+
+                        manifest = {
+                            "app": "池鱼Study",
+                            "time": ts,
+                            "errors": _cnt("errors.jsonl"),
+                            "notes": _cnt("notes.jsonl"),
+                            "vocab": _cnt("vocabulary.jsonl"),
+                            "sentences": _cnt("sentences.jsonl"),
+                        }
                         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                            zf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
                             for root, dirs, files in os.walk(DATA_DIR):
                                 if "_restore_tmp" in root.split(os.sep):
                                     continue
@@ -9963,7 +9993,9 @@ def main(page: ft.Page):
                                     full = os.path.join(root, f)
                                     arc = os.path.relpath(full, DATA_DIR)
                                     zf.write(full, arc)
-                        backup_status.value = f"✅ 备份成功：{zip_path}"
+                        backup_status.value = (f"✅ 备份成功：错题 {manifest['errors']} · 笔记 "
+                                               f"{manifest['notes']} · 单词 {manifest['vocab']} · "
+                                               f"金句 {manifest['sentences']}\n{zip_path}")
                         backup_status.color = "#81C784"
                     except Exception as ex:
                         backup_status.value = f"❌ 备份失败：{str(ex)[:80]}"
@@ -10280,19 +10312,19 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ft.Text("💾 数据备份与恢复", size=18, weight=ft.FontWeight.BOLD),
                 ft.Row([
-                    ft.ElevatedButton("📤 备份数据",
+                    ft.ElevatedButton("📤 完整备份（全部数据）",
                                       on_click=lambda e: _use_picker(page, on_backup_result).save_file(
                                           dialog_title="保存备份文件",
                                           file_name="池鱼备份_%s.zip" % time.strftime("%Y%m%d"),
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
                                       icon=ft.Icons.BACKUP),
-                    ft.ElevatedButton("📥 覆盖恢复",
+                    ft.ElevatedButton("📥 覆盖恢复（换设备）",
                                       on_click=lambda e: _use_picker(page, on_restore_result).pick_files(
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
                                       icon=ft.Icons.RESTORE),
-                    ft.ElevatedButton("🔀 合并恢复",
+                    ft.ElevatedButton("🔀 合并恢复（多设备合数据）",
                                       on_click=lambda e: _use_picker(page, on_merge_result).pick_files(
                                           file_type=ft.FilePickerFileType.CUSTOM,
                                           allowed_extensions=["zip"]),
