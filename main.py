@@ -8647,7 +8647,12 @@ def main(page: ft.Page):
                     ("📖", "单词本", "#3A2F22"),
                     ("💬", "金句", "#3A2233"),
                 ]
-                cards_config = all_cards if subject == "英语" else all_cards[:3]
+                if subject == "英语":
+                    cards_config = all_cards
+                elif subject == "化学":
+                    cards_config = all_cards[:3] + [("🧪", "化学总图", "#22303A")]
+                else:
+                    cards_config = all_cards[:3]
                 # 手机端纵向排布，三张卡平分高度，避免底部大片留白
                 grid = ft.Column(spacing=14, expand=True,
                                   horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
@@ -8716,6 +8721,7 @@ def main(page: ft.Page):
                     "错题本": lambda: build_error_list_page(subject),
                     "笔记本": lambda: build_note_list_page(subject),
                     "思维导图": lambda: build_knowledge_page(subject),
+                    "化学总图": lambda: _build_chem_map_page(),
                     "单词本": lambda: build_vocab_page(subject),
                     "金句": lambda: build_sentence_page(subject),
                 }
@@ -8769,6 +8775,21 @@ def main(page: ft.Page):
                             page.update()
                         except BaseException:
                             pass
+
+            def _build_chem_map_page():
+                """人教版高中化学三年知识总图：整张可缩放拖动"""
+                return ft.Column([
+                    ft.Text("人教版高中化学 · 三年总图", size=18,
+                            weight=ft.FontWeight.W_600, color="#E8EBF5"),
+                    ft.Text("双指缩放、拖动查看；5 册 20 章 101 个要点", size=12, color=C_TEXT2),
+                    ft.Container(
+                        content=ft.InteractiveViewer(
+                            content=ft.Image(src="assets/chem_map.png", fit=ft.ImageFit.CONTAIN),
+                            min_scale=0.3, max_scale=8.0,
+                            constrained=True, expand=True),
+                        expand=True, bgcolor="#0F0F16", border_radius=12,
+                        padding=4),
+                ], spacing=10, expand=True)
 
             def build_knowledge_page(subject):
                 """知识点 → 笔记全文 / 错题。追求好用、精准、信息完整，不做花哨动效。"""
@@ -10238,6 +10259,7 @@ def main(page: ft.Page):
                     ("知识页-数学", lambda: build_knowledge_page("数学")),
                     ("知识页-化学", lambda: build_knowledge_page("化学")),
                     ("知识页-英语", lambda: build_knowledge_page("英语")),
+                    ("化学总图", lambda: _build_chem_map_page()),
                     ("学科卡片-数学", lambda: build_function_card_grid("数学")),
                     ("学科左栏-数学", lambda: build_subject_left_panel("数学")),
                     ("错题本-数学", lambda: open_function_page("数学", "错题本")),
