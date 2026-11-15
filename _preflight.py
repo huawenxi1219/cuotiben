@@ -9,6 +9,7 @@ STEPS = [
     ("语法编译", [sys.executable, "-m", "py_compile", MAIN]),
     ("Flet API", [sys.executable, r"C:\myapp\_check_flet_api.py", MAIN]),
     ("函数参数", [sys.executable, r"C:\myapp\_check_arity.py", MAIN]),
+    ("未定义名称", [sys.executable, r"C:\myapp\_check_undefined.py", MAIN]),
 ]
 
 failed = 0

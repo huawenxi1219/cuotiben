@@ -1514,6 +1514,14 @@ def get_api_endpoint():
     return key, info["url"], model, info["vision_model"]
 
 
+def _cfg_thinking_off():
+    """是否关闭 DeepSeek 的思考模式：默认关闭（保证对话框能看到正文）。"""
+    try:
+        return not bool(load_ai_config().get("deepseek_thinking", False))
+    except BaseException:
+        return True
+
+
 def endpoint_for(task="smart"):
     """DeepTutor 式任务分工：
     cheap → 免费模型（打标签/错题自动分析/单词补齐/金句/诊断）
@@ -4463,7 +4471,7 @@ def main(page: ft.Page):
                         return None
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 payload = {"model": api_model, "messages": messages,
-                           "temperature": 0.7, "max_tokens": 4096, "stream": True}
+                           "temperature": 0.7, "max_tokens": 8192, "stream": True}
                 # DeepSeek：按设置开关思考模式 + 推理程度档位（同官方 Harness：low/medium/high/max）
                 if api_model.startswith("deepseek"):
                     # 官方支持 reasoning_effort: low / high / max（默认 high），
@@ -4509,6 +4517,29 @@ def main(page: ft.Page):
                                 _diag_log(_be, "L3695")
 
                                 continue
+                    if not accumulated.strip():
+                        # 正文为空：多半是思考把 token 用光了。关掉思考重试一次（非流式）
+                        _retry = dict(payload)
+                        _retry["stream"] = False
+                        _retry["max_tokens"] = 2048
+                        if str(_retry.get("model", "")).startswith("deepseek"):
+                            _retry["reasoning_effort"] = "none"
+                        try:
+                            r2 = requests.post(api_url, headers=headers, json=_retry, timeout=90)
+                            if r2.status_code == 200:
+                                _j = r2.json()
+                                _c = (_j.get("choices") or [{}])[0].get("message", {}).get("content", "")
+                                if _c and _c.strip():
+                                    on_chunk(_c)
+                                    return _c
+                                _fin = (_j.get("choices") or [{}])[0].get("finish_reason", "")
+                                on_chunk(f"❌ 模型没有返回正文（finish_reason={_fin}），"
+                                         f"请到「我的 → AI 设置」把模型换成 deepseek-flash 再试")
+                            else:
+                                on_chunk(f"❌ 重试失败 {r2.status_code} {(r2.text or '')[:120]}")
+                        except Exception as _e2:
+                            on_chunk(f"❌ 重试异常：{str(_e2)[:120]}")
+                        return accumulated
                     return accumulated
                 except Exception as e:
                     on_chunk(f"❌ 异常: {str(e)}")
@@ -8918,10 +8949,67 @@ def main(page: ft.Page):
                         return ft.Column([ft.Text("知识图为空", color="#8B93A7")])
                     return ft.Column(cols, spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
 
+                _recite_box = ft.Container(expand=True, visible=False)
+
+                def _render_recite():
+                    tree = load_chem_tree()
+                    if not tree:
+                        _recite_box.content = ft.Container(
+                            alignment=ft.alignment.center,
+                            content=ft.Text("还没有知识图", color="#8B93A7"))
+                        return
+                    blocks = []
+                    for book in tree.get("books", []):
+                        blocks.append(ft.Text(book.get("name", ""), size=17,
+                                              weight=ft.FontWeight.BOLD, color="#7AA2F7"))
+                        for chap in book.get("chapters", []):
+                            blocks.append(ft.Text(chap.get("name", ""), size=14,
+                                                  weight=ft.FontWeight.W_600, color="#E8EBF5"))
+                            for sec in chap.get("sections", []):
+                                blocks.append(ft.Container(
+                                    content=ft.Text(sec.get("section", ""), size=13,
+                                                    color="#4DB6AC", weight=ft.FontWeight.W_600),
+                                    padding=ft.Padding(left=2, right=0, top=6, bottom=2)))
+                                for pt in sec.get("points", []):
+                                    row = [ft.Text(f"{pt.get('id','')}  {pt.get('title','')}",
+                                                   size=13, weight=ft.FontWeight.BOLD, color="#F0F2FA")]
+                                    if pt.get("detail"):
+                                        row.append(ft.Text(pt["detail"], size=12.5,
+                                                         color="#C9CFE0", selectable=True))
+                                    for fa in (pt.get("facts") or []):
+                                        row.append(ft.Text("· " + str(fa), size=12, color="#A8B0C4"))
+                                    for pf in (pt.get("pitfalls") or []):
+                                        row.append(ft.Text("⚠ " + str(pf), size=12, color="#F7768E"))
+                                    blocks.append(ft.Container(
+                                        content=ft.Column(row, spacing=2),
+                                        padding=ft.Padding(left=10, right=10, top=8, bottom=8),
+                                        border_radius=8, bgcolor="#1A1E2B",
+                                        margin=ft.margin.only(bottom=6)))
+                                if sec.get("equations"):
+                                    blocks.append(ft.Container(
+                                        content=ft.Column([
+                                            ft.Text("　" + e.get("eq", ""), size=12,
+                                                    color="#9DBBF8", selectable=True)
+                                            for e in sec["equations"]]),
+                                        padding=ft.Padding(left=10, right=10, top=4, bottom=8),
+                                        bgcolor="#141926", border_radius=6))
+                    _recite_box.content = ft.Column(blocks, spacing=4,
+                                                    scroll=ft.ScrollMode.AUTO, expand=True)
+
+                def _switch_recite():
+                    body.visible = False
+                    _graph_box.visible = False
+                    _overview_box.visible = False
+                    _nav_box.visible = False
+                    _recite_box.visible = True
+                    _render_recite()
+                    page.update()
+
                 def _switch_nav():
                     body.visible = False
                     _graph_box.visible = False
                     _overview_box.visible = False
+                    _recite_box.visible = False
                     _nav_box.visible = True
                     _render_nav()
                     page.update()
@@ -8938,6 +9026,7 @@ def main(page: ft.Page):
                     body.visible = False
                     _graph_box.visible = False
                     _nav_box.visible = False
+                    _recite_box.visible = False
                     _overview_box.visible = True
                     page.update()
 
@@ -8947,6 +9036,7 @@ def main(page: ft.Page):
                     _view_state["graph"] = to_graph
                     _overview_box.visible = False
                     _nav_box.visible = False
+                    _recite_box.visible = False
                     body.visible = not to_graph
                     _graph_box.visible = to_graph
                     if to_graph:
@@ -8963,6 +9053,9 @@ def main(page: ft.Page):
                     _seg_items.append(ft.ElevatedButton(
                         "📚 教材导航", icon=ft.Icons.MENU_BOOK,
                         on_click=lambda e: _switch_nav()))
+                    _seg_items.append(ft.ElevatedButton(
+                        "📖 背诵版", icon=ft.Icons.MENU_BOOK,
+                        on_click=lambda e: _switch_recite()))
                     _seg_items.append(ft.ElevatedButton(
                         "🧪 三年总览", icon=ft.Icons.MAP,
                         on_click=lambda e: _switch_overview()))
@@ -9055,6 +9148,7 @@ def main(page: ft.Page):
                     body,
                     _graph_box,
                     _nav_box,
+                    _recite_box,
                     _overview_box,
                 ], spacing=10, expand=True)
 
@@ -10209,18 +10303,6 @@ def main(page: ft.Page):
                                       icon=ft.Icons.MERGE_TYPE),
                 ], spacing=10, wrap=True),
                 backup_status,
-                ft.Divider(),
-                ft.Text("☁️ 坚果云同步（WebDAV）", size=16, weight=ft.FontWeight.W_600),
-                ft.Text("坚果云「账户信息 → 安全选项 → 添加应用」生成应用密码，别用登录密码",
-                        size=11, color=C_TEXT2),
-                dav_url_input, dav_user_input, dav_pass_input,
-                ft.Row([
-                    ft.ElevatedButton("☁️ 上传到网盘", icon=ft.Icons.CLOUD_UPLOAD,
-                                      on_click=lambda e: dav_do_upload(e)),
-                    ft.ElevatedButton("⬇️ 从网盘拉取", icon=ft.Icons.CLOUD_DOWNLOAD,
-                                      on_click=lambda e: dav_do_download(e)),
-                ], spacing=10, wrap=True),
-                dav_status,
                 ft.Container(height=20),
             ], spacing=20, scroll=ft.ScrollMode.AUTO,
                horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
