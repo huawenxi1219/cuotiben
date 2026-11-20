@@ -1774,7 +1774,8 @@ DOC_EXTS = [".pdf", ".doc", ".docx", ".txt", ".md", ".ppt", ".pptx", ".xls", ".x
 
 
 def save_error(subject, original="", original_media=None, answer="", answer_media=None,
-               mistake="", idea="", idea_media=None, manual_tags=""):
+               mistake="", idea="", idea_media=None, manual_tags="",
+               status="未解决", mastery="", solution_media=None):
     if original_media is None:
         original_media = []
     if answer_media is None:
@@ -1796,7 +1797,8 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
         "tags": [subject] + user_tags if user_tags else [subject],
         "error_type": "", "difficulty": 0, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
         "timestamp": now_ms(), "event_id": gen_uid(),
-        "deep_analysis": "", "status": "未看",
+        "deep_analysis": "", "status": status or "未解决",
+        "mastery": mastery or "", "solution_media": solution_media or [],
         "tags_done": bool(user_tags)
     }
     data.append(entry)
@@ -3762,10 +3764,45 @@ def main(page: ft.Page):
             tags_input = ft.TextField(label="手动标签（逗号分隔）", multiline=False,
                                       border_radius=14, filled=True, fill_color="#1F1F26",
                                       border_color="#414868", focused_border_color="#7AA2F7")
+            status_dd = ft.Dropdown(
+                label="这道题现在什么状态",
+                options=[ft.dropdown.Option("未解决"), ft.dropdown.Option("待查"),
+                         ft.dropdown.Option("已解决")],
+                value="未解决", width=190, dense=True)
+            mastery_dd = ft.Dropdown(
+                label="掌握程度",
+                options=[ft.dropdown.Option("不会"), ft.dropdown.Option("需提示"),
+                         ft.dropdown.Option("能独立写")],
+                value="需提示", width=170, dense=True)
+
+            _sym_target = {"f": None}
+            SYMBOLS = ["²", "³", "⁻", "⁺", "₁", "₂", "₃", "√", "≤", "≥", "≠", "≈",
+                       "∵", "∴", "α", "β", "θ", "π", "Δ", "Σ", "∫", "→", "⇌", "↑",
+                       "↓", "±", "×", "÷", "∞", "∠", "⊥", "∥", "°"]
+
+            def _sym_insert(ch):
+                f = _sym_target["f"]
+                if f is None:
+                    show_toast("先点一下要输入的位置", "orange")
+                    return
+                f.value = (f.value or "") + ch
+                page.update()
+
+            def _mk_sym_bar():
+                return ft.Container(
+                    content=ft.Row(
+                        [ft.TextButton(s, on_click=lambda e, c=s: _sym_insert(c),
+                                       style=ft.ButtonStyle(padding=ft.Padding(4, 2, 4, 2)))
+                         for s in SYMBOLS],
+                        scroll=ft.ScrollMode.AUTO, spacing=0),
+                    bgcolor="#171A24", border_radius=10, padding=2)
 
             progress_status = ft.Text("", size=14)
             progress_bar = ft.ProgressBar(width=200, height=8, value=0, visible=False)
             progress_row = ft.Row([progress_bar, progress_status], spacing=10, visible=False)
+
+            for _f in (original_input, mistake_input, answer_input, idea_input):
+                _f.on_focus = (lambda e, f=_f: _sym_target.update({"f": f}))
 
             def on_picker_complete(selected_files):
                 if selected_files:
@@ -3777,6 +3814,8 @@ def main(page: ft.Page):
                 "📷 答案图片", "image", on_complete=None)
             picker_col3, idea_files, reset_picker3 = make_file_picker_button(
                 "📷 笔记图片（错题补充）", "image", on_complete=None)
+            picker_col4, solution_files, reset_picker4 = make_file_picker_button(
+                "✍️ 我自己的解题过程（拍照）", "image", on_complete=None)
 
             def analyze_images(image_paths):
                 progress_row.visible = True
@@ -3899,7 +3938,11 @@ def main(page: ft.Page):
                 if not orig and not original_files:
                     show_toast("请至少输入原题或拍照上传", "red")
                     return
-                save_error(subj, orig, list(original_files), ans, list(answer_files), mis, idea, list(idea_files), tags)
+                save_error(subj, orig, list(original_files), ans, list(answer_files), mis, idea,
+                           list(idea_files), tags,
+                           status=(status_dd.value or "未解决"),
+                           mastery=(mastery_dd.value or ""),
+                           solution_media=list(solution_files))
                 original_input.value = ""
                 mistake_input.value = ""
                 answer_input.value = ""
@@ -3908,6 +3951,7 @@ def main(page: ft.Page):
                 reset_picker1(keep=True)   # 文件已随 save_error 入库，只清列表不删文件
                 reset_picker2(keep=True)
                 reset_picker3(keep=True)
+                reset_picker4(keep=True)
                 show_toast(f"✅ {subj} 错题已保存！", "green")
 
             # ================= 批量拍题 =================
@@ -4141,8 +4185,10 @@ def main(page: ft.Page):
                 ft.Text("拍照录题", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 ft.Text("拍下题目，AI 自动读取原文并分析错因", size=13, color=C_TEXT2),
                 u_card(ft.Column([
-                    ft.Row([subj_dd], spacing=15) if not is_mobile else ft.Column([subj_dd]),
+                    ft.Row([subj_dd, status_dd, mastery_dd], spacing=12, wrap=True)
+                    if not is_mobile else ft.Column([subj_dd, status_dd, mastery_dd], spacing=8),
                     original_input,
+                    _mk_sym_bar(),
                     mistake_input,
                 ], spacing=12)),
                 u_section("可选补充", "✨"),
@@ -4156,6 +4202,7 @@ def main(page: ft.Page):
                     picker_col1,
                     picker_col2,
                     picker_col3,
+                    picker_col4,
                     progress_row,
                 ], spacing=10)),
                 ft.Container(height=4),
@@ -7049,6 +7096,32 @@ def main(page: ft.Page):
                     "🤖 AI 深度搜索", on_click=lambda e: perform_search(e))
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
                 search_row = ft.Row([search_input, local_search_btn, ai_search_btn], spacing=10)
+
+                _flt = {"v": "全部"}
+                _chips_row = ft.Row(spacing=8, wrap=True)
+
+                def _render_chips():
+                    _chips_row.controls.clear()
+                    for name, color in (("全部", "#7AA2F7"), ("未解决", "#F7768E"),
+                                        ("待查", "#E0AF68"), ("已解决", "#4DB6AC")):
+                        active = _flt["v"] == name
+                        _chips_row.controls.append(ft.Container(
+                            content=ft.Text(name, size=12,
+                                            color="#0B0D14" if active else "#C9CFE0"),
+                            padding=ft.Padding(12, 6, 12, 6), border_radius=14,
+                            bgcolor=color if active else "#24283B",
+                            on_click=lambda e, n=name: _pick(n), ink=True))
+
+                def _pick(name):
+                    _flt["v"] = name
+                    _render_chips()
+                    if name == "全部":
+                        render_list()
+                    else:
+                        render_list([(it, None) for it in subject_items
+                                     if (it.get("status") or "未解决") == name])
+
+                _render_chips()
                 list_view = ft.ListView(spacing=10, expand=True)
 
                 def render_list(display_list=None, matched_count=None):
@@ -7089,9 +7162,13 @@ def main(page: ft.Page):
                             bg_color = "#3D3A28" if is_highlighted else "#1F1F26"
                             status = item.get("status", "未看")
                             status_color = {"未看": "#9E9E9E", "已看": "#4CAF50",
-                                            "重要": "#F44336", "已掌握": "#2196F3"}.get(status, "#9E9E9E")
+                                            "重要": "#F44336", "已掌握": "#2196F3",
+                                            "未解决": "#F7768E", "待查": "#E0AF68",
+                                            "已解决": "#4DB6AC"}.get(status, "#9E9E9E")
                             status_dot = ft.Container(width=12, height=12, border_radius=6,
                                                       bgcolor=status_color, tooltip=status)
+                            _mastery = item.get("mastery") or ""
+                            _sol_imgs = item.get("solution_media") or []
                             thumb_container = None
                             if q_media and len(q_media) > 0:
                                 first_img = q_media[0]
@@ -7557,6 +7634,7 @@ def main(page: ft.Page):
                     ft.Text("🔍 本地加权搜索（多个词空格分隔）｜AI 深度搜索可选", size=13,
                             color="#7AA2F7"),
                     search_row,
+                    _chips_row,
                     search_status,
                     ft.Divider(height=1),
                     ft.Container(content=list_view, expand=True),
@@ -8656,7 +8734,6 @@ def main(page: ft.Page):
                     ("📝", "笔记本", "#223A22"),
                     ("🧠", "思维导图", "#1F2A44"),
                     ("📖", "单词本", "#3A2F22"),
-                    ("💬", "金句", "#3A2233"),
                 ]
                 cards_config = all_cards if subject == "英语" else all_cards[:3]
                 # 手机端纵向排布，三张卡平分高度，避免底部大片留白
