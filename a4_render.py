@@ -116,7 +116,8 @@ def render_error_pages(errors, per_page=6, blank=False, mode="question",
             inner_x, inner_w = x + 30, cw - 60
             cur_y = y + 24
 
-            no = first_no + i
+            _no = e.get("no")
+            no = int(_no) if str(_no or "").isdigit() else (first_no + i)
             d.text((inner_x, cur_y), f"{no:03d}", font=f_no, fill=(180, 60, 60))
             meta = " ".join(str(v) for v in [e.get("subject") or "",
                                              (e.get("tags") or [""])[0] if e.get("tags") else "",
@@ -206,7 +207,9 @@ def _render_remind_pages(errors, title="池鱼错题卡", start_no=1, per_page=8
                                 outline=(170, 170, 170), width=3)
             ix, iw = x + 24, cw - 48
             cy = y + 18
-            d.text((ix, cy), f"{first_no + i:03d}", font=f_no, fill=(180, 60, 60))
+            _no = e.get("no")
+            no = int(_no) if str(_no or "").isdigit() else (first_no + i)
+            d.text((ix, cy), f"{no:03d}", font=f_no, fill=(180, 60, 60))
             tag = " ".join(str(v) for v in [e.get("subject") or "",
                                             (e.get("tags") or [""])[0] if e.get("tags") else ""] if v)
             if tag:

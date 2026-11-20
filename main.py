@@ -1773,6 +1773,40 @@ VIDEO_EXTS = [".mp4", ".mov", ".avi", ".mkv", ".flv", ".wmv"]
 DOC_EXTS = [".pdf", ".doc", ".docx", ".txt", ".md", ".ppt", ".pptx", ".xls", ".xlsx"]
 
 
+def ensure_error_numbers():
+    """给没有 no 的老错题按学科补编号（按时间先后）。"""
+    try:
+        data = load_jsonl(ERRORS_FILE)
+        changed = False
+        by_subj = {}
+        for e in data:
+            s = e.get("subject") or "未分类"
+            by_subj.setdefault(s, []).append(e)
+        for s, arr in by_subj.items():
+            used = [int(x.get("no")) for x in arr if str(x.get("no") or "").isdigit()]
+            nxt = (max(used) + 1) if used else 1
+            for e in sorted(arr, key=lambda x: x.get("timestamp") or 0):
+                if not str(e.get("no") or "").isdigit():
+                    e["no"] = nxt
+                    nxt += 1
+                    changed = True
+        if changed:
+            save_jsonl(ERRORS_FILE, data)
+    except BaseException as _be:
+        _diag_log(_be, "ensure_no")
+
+
+def next_error_no(subject):
+    """该学科下一个可用编号。"""
+    try:
+        data = load_jsonl(ERRORS_FILE)
+        used = [int(e.get("no")) for e in data
+                if e.get("subject") == subject and str(e.get("no") or "").isdigit()]
+        return (max(used) + 1) if used else 1
+    except BaseException:
+        return 1
+
+
 def save_error(subject, original="", original_media=None, answer="", answer_media=None,
                mistake="", idea="", idea_media=None, manual_tags="",
                status="未解决", mastery="", solution_media=None):
@@ -1791,7 +1825,8 @@ def save_error(subject, original="", original_media=None, answer="", answer_medi
             seen.add(m)
             question_media.append(m)
     entry = {
-        "type": "error", "subject": subject, "original": original, "original_media": original_media,
+        "type": "error", "subject": subject, "no": next_error_no(subject),
+        "original": original, "original_media": original_media,
         "answer": answer, "answer_media": answer_media, "mistake": mistake, "idea": idea,
         "idea_media": idea_media, "question": original, "question_media": question_media,
         "tags": [subject] + user_tags if user_tags else [subject],
@@ -3246,6 +3281,10 @@ def init_content_lib():
 
 def main(page: ft.Page):
     _install_deepseek_post_shim()
+    try:
+        ensure_error_numbers()
+    except BaseException as _be:
+        _diag_log(_be, "ensure_no_main")
     page.padding = 0
     page.spacing = 0
     try:
@@ -9016,12 +9055,21 @@ def main(page: ft.Page):
                         _lookup_txt.value = ""
                         page.update()
                         return
-                    idx = int(q) - 1
+                    want = int(q)
                     errs = st.get("errs") or _collect()
-                    if 0 <= idx < len(errs):
-                        _lookup_txt.value = f"{int(q):03d} → " + _err_title(errs[idx])[:60]
+                    hit = None
+                    for e2 in errs:
+                        v = e2.get("no")
+                        if str(v or "").isdigit() and int(v) == want:
+                            hit = e2
+                            break
+                    if hit is None and 0 < want <= len(errs) and all(
+                            not str(x.get("no") or "").isdigit() for x in errs):
+                        hit = errs[want - 1]
+                    if hit is not None:
+                        _lookup_txt.value = (f"{want:03d} → " + _err_title(hit)[:60])
                     else:
-                        _lookup_txt.value = f"没有 {int(q):03d} 号（共 {len(errs)} 道）"
+                        _lookup_txt.value = f"当前范围内没有 {want:03d} 号"
                     page.update()
 
                 _lookup.on_submit = _do_lookup
