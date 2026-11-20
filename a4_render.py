@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
-"""A4 错题卡排版：在 App 里直接排好一整张 A4，导出 PNG / PDF 给打印机用。
+"""A4 错题卡 2.0：为「纸上做题」设计的交互。
 
-- render_error_pages(): 把错题排成若干张 A4（300dpi = 2480×3508）
-- pages_to_pdf(): 把排好的页面打包成 PDF（纯标准库，不依赖第三方 PDF 库）
+核心思路：
+1. 一次导出两份——「题目版」（留白重做）+「答案版」（对答案），先做后对
+2. 每张卡带编号 + 复习打勾格（D1/D3/D7/D15），纸面就是复习进度表
+3. 页脚印「批次 · 编号范围」，配合 App 里的编号搜索，纸和软件能对上
+4. 卡上留「改状态」提示：在 App 搜编号 → 改成已解决
 """
 import io
 import os
 
 from PIL import Image, ImageDraw, ImageFont
 
-A4_W, A4_H = 2480, 3508          # 300 dpi
+A4_W, A4_H = 2480, 3508
 MARGIN = 110
 
 FONT_CANDIDATES = [
@@ -25,7 +28,6 @@ LAYOUT = {1: (1, 1), 2: (1, 2), 3: (1, 3), 4: (2, 2), 5: (2, 3), 6: (2, 3)}
 
 
 def _font(size, bold=False):
-    idx = 1 if bold else 0
     cands = FONT_CANDIDATES if not bold else [FONT_CANDIDATES[1], FONT_CANDIDATES[0]] + FONT_CANDIDATES[2:]
     for p in cands:
         try:
@@ -66,8 +68,12 @@ def _err_title(e):
     return ("（%s）" % tags[0]) if tags else "（未填题干）"
 
 
-def render_error_pages(errors, per_page=6, blank=False, title="池鱼错题卡"):
-    """返回 [PIL.Image] 列表，每个元素是一张 A4。"""
+def render_error_pages(errors, per_page=6, blank=False, mode="question",
+                       title="池鱼错题卡", start_no=1):
+    """mode: question=只给题+留白（重做用）；answer=题+答案+错因（对答案用）。
+
+    返回 [PIL.Image]。
+    """
     per_page = per_page if per_page in LAYOUT else 6
     cols, rows = LAYOUT[per_page]
     f_title = _font(58, True)
@@ -77,24 +83,25 @@ def render_error_pages(errors, per_page=6, blank=False, title="池鱼错题卡")
     f_small = _font(38)
     f_tiny = _font(32)
 
-    pages = []
-    items = list(errors)
-    if not items:
-        items = [{"original": "（还没有错题）", "subject": ""}]
+    items = list(errors) or [{"original": "（还没有错题）"}]
     total_pages = (len(items) + per_page - 1) // per_page
+    pages = []
+    extra = {"answer": "答案版", "question": "题目版"}.get(mode, "")
 
     for pi in range(total_pages):
         chunk = items[pi * per_page:(pi + 1) * per_page]
         img = Image.new("RGB", (A4_W, A4_H), (255, 255, 255))
         d = ImageDraw.Draw(img)
 
-        d.text((MARGIN, 70), title, font=f_title, fill=(20, 20, 20))
-        d.text((A4_W - MARGIN, 88), f"第 {pi + 1} / {total_pages} 页", font=f_meta,
-               fill=(120, 120, 120), anchor="ra")
+        d.text((MARGIN, 70), f"{title} · {extra}" if extra else title, font=f_title, fill=(20, 20, 20))
+        first_no = start_no + pi * per_page
+        last_no = first_no + len(chunk) - 1
+        d.text((A4_W - MARGIN, 88), f"第 {pi + 1}/{total_pages} 页 · 编号 {first_no:03d}–{last_no:03d}",
+               font=f_meta, fill=(120, 120, 120), anchor="ra")
         d.line([(MARGIN, 150), (A4_W - MARGIN, 150)], fill=(200, 200, 200), width=3)
 
         top = 190
-        usable_h = A4_H - top - MARGIN
+        usable_h = A4_H - top - MARGIN - 60
         gap = 34
         cw = (A4_W - 2 * MARGIN - (cols - 1) * gap) // cols
         chh = (usable_h - (rows - 1) * gap) // rows
@@ -103,62 +110,60 @@ def render_error_pages(errors, per_page=6, blank=False, title="池鱼错题卡")
             r, c = divmod(i, cols)
             x = MARGIN + c * (cw + gap)
             y = top + r * (chh + gap)
-            # 卡片边框
             d.rounded_rectangle([x, y, x + cw, y + chh], radius=24, outline=(150, 150, 150), width=4)
+            inner_x, inner_w = x + 30, cw - 60
+            cur_y = y + 24
 
-            inner_x = x + 30
-            inner_w = cw - 60
-            cur_y = y + 26
-
-            # 编号 + 科目
-            no = e.get("_no") or (pi * per_page + i + 1)
+            no = first_no + i
             d.text((inner_x, cur_y), f"{no:03d}", font=f_no, fill=(180, 60, 60))
-            meta = " ".join(x for x in [str(e.get("subject") or ""),
-                                        str((e.get("tags") or [""])[0] if e.get("tags") else "")] if x)
+            meta = " ".join(str(v) for v in [e.get("subject") or "",
+                                             (e.get("tags") or [""])[0] if e.get("tags") else "",
+                                             e.get("mastery") or ""] if v)
             if meta:
                 d.text((x + cw - 30, cur_y + 6), meta, font=f_tiny, fill=(120, 120, 120), anchor="ra")
-            cur_y += 64
+            cur_y += 60
 
-            # 题目
-            for line in _wrap(d, _err_title(e), f_q, inner_w, max_lines=6):
+            for line in _wrap(d, _err_title(e), f_q, inner_w, max_lines=5 if mode == "answer" else 8):
                 d.text((inner_x, cur_y), line, font=f_q, fill=(15, 15, 15))
-                cur_y += 62
-            cur_y += 10
+                cur_y += 60
+            cur_y += 8
 
-            # 我的思路 / 错因 / 答案
-            blocks = [
-                ("我的思路", e.get("idea") or e.get("my_thought") or ""),
-                ("错因", e.get("mistake") or e.get("reason") or ""),
-                ("标准答案", e.get("answer") or ""),
-            ]
-            for label, val in blocks:
-                if not str(val).strip():
-                    continue
-                d.text((inner_x, cur_y), f"【{label}】", font=f_tiny, fill=(90, 90, 90))
-                cur_y += 44
-                for line in _wrap(d, val, f_small, inner_w, max_lines=4):
-                    if cur_y > y + chh - 120:
-                        break
-                    d.text((inner_x + 8, cur_y), line, font=f_small, fill=(40, 40, 40))
-                    cur_y += 50
-                cur_y += 6
+            if mode == "answer":
+                for label, val in (("我的思路", e.get("idea") or ""),
+                                   ("错因", e.get("mistake") or ""),
+                                   ("标准答案", e.get("answer") or "")):
+                    if not str(val).strip():
+                        continue
+                    d.text((inner_x, cur_y), f"【{label}】", font=f_tiny, fill=(90, 90, 90))
+                    cur_y += 42
+                    for line in _wrap(d, val, f_small, inner_w, max_lines=5):
+                        if cur_y > y + chh - 150:
+                            break
+                        d.text((inner_x + 8, cur_y), line, font=f_small, fill=(40, 40, 40))
+                        cur_y += 48
+                    cur_y += 4
+            # 题目版：整块留白给演算
+            if mode == "question" or blank:
+                box_top = cur_y
+                box_bot = y + chh - 96
+                if box_bot - box_top > 60:
+                    d.rounded_rectangle([inner_x, box_top, x + cw - 30, box_bot],
+                                        radius=10, outline=(215, 215, 215), width=2)
 
-            # 演算留白
-            if blank and cur_y < y + chh - 140:
-                d.rounded_rectangle([inner_x, cur_y, x + cw - 30, y + chh - 70],
-                                    radius=10, outline=(210, 210, 210), width=2)
-                d.text((inner_x + 10, cur_y + 8), "演算区", font=f_tiny, fill=(200, 200, 200))
-                cur_y = y + chh - 70
+            # 复习打勾 + 状态
+            fy = y + chh - 62
+            d.text((inner_x, fy), "复习：□D1   □D3   □D7   □D15", font=f_tiny, fill=(110, 110, 110))
+            d.text((x + cw - 30, fy), "○对  △半对  ✗错", font=f_tiny, fill=(160, 160, 160), anchor="ra")
 
-            # 底部勾选
-            d.text((inner_x, y + chh - 52), "□ 已会    □ 还需练", font=f_tiny, fill=(120, 120, 120))
-
+        # 页脚
+        d.text((MARGIN, A4_H - 78),
+               "改状态：在 App 错题本里按编号搜索 → 改成「已解决」／「待查」",
+               font=f_tiny, fill=(150, 150, 150))
         pages.append(img)
     return pages
 
 
 def pages_to_pdf(images, quality=82):
-    """把 PIL 图片打包成 PDF（JPEG 嵌入，纯标准库实现）。"""
     jpegs = []
     for im in images:
         buf = io.BytesIO()
@@ -167,10 +172,6 @@ def pages_to_pdf(images, quality=82):
 
     n = len(jpegs)
     objs = {}
-
-    def add(num, data):
-        objs[num] = data
-
     obj_nums = []
     next_num = 3
     for _ in range(n):
@@ -178,19 +179,19 @@ def pages_to_pdf(images, quality=82):
         next_num += 3
 
     kids = " ".join(f"{p[0]} 0 R" for p in obj_nums)
-    add(1, b"<< /Type /Catalog /Pages 2 0 R >>")
-    add(2, f"<< /Type /Pages /Kids [{kids}] /Count {n} >>".encode())
+    objs[1] = b"<< /Type /Catalog /Pages 2 0 R >>"
+    objs[2] = f"<< /Type /Pages /Kids [{kids}] /Count {n} >>".encode()
 
     for idx, jpg in enumerate(jpegs):
         pnum, cnum, inum = obj_nums[idx]
-        add(pnum, (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-                   f"/Resources << /XObject << /Im{idx} {inum} 0 R >> >> "
-                   f"/Contents {cnum} 0 R >>").encode())
-        content = (f"q 595 0 0 842 0 0 cm /Im{idx} Do Q").encode()
-        add(cnum, b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream")
-        add(inum, (f"<< /Type /XObject /Subtype /Image /Width {A4_W} /Height {A4_H} "
-                   f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode "
-                   f"/Length {len(jpg)} >>\nstream\n").encode() + jpg + b"\nendstream")
+        objs[pnum] = (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+                      f"/Resources << /XObject << /Im{idx} {inum} 0 R >> >> "
+                      f"/Contents {cnum} 0 R >>").encode()
+        content = f"q 595 0 0 842 0 0 cm /Im{idx} Do Q".encode()
+        objs[cnum] = b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream"
+        objs[inum] = (f"<< /Type /XObject /Subtype /Image /Width {A4_W} /Height {A4_H} "
+                      f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode "
+                      f"/Length {len(jpg)} >>\nstream\n").encode() + jpg + b"\nendstream"
 
     out = bytearray(b"%PDF-1.4\n")
     offsets = {}

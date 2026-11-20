@@ -8879,7 +8879,7 @@ def main(page: ft.Page):
                 """在 App 里直接排好 A4 错题卡，预览后导出 PDF/PNG 给打印机。"""
                 import base64 as _b64
 
-                st = {"per": 6, "blank": False, "days": "", "pages": [], "idx": 0}
+                st = {"per": 6, "blank": False, "days": "", "pages": [], "idx": 0, "mode": "question"}
 
                 _head = ft.Text("🖨 错题卡排版", size=20, weight=ft.FontWeight.W_700, color="#E8EBF5")
                 _info = ft.Text("", size=12, color=C_TEXT2)
@@ -8897,6 +8897,13 @@ def main(page: ft.Page):
                                            ft.dropdown.Option("30", "最近30天")],
                                   value="")
                 _bk = ft.Switch(label="演算留白", value=False)
+                _md = ft.Dropdown(label="版本", width=160, dense=True,
+                                  options=[ft.dropdown.Option("question", "题目版（重做）"),
+                                           ft.dropdown.Option("answer", "答案版（对答案）"),
+                                           ft.dropdown.Option("both", "两份都导")],
+                                  value="question")
+                _lookup = ft.TextField(label="按编号查（如 001）", width=170, dense=True)
+                _lookup_txt = ft.Text("", size=12, color=C_TEXT2)
                 _busy = {"v": False}
 
                 def _collect():
@@ -8914,8 +8921,11 @@ def main(page: ft.Page):
                         page.update()
                         return
                     errs = _collect()
+                    st["errs"] = errs
+                    st["mode"] = _md.value or "question"
+                    _mode = "question" if st["mode"] == "both" else st["mode"]
                     st["pages"] = _render_error_pages(errs, per_page=int(_pp.value or 6),
-                                                      blank=bool(_bk.value))
+                                                      blank=bool(_bk.value), mode=_mode)
                     if not keep_idx:
                         st["idx"] = 0
                     st["idx"] = max(0, min(st["idx"], len(st["pages"]) - 1))
@@ -8962,8 +8972,13 @@ def main(page: ft.Page):
                         return
                     try:
                         p = e.path if str(e.path).lower().endswith(".pdf") else str(e.path) + ".pdf"
+                        _all = list(st["pages"])
+                        if st.get("mode") == "both":
+                            _all += _render_error_pages(st.get("errs") or [],
+                                                        per_page=int(_pp.value or 6),
+                                                        blank=False, mode="answer")
                         with open(p, "wb") as f:
-                            f.write(_pages_to_pdf(st["pages"]))
+                            f.write(_pages_to_pdf(_all))
                         show_toast(f"✅ 已导出 PDF：{os.path.basename(p)}", "green")
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
@@ -8978,14 +8993,31 @@ def main(page: ft.Page):
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
 
-                for w in (_pp, _dr):
+                for w in (_pp, _dr, _md):
                     w.on_change = _regen
                 _bk.on_change = _regen
+
+                def _do_lookup(e=None):
+                    q = (_lookup.value or "").strip()
+                    if not q.isdigit():
+                        _lookup_txt.value = ""
+                        page.update()
+                        return
+                    idx = int(q) - 1
+                    errs = st.get("errs") or _collect()
+                    if 0 <= idx < len(errs):
+                        _lookup_txt.value = f"{int(q):03d} → " + _err_title(errs[idx])[:60]
+                    else:
+                        _lookup_txt.value = f"没有 {int(q):03d} 号（共 {len(errs)} 道）"
+                    page.update()
+
+                _lookup.on_submit = _do_lookup
 
                 return ft.Column([
                     _head,
                     ft.Text("排好后导出 PDF，直接发给打印机 App 即可", size=12, color=C_TEXT2),
-                    ft.Row([_pp, _dr, _bk], spacing=10, wrap=True),
+                    ft.Row([_pp, _dr, _md, _bk], spacing=10, wrap=True),
+                    ft.Row([_lookup, _lookup_txt], spacing=10, wrap=True),
                     _info,
                     ft.Row([
                         ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=lambda e: _nav(-1)),
