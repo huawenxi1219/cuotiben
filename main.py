@@ -8897,17 +8897,26 @@ def main(page: ft.Page):
                                            ft.dropdown.Option("30", "最近30天")],
                                   value="")
                 _bk = ft.Switch(label="演算留白", value=False)
-                _md = ft.Dropdown(label="版本", width=160, dense=True,
-                                  options=[ft.dropdown.Option("question", "题目版（重做）"),
+                _md = ft.Dropdown(label="版本", width=170, dense=True,
+                                  options=[ft.dropdown.Option("remind", "提醒卡（不重做）"),
+                                           ft.dropdown.Option("question", "题目版（重做）"),
                                            ft.dropdown.Option("answer", "答案版（对答案）"),
                                            ft.dropdown.Option("both", "两份都导")],
-                                  value="question")
+                                  value="remind")
+                _subj = ft.Dropdown(label="学科", width=130, dense=True,
+                                    options=[ft.dropdown.Option(x) for x in
+                                             ["全部", "数学", "语文", "英语", "物理", "化学",
+                                              "生物", "历史", "政治", "地理"]],
+                                    value="全部")
                 _lookup = ft.TextField(label="按编号查（如 001）", width=170, dense=True)
                 _lookup_txt = ft.Text("", size=12, color=C_TEXT2)
                 _busy = {"v": False}
 
                 def _collect():
                     errs = load_jsonl(ERRORS_FILE)
+                    s = str(_subj.value or "全部")
+                    if s != "全部":
+                        errs = [e for e in errs if e.get("subject") == s]
                     d = str(_dr.value or "").strip()
                     if d.isdigit():
                         cutoff = time.time() * 1000 - int(d) * 86400000
@@ -8924,6 +8933,10 @@ def main(page: ft.Page):
                     st["errs"] = errs
                     st["mode"] = _md.value or "question"
                     _mode = "question" if st["mode"] == "both" else st["mode"]
+                    if _mode == "remind":
+                        st["pages"] = _render_error_pages(errs, mode="remind")
+                        _show()
+                        return
                     st["pages"] = _render_error_pages(errs, per_page=int(_pp.value or 6),
                                                       blank=bool(_bk.value), mode=_mode)
                     if not keep_idx:
@@ -8993,7 +9006,7 @@ def main(page: ft.Page):
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
 
-                for w in (_pp, _dr, _md):
+                for w in (_pp, _dr, _md, _subj):
                     w.on_change = _regen
                 _bk.on_change = _regen
 
@@ -9016,7 +9029,7 @@ def main(page: ft.Page):
                 return ft.Column([
                     _head,
                     ft.Text("排好后导出 PDF，直接发给打印机 App 即可", size=12, color=C_TEXT2),
-                    ft.Row([_pp, _dr, _md, _bk], spacing=10, wrap=True),
+                    ft.Row([_subj, _md, _pp, _dr, _bk], spacing=10, wrap=True),
                     ft.Row([_lookup, _lookup_txt], spacing=10, wrap=True),
                     _info,
                     ft.Row([
