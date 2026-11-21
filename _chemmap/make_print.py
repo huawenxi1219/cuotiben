@@ -22,6 +22,21 @@ HTML = (r"C:\myapp\化学背诵版-紧凑.html" if COMPACT else r"C:\myapp\化�
 
 tree = json.load(io.open(TREE, encoding="utf-8"))
 
+
+def _render_sub(items, out, depth=1):
+    if not items:
+        return
+    out.append(f"<ul class='sub d{depth}'>")
+    for it in items:
+        ttl = html.escape(it.get("title", ""))
+        out.append(f"<li><b>{ttl}</b>")
+        for f in (it.get("facts") or []):
+            out.append(f"　{html.escape(str(f))}")
+        out.append("</li>")
+        _render_sub(it.get("sub") or [], out, depth + 1)
+    out.append("</ul>")
+
+
 if COMPACT:
     BASE, H1, SUB = "9.5pt", "16pt", "8pt"
     BOOK, CHAP, SEC = "12pt", "10.5pt", "9.2pt"
@@ -53,6 +68,10 @@ h1 {{ font-size: {H1}; margin: 0 0 3pt; }}
 .pt .d {{ text-align: justify; }}
 .facts {{ margin: 1pt 0 0 12pt; padding: 0; font-size: {FACT}; }}
 .facts li {{ margin: 0; }}
+.sub {{ margin: 1pt 0 2pt 14pt; padding: 0; list-style: none; }}
+.sub li {{ margin: 1pt 0; }}
+.sub .d2 {{ margin-left: 14pt; }}
+.sub .d3 {{ margin-left: 28pt; }}
 .pit {{ color: #b03030; margin: 1pt 0 0 12pt; font-size: {FACT}; }}
 .pit li {{ margin: 0; }}
 .how {{ background: #fffbe6; border-left: 3px solid #d4a017; padding: 2pt 5pt;
@@ -102,6 +121,7 @@ for b in tree["books"]:
                     for f in pits:
                         out.append(f"<li>⚠ {html.escape(str(f))}</li>")
                     out.append("</ul>")
+                _render_sub(p.get("sub") or [], out)
                 out.append("</div>")
             if s.get("equations"):
                 for e in s["equations"]:
