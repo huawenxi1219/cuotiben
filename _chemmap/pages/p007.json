@@ -1,0 +1,123 @@
+{
+  "page": 7,
+  "book": "必修第一册",
+  "chapter": "第二章 钠和氯",
+  "section": "Na₂CO₃ 与 NaHCO₃ 的鉴别与转化",
+  "level": "detailed",
+  "points": [
+    {
+      "id": "2.3.1",
+      "title": "溶解性与状态",
+      "detail": "同温下 Na₂CO₃ 溶解度大于 NaHCO₃；Na₂CO₃ 常为白色粉末（含结晶水时为 Na₂CO₃·10H₂O），NaHCO₃ 为细小白色晶体。",
+      "facts": [
+        "溶解度：Na₂CO₃ > NaHCO₃",
+        "NaHCO₃ 溶解度较小，是侯氏制碱法能析出的原因"
+      ],
+      "pitfalls": [
+        "不能只看“白色固体”区分，要结合溶解性与热稳定性"
+      ]
+    },
+    {
+      "id": "2.3.2",
+      "title": "热稳定性",
+      "detail": "Na₂CO₃ 受热不分解；NaHCO₃ 受热分解生成 Na₂CO₃、H₂O、CO₂，这是最常用的鉴别方法。",
+      "facts": [
+        "2NaHCO₃ →(Δ) Na₂CO₃ + H₂O + CO₂↑",
+        "把气体通入澄清石灰水变浑浊 → 证明是 NaHCO₃"
+      ],
+      "pitfalls": [
+        "加热固体时试管口略向下倾斜",
+        "Na₂CO₃·10H₂O 受热会先失结晶水，不算分解"
+      ]
+    },
+    {
+      "id": "2.3.3",
+      "title": "与酸反应的快慢",
+      "detail": "与同浓度盐酸反应，NaHCO₃ 产生气泡更快（HCO₃⁻ 一步放气）；Na₂CO₃ 分步，先慢后快。",
+      "facts": [
+        "等质量时 NaHCO₃ 产生的 CO₂ 更多（摩尔质量小）"
+      ],
+      "pitfalls": [
+        "比较“产生气体快慢”和“产生气体多少”是两个不同问题"
+      ]
+    },
+    {
+      "id": "2.3.4",
+      "title": "与碱反应",
+      "detail": "NaHCO₃ 能与 NaOH 反应生成 Na₂CO₃；Na₂CO₃ 不与 NaOH 反应。",
+      "facts": [
+        "NaHCO₃ + NaOH → Na₂CO₃ + H₂O"
+      ],
+      "pitfalls": [
+        "该反应可用于“除去 Na₂CO₃ 中的 NaHCO₃”吗？不行——会引入 NaOH 或需恰好量"
+      ]
+    },
+    {
+      "id": "2.3.5",
+      "title": "水解与溶液碱性",
+      "detail": "两者都能水解使溶液显碱性，CO₃²⁻ 水解程度大于 HCO₃⁻，所以同浓度时 Na₂CO₃ 溶液 pH 更大。",
+      "facts": [
+        "CO₃²⁻ + H₂O ⇌ HCO₃⁻ + OH⁻（程度大）",
+        "HCO₃⁻ + H₂O ⇌ H₂CO₃ + OH⁻（程度小）",
+        "同浓度 pH：Na₂CO₃ > NaHCO₃"
+      ],
+      "pitfalls": [
+        "HCO₃⁻ 既能水解又能电离，溶液显碱性说明水解占优"
+      ]
+    },
+    {
+      "id": "2.3.6",
+      "title": "鉴别方法汇总",
+      "detail": "加热法、加 BaCl₂/CaCl₂ 法、逐滴加盐酸法、测同浓度 pH 法。",
+      "facts": [
+        "加热：产生使石灰水变浑的气体 → NaHCO₃",
+        "加 BaCl₂：产生白色沉淀 → Na₂CO₃；无现象 → NaHCO₃",
+        "逐滴加盐酸：立即冒泡 → NaHCO₃；先不冒泡 → Na₂CO₃"
+      ],
+      "pitfalls": [
+        "加 Ca(OH)₂ 两者都沉淀，不能用来鉴别"
+      ]
+    },
+    {
+      "id": "2.3.7",
+      "title": "相互转化与除杂",
+      "detail": "固体除杂用加热；溶液除杂用通 CO₂ 或加适量 NaOH。",
+      "facts": [
+        "Na₂CO₃ 固体中含 NaHCO₃ → 加热",
+        "NaHCO₃ 溶液中含 Na₂CO₃ → 通足量 CO₂",
+        "Na₂CO₃ 溶液中含 NaHCO₃ → 加适量 NaOH"
+      ],
+      "pitfalls": [
+        "“适量”是关键，过量会引入新杂质"
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "eq": "2NaHCO₃ →(Δ) Na₂CO₃ + H₂O + CO₂↑",
+      "note": "热分解"
+    },
+    {
+      "eq": "NaHCO₃ + HCl → NaCl + H₂O + CO₂↑",
+      "note": "一步放气"
+    },
+    {
+      "eq": "Na₂CO₃ + 2HCl → 2NaCl + H₂O + CO₂↑",
+      "note": "分步"
+    },
+    {
+      "eq": "NaHCO₃ + NaOH → Na₂CO₃ + H₂O",
+      "note": "与碱"
+    },
+    {
+      "eq": "Na₂CO₃ + CO₂ + H₂O → 2NaHCO₃",
+      "note": "溶液转化"
+    }
+  ],
+  "pitfalls_summary": [
+    "加热法、BaCl₂ 法、逐滴加盐酸法是最常用的三种鉴别",
+    "Ca(OH)₂ 不行（两者都沉淀）",
+    "除杂要防“过量引入新杂质”"
+  ],
+  "how": "NaHCO₃ 受热分解、Na₂CO₃ 不分解，原因是 HCO₃⁻ 里的 H 能转移成 H₂O 和 CO₂ 跑掉。理解了“为什么能跑掉”，加热法鉴别就是自然结论。"
+}

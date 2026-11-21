@@ -1,0 +1,276 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1090" height="3854" viewBox="0 0 1090 3854" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+<rect width="1090" height="3854" fill="#16161E"/>
+<text x="30" y="40" fill="#E8EBF5" font-size="24" font-weight="bold">人教版高中化学 · 三年知识总图</text>
+<rect x="30" y="424.0" width="230" height="52" rx="14" fill="#17324F" stroke="#7AA2F7" stroke-width="2"/>
+<text x="145.0" y="457.0" fill="#F5F7FF" font-size="17" text-anchor="middle">必修第一册</text>
+<rect x="300" y="70" width="760" height="188" rx="12" fill="#1B1F2E" stroke="#7AA2F7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="96" fill="#E8EBF5" font-size="16" font-weight="600">第一章 物质及其变化</text>
+<path d="M260,450.0 C300,450.0 240,164.0 300,164.0" fill="none" stroke="#7AA2F7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="107" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="112" fill="#C9CFE0" font-size="14">物质的分类（单质/氧化物/酸/碱/盐）</text>
+<circle cx="320" cy="131" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="136" fill="#C9CFE0" font-size="14">分散系：溶液·胶体·浊液；胶体丁达尔效应</text>
+<circle cx="320" cy="155" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="160" fill="#C9CFE0" font-size="14">电解质与非电解质</text>
+<circle cx="320" cy="179" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="184" fill="#C9CFE0" font-size="14">离子反应：离子方程式书写、离子共存判断</text>
+<circle cx="320" cy="203" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="208" fill="#C9CFE0" font-size="14">氧化还原：化合价升降、电子守恒配平</text>
+<circle cx="320" cy="227" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="232" fill="#C9CFE0" font-size="14">氧化剂/还原剂、氧化性/还原性比较</text>
+<rect x="300" y="272" width="760" height="188" rx="12" fill="#1B1F2E" stroke="#7AA2F7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="298" fill="#E8EBF5" font-size="16" font-weight="600">第二章 钠和氯</text>
+<path d="M260,450.0 C300,450.0 240,366.0 300,366.0" fill="none" stroke="#7AA2F7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="309" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="314" fill="#C9CFE0" font-size="14">钠与水/氧气反应；Na₂O 与 Na₂O₂ 区别</text>
+<circle cx="320" cy="333" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="338" fill="#C9CFE0" font-size="14">Na₂CO₃ 与 NaHCO₃ 的鉴别；焰色试验</text>
+<circle cx="320" cy="357" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="362" fill="#C9CFE0" font-size="14">氯气：与金属/水/碱反应；氯水成分</text>
+<circle cx="320" cy="381" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="386" fill="#C9CFE0" font-size="14">次氯酸盐与漂白粉</text>
+<circle cx="320" cy="405" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="410" fill="#C9CFE0" font-size="14">物质的量 n=m/M=N/N_A；Vm=22.4L/mol（标况）</text>
+<circle cx="320" cy="429" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="434" fill="#C9CFE0" font-size="14">物质的量浓度 c=n/V；配制一定浓度溶液</text>
+<rect x="300" y="474" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#7AA2F7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="500" fill="#E8EBF5" font-size="16" font-weight="600">第三章 铁 金属材料</text>
+<path d="M260,450.0 C300,450.0 240,556.0 300,556.0" fill="none" stroke="#7AA2F7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="511" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="516" fill="#C9CFE0" font-size="14">Fe²⁺/Fe³⁺ 转化；Fe(OH)₂ 白→灰绿→红褐</text>
+<circle cx="320" cy="535" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="540" fill="#C9CFE0" font-size="14">Fe³⁺ 检验（KSCN 变红）</text>
+<circle cx="320" cy="559" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="564" fill="#C9CFE0" font-size="14">铝的两性：Al、Al₂O₃、Al(OH)₃</text>
+<circle cx="320" cy="583" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="588" fill="#C9CFE0" font-size="14">铝热反应</text>
+<circle cx="320" cy="607" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="612" fill="#C9CFE0" font-size="14">合金：钢/生铁/青铜；金属冶炼方法</text>
+<rect x="300" y="652" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#7AA2F7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="678" fill="#E8EBF5" font-size="16" font-weight="600">第四章 物质结构 元素周期律</text>
+<path d="M260,450.0 C300,450.0 240,734.0 300,734.0" fill="none" stroke="#7AA2F7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="689" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="694" fill="#C9CFE0" font-size="14">原子结构：质子/中子/电子；核素与同位素</text>
+<circle cx="320" cy="713" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="718" fill="#C9CFE0" font-size="14">元素周期表结构与周期律</text>
+<circle cx="320" cy="737" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="742" fill="#C9CFE0" font-size="14">同周期/同主族递变规律</text>
+<circle cx="320" cy="761" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="766" fill="#C9CFE0" font-size="14">化学键：离子键/共价键；电子式</text>
+<circle cx="320" cy="785" r="2.6" fill="#7AA2F7"/>
+<text x="332" y="790" fill="#C9CFE0" font-size="14">分子间作用力与氢键</text>
+<rect x="30" y="1218.0" width="230" height="52" rx="14" fill="#173D33" stroke="#4DB6AC" stroke-width="2"/>
+<text x="145.0" y="1251.0" fill="#F5F7FF" font-size="17" text-anchor="middle">必修第二册</text>
+<rect x="300" y="864" width="760" height="212" rx="12" fill="#1B1F2E" stroke="#4DB6AC" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="890" fill="#E8EBF5" font-size="16" font-weight="600">第五章 非金属元素</text>
+<path d="M260,1244.0 C300,1244.0 240,970.0 300,970.0" fill="none" stroke="#4DB6AC" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="901" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="906" fill="#C9CFE0" font-size="14">硫：SO₂ 还原性与漂白性</text>
+<circle cx="320" cy="925" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="930" fill="#C9CFE0" font-size="14">浓硫酸三大特性：吸水/脱水/强氧化</text>
+<circle cx="320" cy="949" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="954" fill="#C9CFE0" font-size="14">硫酸根检验</text>
+<circle cx="320" cy="973" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="978" fill="#C9CFE0" font-size="14">氮：N₂ 稳定性；NO/NO₂ 转化</text>
+<circle cx="320" cy="997" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1002" fill="#C9CFE0" font-size="14">硝酸的强氧化性</text>
+<circle cx="320" cy="1021" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1026" fill="#C9CFE0" font-size="14">氨气喷泉实验；铵盐与铵根检验</text>
+<circle cx="320" cy="1045" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1050" fill="#C9CFE0" font-size="14">硅及其化合物（半导体/玻璃）</text>
+<rect x="300" y="1090" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#4DB6AC" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="1116" fill="#E8EBF5" font-size="16" font-weight="600">第六章 化学反应与能量</text>
+<path d="M260,1244.0 C300,1244.0 240,1172.0 300,1172.0" fill="none" stroke="#4DB6AC" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="1127" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1132" fill="#C9CFE0" font-size="14">键断裂吸热/键形成放热</text>
+<circle cx="320" cy="1151" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1156" fill="#C9CFE0" font-size="14">放热与吸热反应判断</text>
+<circle cx="320" cy="1175" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1180" fill="#C9CFE0" font-size="14">原电池构成条件与正负极判断</text>
+<circle cx="320" cy="1199" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1204" fill="#C9CFE0" font-size="14">反应速率及影响因素</text>
+<circle cx="320" cy="1223" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1228" fill="#C9CFE0" font-size="14">可逆反应、化学平衡状态与反应限度</text>
+<rect x="300" y="1268" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#4DB6AC" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="1294" fill="#E8EBF5" font-size="16" font-weight="600">第七章 有机化合物</text>
+<path d="M260,1244.0 C300,1244.0 240,1350.0 300,1350.0" fill="none" stroke="#4DB6AC" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="1305" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1310" fill="#C9CFE0" font-size="14">有机物特点：同分异构</text>
+<circle cx="320" cy="1329" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1334" fill="#C9CFE0" font-size="14">甲烷取代；乙烯加成/加聚；苯的取代</text>
+<circle cx="320" cy="1353" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1358" fill="#C9CFE0" font-size="14">乙醇：羟基性质与催化氧化</text>
+<circle cx="320" cy="1377" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1382" fill="#C9CFE0" font-size="14">乙酸：羧基与酯化反应；酯的水解</text>
+<circle cx="320" cy="1401" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1406" fill="#C9CFE0" font-size="14">糖类、油脂、蛋白质</text>
+<rect x="300" y="1446" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#4DB6AC" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="1472" fill="#E8EBF5" font-size="16" font-weight="600">第八章 化学与可持续发展</text>
+<path d="M260,1244.0 C300,1244.0 240,1528.0 300,1528.0" fill="none" stroke="#4DB6AC" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="1483" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1488" fill="#C9CFE0" font-size="14">金属矿物开发利用</text>
+<circle cx="320" cy="1507" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1512" fill="#C9CFE0" font-size="14">海水资源利用（溴/镁）</text>
+<circle cx="320" cy="1531" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1536" fill="#C9CFE0" font-size="14">煤、石油、天然气综合利用</text>
+<circle cx="320" cy="1555" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1560" fill="#C9CFE0" font-size="14">化肥农药合理使用；安全用药</text>
+<circle cx="320" cy="1579" r="2.6" fill="#4DB6AC"/>
+<text x="332" y="1584" fill="#C9CFE0" font-size="14">环境保护与绿色化学</text>
+<rect x="30" y="1976.0" width="230" height="52" rx="14" fill="#33204A" stroke="#BB9AF7" stroke-width="2"/>
+<text x="145.0" y="2009.0" fill="#F5F7FF" font-size="17" text-anchor="middle">选择性必修1 化学反应原理</text>
+<rect x="300" y="1658" width="760" height="140" rx="12" fill="#1B1F2E" stroke="#BB9AF7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="1684" fill="#E8EBF5" font-size="16" font-weight="600">第一章 化学反应的热效应</text>
+<path d="M260,2002.0 C300,2002.0 240,1728.0 300,1728.0" fill="none" stroke="#BB9AF7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="1695" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1700" fill="#C9CFE0" font-size="14">反应热与焓变 ΔH；放热 ΔH&lt;0、吸热 ΔH&gt;0</text>
+<circle cx="320" cy="1719" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1724" fill="#C9CFE0" font-size="14">热化学方程式书写</text>
+<circle cx="320" cy="1743" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1748" fill="#C9CFE0" font-size="14">盖斯定律</text>
+<circle cx="320" cy="1767" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1772" fill="#C9CFE0" font-size="14">燃烧热与中和热</text>
+<rect x="300" y="1812" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#BB9AF7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="1838" fill="#E8EBF5" font-size="16" font-weight="600">第二章 速率与平衡</text>
+<path d="M260,2002.0 C300,2002.0 240,1894.0 300,1894.0" fill="none" stroke="#BB9AF7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="1849" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1854" fill="#C9CFE0" font-size="14">速率 v=Δc/Δt；浓度/温度/压强/催化剂影响</text>
+<circle cx="320" cy="1873" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1878" fill="#C9CFE0" font-size="14">活化能与有效碰撞</text>
+<circle cx="320" cy="1897" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1902" fill="#C9CFE0" font-size="14">平衡常数 K；浓度商 Q 与 K 比较</text>
+<circle cx="320" cy="1921" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1926" fill="#C9CFE0" font-size="14">勒夏特列原理</text>
+<circle cx="320" cy="1945" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="1950" fill="#C9CFE0" font-size="14">转化率计算、等效平衡</text>
+<rect x="300" y="1990" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#BB9AF7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="2016" fill="#E8EBF5" font-size="16" font-weight="600">第三章 水溶液中的离子平衡</text>
+<path d="M260,2002.0 C300,2002.0 240,2072.0 300,2072.0" fill="none" stroke="#BB9AF7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="2027" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2032" fill="#C9CFE0" font-size="14">弱电解质电离平衡；电离常数 Ka</text>
+<circle cx="320" cy="2051" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2056" fill="#C9CFE0" font-size="14">水的电离与 Kw；pH 计算</text>
+<circle cx="320" cy="2075" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2080" fill="#C9CFE0" font-size="14">盐类水解规律与水解离子方程式</text>
+<circle cx="320" cy="2099" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2104" fill="#C9CFE0" font-size="14">沉淀溶解平衡 Ksp；沉淀转化</text>
+<circle cx="320" cy="2123" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2128" fill="#C9CFE0" font-size="14">酸碱中和滴定与误差分析</text>
+<rect x="300" y="2168" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#BB9AF7" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="2194" fill="#E8EBF5" font-size="16" font-weight="600">第四章 化学反应与电能</text>
+<path d="M260,2002.0 C300,2002.0 240,2250.0 300,2250.0" fill="none" stroke="#BB9AF7" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="2205" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2210" fill="#C9CFE0" font-size="14">原电池原理与电极反应式</text>
+<circle cx="320" cy="2229" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2234" fill="#C9CFE0" font-size="14">化学电源：一次/二次/燃料电池</text>
+<circle cx="320" cy="2253" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2258" fill="#C9CFE0" font-size="14">电解池原理与电解产物判断</text>
+<circle cx="320" cy="2277" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2282" fill="#C9CFE0" font-size="14">电镀与电解精炼</text>
+<circle cx="320" cy="2301" r="2.6" fill="#BB9AF7"/>
+<text x="332" y="2306" fill="#C9CFE0" font-size="14">金属腐蚀与防护（牺牲阳极法）</text>
+<rect x="30" y="2621.0" width="230" height="52" rx="14" fill="#3D2E17" stroke="#E0AF68" stroke-width="2"/>
+<text x="145.0" y="2654.0" fill="#F5F7FF" font-size="17" text-anchor="middle">选择性必修2 物质结构与性质</text>
+<rect x="300" y="2380" width="760" height="140" rx="12" fill="#1B1F2E" stroke="#E0AF68" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="2406" fill="#E8EBF5" font-size="16" font-weight="600">第一章 原子结构与性质</text>
+<path d="M260,2647.0 C300,2647.0 240,2450.0 300,2450.0" fill="none" stroke="#E0AF68" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="2417" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2422" fill="#C9CFE0" font-size="14">能层与能级</text>
+<circle cx="320" cy="2441" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2446" fill="#C9CFE0" font-size="14">电子排布式与轨道表示式</text>
+<circle cx="320" cy="2465" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2470" fill="#C9CFE0" font-size="14">构造原理、洪特规则</text>
+<circle cx="320" cy="2489" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2494" fill="#C9CFE0" font-size="14">电离能与电负性；原子光谱</text>
+<rect x="300" y="2534" width="760" height="188" rx="12" fill="#1B1F2E" stroke="#E0AF68" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="2560" fill="#E8EBF5" font-size="16" font-weight="600">第二章 分子结构与性质</text>
+<path d="M260,2647.0 C300,2647.0 240,2628.0 300,2628.0" fill="none" stroke="#E0AF68" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="2571" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2576" fill="#C9CFE0" font-size="14">共价键：σ 键与 π 键</text>
+<circle cx="320" cy="2595" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2600" fill="#C9CFE0" font-size="14">键参数：键能/键长/键角</text>
+<circle cx="320" cy="2619" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2624" fill="#C9CFE0" font-size="14">杂化轨道 sp/sp²/sp³</text>
+<circle cx="320" cy="2643" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2648" fill="#C9CFE0" font-size="14">VSEPR 模型与分子构型</text>
+<circle cx="320" cy="2667" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2672" fill="#C9CFE0" font-size="14">极性分子与非极性分子</text>
+<circle cx="320" cy="2691" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2696" fill="#C9CFE0" font-size="14">范德华力与氢键；手性分子</text>
+<rect x="300" y="2736" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#E0AF68" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="2762" fill="#E8EBF5" font-size="16" font-weight="600">第三章 晶体结构与性质</text>
+<path d="M260,2647.0 C300,2647.0 240,2818.0 300,2818.0" fill="none" stroke="#E0AF68" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="2773" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2778" fill="#C9CFE0" font-size="14">晶体与非晶体</text>
+<circle cx="320" cy="2797" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2802" fill="#C9CFE0" font-size="14">四种晶体类型与性质对比</text>
+<circle cx="320" cy="2821" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2826" fill="#C9CFE0" font-size="14">晶胞、配位数与密度计算</text>
+<circle cx="320" cy="2845" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2850" fill="#C9CFE0" font-size="14">离子晶体熔沸点比较</text>
+<circle cx="320" cy="2869" r="2.6" fill="#E0AF68"/>
+<text x="332" y="2874" fill="#C9CFE0" font-size="14">金属晶体与电子气理论</text>
+<rect x="30" y="3343.0" width="230" height="52" rx="14" fill="#3F1B2A" stroke="#F7768E" stroke-width="2"/>
+<text x="145.0" y="3376.0" fill="#F5F7FF" font-size="17" text-anchor="middle">选择性必修3 有机化学基础</text>
+<rect x="300" y="2948" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#F7768E" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="2974" fill="#E8EBF5" font-size="16" font-weight="600">第一章 有机物的结构特点</text>
+<path d="M260,3369.0 C300,3369.0 240,3030.0 300,3030.0" fill="none" stroke="#F7768E" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="2985" r="2.6" fill="#F7768E"/>
+<text x="332" y="2990" fill="#C9CFE0" font-size="14">碳原子成键特点</text>
+<circle cx="320" cy="3009" r="2.6" fill="#F7768E"/>
+<text x="332" y="3014" fill="#C9CFE0" font-size="14">同分异构体书写</text>
+<circle cx="320" cy="3033" r="2.6" fill="#F7768E"/>
+<text x="332" y="3038" fill="#C9CFE0" font-size="14">官能团与结构式</text>
+<circle cx="320" cy="3057" r="2.6" fill="#F7768E"/>
+<text x="332" y="3062" fill="#C9CFE0" font-size="14">分离提纯：蒸馏/萃取/重结晶</text>
+<circle cx="320" cy="3081" r="2.6" fill="#F7768E"/>
+<text x="332" y="3086" fill="#C9CFE0" font-size="14">元素分析与波谱（红外/核磁/X 射线）</text>
+<rect x="300" y="3126" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#F7768E" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="3152" fill="#E8EBF5" font-size="16" font-weight="600">第二章 烃</text>
+<path d="M260,3369.0 C300,3369.0 240,3208.0 300,3208.0" fill="none" stroke="#F7768E" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="3163" r="2.6" fill="#F7768E"/>
+<text x="332" y="3168" fill="#C9CFE0" font-size="14">烷烃：取代反应</text>
+<circle cx="320" cy="3187" r="2.6" fill="#F7768E"/>
+<text x="332" y="3192" fill="#C9CFE0" font-size="14">烯烃：加成/加聚/氧化</text>
+<circle cx="320" cy="3211" r="2.6" fill="#F7768E"/>
+<text x="332" y="3216" fill="#C9CFE0" font-size="14">炔烃</text>
+<circle cx="320" cy="3235" r="2.6" fill="#F7768E"/>
+<text x="332" y="3240" fill="#C9CFE0" font-size="14">芳香烃：苯及其同系物</text>
+<circle cx="320" cy="3259" r="2.6" fill="#F7768E"/>
+<text x="332" y="3264" fill="#C9CFE0" font-size="14">烃的燃烧规律</text>
+<rect x="300" y="3304" width="760" height="164" rx="12" fill="#1B1F2E" stroke="#F7768E" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="3330" fill="#E8EBF5" font-size="16" font-weight="600">第三章 烃的衍生物</text>
+<path d="M260,3369.0 C300,3369.0 240,3386.0 300,3386.0" fill="none" stroke="#F7768E" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="3341" r="2.6" fill="#F7768E"/>
+<text x="332" y="3346" fill="#C9CFE0" font-size="14">卤代烃：取代与消去</text>
+<circle cx="320" cy="3365" r="2.6" fill="#F7768E"/>
+<text x="332" y="3370" fill="#C9CFE0" font-size="14">醇：羟基性质；酚：弱酸性</text>
+<circle cx="320" cy="3389" r="2.6" fill="#F7768E"/>
+<text x="332" y="3394" fill="#C9CFE0" font-size="14">醛：氧化与还原（银镜反应）；酮</text>
+<circle cx="320" cy="3413" r="2.6" fill="#F7768E"/>
+<text x="332" y="3418" fill="#C9CFE0" font-size="14">羧酸：酸性/酯化；酯：水解</text>
+<circle cx="320" cy="3437" r="2.6" fill="#F7768E"/>
+<text x="332" y="3442" fill="#C9CFE0" font-size="14">官能团检验与有机合成路线设计</text>
+<rect x="300" y="3482" width="760" height="140" rx="12" fill="#1B1F2E" stroke="#F7768E" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="3508" fill="#E8EBF5" font-size="16" font-weight="600">第四章 生物大分子</text>
+<path d="M260,3369.0 C300,3369.0 240,3552.0 300,3552.0" fill="none" stroke="#F7768E" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="3519" r="2.6" fill="#F7768E"/>
+<text x="332" y="3524" fill="#C9CFE0" font-size="14">糖类：单糖/二糖/多糖</text>
+<circle cx="320" cy="3543" r="2.6" fill="#F7768E"/>
+<text x="332" y="3548" fill="#C9CFE0" font-size="14">淀粉与纤维素水解</text>
+<circle cx="320" cy="3567" r="2.6" fill="#F7768E"/>
+<text x="332" y="3572" fill="#C9CFE0" font-size="14">氨基酸与蛋白质；蛋白质变性</text>
+<circle cx="320" cy="3591" r="2.6" fill="#F7768E"/>
+<text x="332" y="3596" fill="#C9CFE0" font-size="14">酶与核酸</text>
+<rect x="300" y="3636" width="760" height="140" rx="12" fill="#1B1F2E" stroke="#F7768E" stroke-width="1.4" opacity="0.96"/>
+<text x="314" y="3662" fill="#E8EBF5" font-size="16" font-weight="600">第五章 合成高分子</text>
+<path d="M260,3369.0 C300,3369.0 240,3706.0 300,3706.0" fill="none" stroke="#F7768E" stroke-width="2" opacity="0.7"/>
+<circle cx="320" cy="3673" r="2.6" fill="#F7768E"/>
+<text x="332" y="3678" fill="#C9CFE0" font-size="14">加聚反应</text>
+<circle cx="320" cy="3697" r="2.6" fill="#F7768E"/>
+<text x="332" y="3702" fill="#C9CFE0" font-size="14">缩聚反应</text>
+<circle cx="320" cy="3721" r="2.6" fill="#F7768E"/>
+<text x="332" y="3726" fill="#C9CFE0" font-size="14">塑料/橡胶/纤维</text>
+<circle cx="320" cy="3745" r="2.6" fill="#F7768E"/>
+<text x="332" y="3750" fill="#C9CFE0" font-size="14">功能高分子材料</text>
+</svg>

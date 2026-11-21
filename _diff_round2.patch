@@ -1,0 +1,549 @@
+﻿diff --git a/main.py b/main.py
+index 9945c65..38621f9 100644
+--- a/main.py
++++ b/main.py
+@@ -80,12 +80,16 @@ def gen_uid():
+     return uuid.uuid4().hex[:16]
+ 
+ 
+-_shared_file_picker = {"fp": None, "handler": None}
++_picker_registry = {}   # R2-P2-8：{id(page): {"fp": FilePicker, "handler": callable}} 按页面存放，Web 多会话互不串
+ 
+ 
+ def _on_shared_picker_result(e):
+-    """全局唯一 FilePicker 的回调分发：每次调用前用 _use_picker 绑定当前处理函数"""
+-    h = _shared_file_picker.get("handler")
++    """FilePicker 回调分发：按事件所属页面取 handler；拿不到页面引用时（桌面单页）退回唯一注册项"""
++    _page = getattr(e, "page", None)
++    _entry = _picker_registry.get(id(_page)) if _page is not None else None
++    if _entry is None and len(_picker_registry) == 1:
++        _entry = next(iter(_picker_registry.values()))
++    h = _entry.get("handler") if _entry else None
+     if h:
+         try:
+             h(e)
+@@ -94,14 +98,19 @@ def _on_shared_picker_result(e):
+ 
+ 
+ def _use_picker(page, handler=None):
+-    """复用同一个 FilePicker 实例（避免每处新建实例导致的内存/覆盖层堆积）。
++    """每个页面各自复用同一个 FilePicker 实例（避免每处新建实例导致的内存/覆盖层堆积）。
++    按 {id(page): fp} 存放：桌面单页无感知，Web 多会话时第二个页面不会拿到已绑到第一个页面的控件。
+     handler 可传 None，在真正 pick 之前再绑定，规避闭包回调尚未定义的问题。"""
+-    if _shared_file_picker["fp"] is None:
+-        _shared_file_picker["fp"] = ft.FilePicker(on_result=_on_shared_picker_result)
+-        page.overlay.append(_shared_file_picker["fp"])
++    _key = id(page)
++    _entry = _picker_registry.get(_key)
++    if _entry is None:
++        _fp = ft.FilePicker(on_result=_on_shared_picker_result)
++        page.overlay.append(_fp)
++        _entry = {"fp": _fp, "handler": None}
++        _picker_registry[_key] = _entry
+     if handler is not None:
+-        _shared_file_picker["handler"] = handler
+-    return _shared_file_picker["fp"]
++        _entry["handler"] = handler
++    return _entry["fp"]
+ 
+ 
+ def dedup_keys(item, extra_fields):
+@@ -180,66 +189,69 @@ def schedule_next_review(level):
+ 
+ def update_word_learning(word, result, review_time=None):
+     """SM-2 间隔重复算法：记录每次选择的确切时间，按难度系数动态安排复习
+-    review_time: 可选，手环同步时传入原始选择时间（格式 YYYY-MM-DD HH:MM:SS）"""
+-    existing = load_jsonl(VOCAB_FILE)
+-    now_dt = datetime.now()
+-    if review_time:
+-        try:
+-            now_dt = datetime.strptime(str(review_time).strip(), "%Y-%m-%d %H:%M:%S")
+-        except Exception:
+-            now_dt = datetime.now()
+-    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+-    for i, w in enumerate(existing):
+-        if w.get("word", "").lower() == word.lower():
+-            ensure_learning_field(existing[i])
+-            L = existing[i]["learning"]
+-            L["review_count"] = L.get("review_count", 0) + 1
+-            L["last_review"] = now_str
+-            # 初始化 SRS 字段
+-            if "ease" not in L or not isinstance(L.get("ease"), (int, float)):
+-                L["ease"] = 2.5
+-            if "interval" not in L or not isinstance(L.get("interval"), (int, float)):
+-                L["interval"] = 0
+-            if "history" not in L or not isinstance(L.get("history"), list):
+-                L["history"] = []
+-            # SM-2 质量分：认识/答对=5，模糊=3，忘记/答错=1
+-            if result in ("know", "quiz_correct"):
+-                q = 5
+-            elif result == "fuzzy":
+-                q = 3
+-            else:  # forget / quiz_wrong
+-                q = 1
+-            ease = float(L["ease"])
+-            interval = int(L["interval"])
+-            if q >= 3:
+-                if interval == 0:
+-                    interval = 1
+-                elif interval == 1:
+-                    interval = 3
+-                else:
+-                    interval = max(2, round(interval * ease))
+-                ease = max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
+-                L["correct_count"] = L.get("correct_count", 0) + 1
+-                L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
+-                L["status"] = "mastered" if L["level"] >= 4 else "review"
+-            else:
+-                # 答错/忘记：大幅缩短间隔，降低难度系数，重新进入学习
+-                if interval <= 1:
+-                    interval = 1
++    review_time: 可选，手环同步时传入原始选择时间（格式 YYYY-MM-DD HH:MM:SS）
++    加锁：考核答题（UI 线程）与 AI 补齐/手环合并（后台线程）可能并发写 vocabulary.jsonl，读-改-写须原子化。
++    注意：merge_band_records 调用本函数，不能再给 merge_band_records 加同一把锁（普通 Lock 重入即死锁）。"""
++    with _vocab_rw_lock:
++        existing = load_jsonl(VOCAB_FILE)
++        now_dt = datetime.now()
++        if review_time:
++            try:
++                now_dt = datetime.strptime(str(review_time).strip(), "%Y-%m-%d %H:%M:%S")
++            except Exception:
++                now_dt = datetime.now()
++        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
++        for i, w in enumerate(existing):
++            if w.get("word", "").lower() == word.lower():
++                ensure_learning_field(existing[i])
++                L = existing[i]["learning"]
++                L["review_count"] = L.get("review_count", 0) + 1
++                L["last_review"] = now_str
++                # 初始化 SRS 字段
++                if "ease" not in L or not isinstance(L.get("ease"), (int, float)):
++                    L["ease"] = 2.5
++                if "interval" not in L or not isinstance(L.get("interval"), (int, float)):
++                    L["interval"] = 0
++                if "history" not in L or not isinstance(L.get("history"), list):
++                    L["history"] = []
++                # SM-2 质量分：认识/答对=5，模糊=3，忘记/答错=1
++                if result in ("know", "quiz_correct"):
++                    q = 5
++                elif result == "fuzzy":
++                    q = 3
++                else:  # forget / quiz_wrong
++                    q = 1
++                ease = float(L["ease"])
++                interval = int(L["interval"])
++                if q >= 3:
++                    if interval == 0:
++                        interval = 1
++                    elif interval == 1:
++                        interval = 3
++                    else:
++                        interval = max(2, round(interval * ease))
++                    ease = max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
++                    L["correct_count"] = L.get("correct_count", 0) + 1
++                    L["level"] = min(L.get("level", 0) + 1, len(REVIEW_INTERVALS) - 1)
++                    L["status"] = "mastered" if L["level"] >= 4 else "review"
+                 else:
+-                    interval = max(1, round(interval * 0.3))
+-                ease = max(1.3, ease - 0.2)
+-                L["level"] = max(0, L.get("level", 0) - 2)
+-                L["wrong_count"] = L.get("wrong_count", 0) + 1
+-                L["status"] = "learning"
+-            L["ease"] = round(ease, 2)
+-            L["interval"] = interval
+-            L["next_review"] = (now_dt + timedelta(days=interval)).strftime("%Y-%m-%d")
+-            L["history"].append({"time": now_str, "action": result})
+-            L["history"] = L["history"][-200:]  # 只保留最近 200 次选择记录
+-            existing[i] = w
+-            break
+-    save_jsonl(VOCAB_FILE, existing)
++                    # 答错/忘记：大幅缩短间隔，降低难度系数，重新进入学习
++                    if interval <= 1:
++                        interval = 1
++                    else:
++                        interval = max(1, round(interval * 0.3))
++                    ease = max(1.3, ease - 0.2)
++                    L["level"] = max(0, L.get("level", 0) - 2)
++                    L["wrong_count"] = L.get("wrong_count", 0) + 1
++                    L["status"] = "learning"
++                L["ease"] = round(ease, 2)
++                L["interval"] = interval
++                L["next_review"] = (now_dt + timedelta(days=interval)).strftime("%Y-%m-%d")
++                L["history"].append({"time": now_str, "action": result})
++                L["history"] = L["history"][-200:]  # 只保留最近 200 次选择记录
++                existing[i] = w
++                break
++        save_jsonl(VOCAB_FILE, existing)
+ 
+ 
+ # ========== 手环背单词：词表导出 / 记录回收（与手环端「池鱼单词」协议一致） ==========
+@@ -470,16 +482,17 @@ def start_band_http_server():
+                         word_list = []
+                     marked = 0
+                     with band_http_lock:
+-                        existing = load_jsonl(VOCAB_FILE)
+-                        wset = {str(x).lower() for x in word_list if str(x)}
+-                        if wset:
+-                            for w in existing:
+-                                ensure_learning_field(w)
+-                                if w.get("word", "").lower() in wset and not w["learning"].get("synced", True):
+-                                    w["learning"]["synced"] = True
+-                                    marked += 1
+-                            if marked:
+-                                save_jsonl(VOCAB_FILE, existing)
++                        with _vocab_rw_lock:   # R2-P1-6：回执写 vocabulary.jsonl 与考核/AI补齐串行化
++                            existing = load_jsonl(VOCAB_FILE)
++                            wset = {str(x).lower() for x in word_list if str(x)}
++                            if wset:
++                                for w in existing:
++                                    ensure_learning_field(w)
++                                    if w.get("word", "").lower() in wset and not w["learning"].get("synced", True):
++                                        w["learning"]["synced"] = True
++                                        marked += 1
++                                if marked:
++                                    save_jsonl(VOCAB_FILE, existing)
+                     self._send({"ok": True, "marked": marked})
+                 except Exception as ex:
+                     self._send({"error": str(ex)}, 500)
+@@ -618,20 +631,21 @@ def merge_restore_from_zip(zip_path):
+ 
+         src_v = os.path.join(tmp_dir, "vocabulary.jsonl")
+         if os.path.exists(src_v):
+-            incoming = load_jsonl(src_v)
+-            existing = load_jsonl(VOCAB_FILE)
+-            seen = set(str(w.get("word", "")).lower() for w in existing if w.get("word"))
+-            added = 0
+-            for w in incoming:
+-                word = str(w.get("word", "")).lower()
+-                if not word or word in seen:
+-                    continue
+-                if not w.get("event_id"):
+-                    w["event_id"] = gen_uid()
+-                existing.append(w)
+-                seen.add(word)
+-                added += 1
+-            save_jsonl(VOCAB_FILE, existing)
++            with _vocab_rw_lock:   # R2-P1-6：合并恢复写 vocabulary.jsonl 与考核/AI补齐串行化
++                incoming = load_jsonl(src_v)
++                existing = load_jsonl(VOCAB_FILE)
++                seen = set(str(w.get("word", "")).lower() for w in existing if w.get("word"))
++                added = 0
++                for w in incoming:
++                    word = str(w.get("word", "")).lower()
++                    if not word or word in seen:
++                        continue
++                    if not w.get("event_id"):
++                        w["event_id"] = gen_uid()
++                    existing.append(w)
++                    seen.add(word)
++                    added += 1
++                save_jsonl(VOCAB_FILE, existing)
+             stats["vocab"] = added
+ 
+         src_s = os.path.join(tmp_dir, "sentences.jsonl")
+@@ -845,6 +859,7 @@ def save_jsonl(filepath, data_list):
+                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
+ 
+ _vocab_cache = {"data": None, "ts": 0.0}
++_vocab_dirty = {"v": False}   # R2-P1-5：词库写操作标记（AI 补齐在 load_ui 层，跨作用域使词库 tab 缓存失效）
+ def load_vocab_cached(max_age=2.0):
+     """词库短缓存：详情页高频打开时避免每次都全量读文件"""
+     now = time.time()
+@@ -1507,6 +1522,39 @@ def load_chat_history(subject):
+     return load_jsonl(get_chat_history_file(subject))
+ 
+ 
++def cleanup_orphan_chat_images():
++    """启动时一次性清理：images/chat/chat_tmp_* 中不被任何聊天历史引用的文件。
++    聊天临时图只记在内存 _pending_chat_imgs，程序崩溃/强退后会永久残留，这里兜底清理。"""
++    try:
++        chat_img_dir = os.path.join(IMAGES_DIR, "chat")
++        if not os.path.isdir(chat_img_dir):
++            return 0
++        used = set()
++        if os.path.isdir(CHAT_HISTORY_DIR):
++            for fname in os.listdir(CHAT_HISTORY_DIR):
++                if not fname.endswith(".jsonl"):
++                    continue
++                try:
++                    for m in load_jsonl(os.path.join(CHAT_HISTORY_DIR, fname)):
++                        for ref in re.findall(r"【图】(\S+)", str(m.get("content", "") or "")):
++                            used.add(os.path.basename(ref))
++                except BaseException:
++                    continue
++        removed = 0
++        for fname in os.listdir(chat_img_dir):
++            if not fname.startswith("chat_tmp_"):
++                continue
++            if os.path.basename(fname) not in used:
++                try:
++                    os.remove(os.path.join(chat_img_dir, fname))
++                    removed += 1
++                except BaseException:
++                    pass
++        return removed
++    except BaseException:
++        return 0
++
++
+ def save_chat_message(subject, role, content):
+     fp = get_chat_history_file(subject)
+     data = load_jsonl(fp)
+@@ -2587,6 +2635,7 @@ def main(page: ft.Page):
+         init_vocabulary()
+         init_content_lib()
+         migrate_timestamps()
++        cleanup_orphan_chat_images()   # R2-P1-7：清理崩溃/强退残留的聊天临时图
+ 
+         def load_ui():
+             page.controls.clear()
+@@ -2928,7 +2977,7 @@ def main(page: ft.Page):
+                     show_toast(f"渲染失败：{str(ex)[:40]}", "red")
+ 
+             sync_status_text = ft.Text("", size=14)
+-            sync_folder_picker = _use_picker(page, None)   # 全局复用 FilePicker，避免重复挂 overlay
++            # R2-P2-9：sync_folder_picker 无用赋值已删除，点击时经 _use_picker 取实例
+ 
+             def on_sync_folder_selected(e: ft.FilePickerResultEvent):
+                 if e.path:
+@@ -2953,7 +3002,6 @@ def main(page: ft.Page):
+             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
+                 selected_files = []
+                 file_list = ft.Column(spacing=4)
+-                picker = _use_picker(page, None)   # 全局复用同一 FilePicker，不重复挂 overlay
+                 progress_row = ft.Row(visible=False, spacing=10)
+                 progress_bar = ft.ProgressBar(width=200, height=8, value=0)
+                 progress_text = ft.Text("0%", size=14)
+@@ -3126,6 +3174,10 @@ def main(page: ft.Page):
+ 
+             @retry_request(max_retries=2, base_delay=2)
+             def analyze_single_image(image_path):
++                # 兼容相对路径：copy_file_to_lib 现在返回相对 DATA_DIR 的路径（如 images\abc.jpg），
++                # 不归一化会按工作目录解析导致 FileNotFoundError 被吞掉，界面表现为"什么都没发生"
++                if not os.path.isabs(image_path):
++                    image_path = os.path.join(DATA_DIR, image_path)
+                 if not provider_supports_vision():
+                     show_toast("当前 API 不支持图像识别，请切换到智谱 GLM", "red")
+                     return None
+@@ -4901,6 +4953,7 @@ def main(page: ft.Page):
+                     if not str(word_data.get("meaning", "") or "").strip():
+                         return None
+                     save_jsonl(VOCAB_FILE, existing)
++                    _vocab_dirty["v"] = True   # R2-P1-5：词库有写，词库 tab 缓存下次 render 时重建
+                 return word_data
+ 
+             def _open_word_detail(word_data, on_close=None):
+@@ -5105,7 +5158,8 @@ def main(page: ft.Page):
+                     content=ft.Container(
+                         content=ft.Column(content_children, spacing=8, scroll=ft.ScrollMode.AUTO),
+                         width=400, height=None, padding=10),
+-                    actions=[ft.TextButton("关闭", on_click=lambda e: page.close(dialog))])
++                    # R2-P0-4：关闭按钮只 page.close 不会触发 on_close → 关闭后列表不刷新；手动补调
++                    actions=[ft.TextButton("关闭", on_click=lambda e: (page.close(dialog), on_close and on_close()))])
+                 page.open(dialog)
+                 page.update()
+ 
+@@ -5245,6 +5299,7 @@ def main(page: ft.Page):
+                             new_entry["learning"]["synced"] = False   # 新词未同步手环
+                             existing.append(new_entry)
+                             save_jsonl(VOCAB_FILE, existing)
++                        _tab_cache.pop(0, None)   # R2-P1-5：新增词后词库 tab 缓存失效，切回时重建
+                         show_toast(f"已添加 {word}，点开自动补齐", "green")
+                         add_word_input.value = ""
+                         nonlocal all_vocab, all_words
+@@ -5253,7 +5308,7 @@ def main(page: ft.Page):
+                         _render_list(search_field.value)
+ 
+                     _render_list()
+-                    import_picker = _use_picker(page, None)
++                    # R2-P2-9：import_picker/export_picker 无用赋值已删除，pick 时经 _use_picker 取实例
+ 
+                     def on_import_result(e: ft.FilePickerResultEvent):
+                         if e.files:
+@@ -5280,6 +5335,7 @@ def main(page: ft.Page):
+                                         existing_words.add(wd)
+                                         added += 1
+                                     save_jsonl(VOCAB_FILE, existing)
++                                _tab_cache.pop(0, None)   # R2-P1-5：导入后词库 tab 缓存失效，切回时重建
+                                 show_toast(f"✅ 已追加 {added} 个词", "green")
+                                 nonlocal all_vocab, all_words
+                                 all_vocab = load_jsonl(VOCAB_FILE)
+@@ -5293,7 +5349,7 @@ def main(page: ft.Page):
+                         on_click=lambda e: _use_picker(page, on_import_result).pick_files(
+                             file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["jsonl"]))
+ 
+-                    export_picker = _use_picker(page, None)
++                    # R2-P2-9：export_picker 无用赋值已删除，点击时经 _use_picker 取实例
+ 
+                     def on_export_result(e: ft.FilePickerResultEvent):
+                         if e.path:
+@@ -5808,9 +5864,11 @@ def main(page: ft.Page):
+                 def render_tab():
+                     idx = tab_index[0]
+                     if idx == 0:
+-                        # 词库 tab 最重：只构建一次，之后复用（内部搜索/分页/滚动状态随之保留）
+-                        if _tab_cache.get(0) is None:
++                        # 词库 tab 最重：内容未被写操作污染时复用；AI 补齐/新增/导入后重建，避免显示旧释义
++                        if _tab_cache.get(0) is None or _vocab_dirty["v"]:
++                            _tab_cache.pop(0, None)
+                             _tab_cache[0] = build_lib_tab()
++                            _vocab_dirty["v"] = False
+                         tab_content.content = _tab_cache[0]
+                     elif idx == 1:
+                         tab_content.content = build_nw_tab()
+@@ -6867,9 +6925,9 @@ def main(page: ft.Page):
+                     else:
+                         view_state["open"].add(t)
+                     # 重建视图（保持当前缩放/平移），刷新折叠状态；折叠=数据变更，强制重建内容
+-                    viewport.content = ft.Transform(
++                    viewport.content = ft.Container(
+                         scale=view_state["scale"],
+-                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
++                        offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
+                         content=rebuild_mindmap_view(force=True))
+                     viewport.update()
+ 
+@@ -6979,23 +7037,24 @@ def main(page: ft.Page):
+ 
+                 def _apply_transform():
+                     # 双指缩放/拖动 → 更新真正显示的 viewport（历史版本曾更新未挂载的 content_holder 导致手势无效）
+-                    viewport.content = ft.Transform(
++                    # flet 0.28.3 无 ft.Transform：用 Container 原生 scale/offset（offset 为相对自身尺寸比例）
++                    viewport.content = ft.Container(
+                         scale=view_state["scale"],
+-                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
++                        offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
+                         content=rebuild_mindmap_view())
+                     viewport.update()
+ 
+                 def zoom_by(delta):
+                     view_state["scale"] = min(2.6, max(0.4, view_state["scale"] + delta))
+-                    viewport.content = ft.Transform(
++                    viewport.content = ft.Container(
+                         scale=view_state["scale"],
+-                        translate=ft.Offset(view_state["dx"], view_state["dy"]),
++                        offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
+                         content=rebuild_mindmap_view())
+                     viewport.update()
+ 
+                 def reset_view():
+                     view_state.update({"scale": 1.0, "dx": 0.0, "dy": 0.0})
+-                    viewport.content = ft.Transform(scale=1.0, translate=ft.Offset(0, 0),
++                    viewport.content = ft.Container(scale=1.0, offset=ft.Offset(0, 0),
+                                                     content=rebuild_mindmap_view())
+                     viewport.update()
+ 
+@@ -7031,16 +7090,16 @@ def main(page: ft.Page):
+                     _th.Thread(target=_job, daemon=True).start()
+                     show_toast("🔍 正在让 AI 理解图片（每张约几秒）...", "orange")
+                 viewport = ft.Container(
+-                    content=ft.Transform(
+-                        scale=1.0, translate=ft.Offset(0, 0),
++                    content=ft.Container(
++                        scale=1.0, offset=ft.Offset(0, 0),
+                         content=rebuild_mindmap_view()),
+                     expand=True,
+                     bgcolor="#12121A",
+                     clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                     border_radius=12,
+                     border=ft.border.all(1, "#2A2E44"))
+-                viewport.content = ft.Transform(
+-                    scale=view_state["scale"], translate=ft.Offset(0, 0),
++                viewport.content = ft.Container(
++                    scale=view_state["scale"], offset=ft.Offset(0, 0),
+                     content=rebuild_mindmap_view())
+                 _mm_root_ref["v"] = viewport
+ 
+@@ -7062,10 +7121,11 @@ def main(page: ft.Page):
+                     view_state["dy"] = -(pos[1]) + (LAYOUT_H - NODE_H) / 2.0
+                     view_state["hl"] = target
+                     try:
+-                        viewport.content = ft.Transform(
++                        # P2-10：force=True 让高亮样式重算（否则命中内容缓存返回旧节点树，hl 不生效）
++                        viewport.content = ft.Container(
+                             scale=view_state["scale"],
+-                            translate=ft.Offset(view_state["dx"], view_state["dy"]),
+-                            content=rebuild_mindmap_view())
++                            offset=ft.Offset(view_state["dx"] / LAYOUT_W, view_state["dy"] / LAYOUT_H),
++                            content=rebuild_mindmap_view(force=True))
+                         viewport.update()
+                         show_toast(f"🧭 已定位知识点：{target}", "orange")
+                     except BaseException:
+@@ -7953,9 +8013,7 @@ def main(page: ft.Page):
+                 page.update()
+ 
+             backup_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+-            backup_picker = _use_picker(page, None)   # 备份/恢复/合并共用同一个 FilePicker 实例
+-            restore_picker = backup_picker
+-            merge_picker = backup_picker
++            # R2-P2-9：backup_picker/restore_picker/merge_picker 无用赋值已删除，点击时经 _use_picker 取实例
+ 
+             # ---------- 手环背单词 操控中心 ----------
+             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+@@ -8194,6 +8252,7 @@ def main(page: ft.Page):
+ 
+                 def do_restore():
+                     tmp_dir = None
++                    _cleared = False   # 标记现网是否已清空：此后若异常，tmp_dir 是唯一数据副本，绝不删除
+                     try:
+                         app_state["busy"] = "覆盖恢复"
+                         # 1) 解压到临时目录（带 zip-slip 越界防护），绝不直接覆盖现网
+@@ -8205,11 +8264,15 @@ def main(page: ft.Page):
+                                 if not _tgt.startswith(os.path.realpath(tmp_dir) + os.sep):
+                                     raise RuntimeError(f"备份包内存在越界路径：{_n}")
+                             zf.extractall(tmp_dir)
+-                        # 2) 校验关键文件可解析，损坏则中止，原数据不受影响
++                        # 2) 校验关键文件可解析；根级一个都不存在 → 备份包结构不正确（可能带顶层目录），中止
++                        _found = 0
+                         for _fname in ("errors.jsonl", "notes.jsonl", "vocabulary.jsonl"):
+                             _fp = os.path.join(tmp_dir, _fname)
+                             if os.path.exists(_fp):
++                                _found += 1
+                                 _validate_jsonl(_fp)
++                        if _found == 0:
++                            raise RuntimeError("备份包结构不正确：根目录下未找到数据文件（包内可能还套了一层 data/ 目录）")
+                         _up = os.path.join(tmp_dir, "user_profile.json")
+                         if os.path.exists(_up):
+                             with open(_up, "r", encoding="utf-8") as f:
+@@ -8239,6 +8302,7 @@ def main(page: ft.Page):
+                                     os.remove(_p)
+                                 except BaseException:
+                                     pass
++                        _cleared = True
+                         for _n in os.listdir(tmp_dir):
+                             shutil.move(os.path.join(tmp_dir, _n), os.path.join(DATA_DIR, _n))
+                         shutil.rmtree(tmp_dir, ignore_errors=True)
+@@ -8246,10 +8310,16 @@ def main(page: ft.Page):
+                         backup_status.value = f"✅ 恢复成功！恢复前数据已自动备份到：\n{_bak_zip}\n（建议重启应用）"
+                         backup_status.color = "#81C784"
+                     except Exception as ex:
+-                        backup_status.value = f"❌ 恢复失败（原数据未受影响）：{str(ex)[:80]}"
++                        if _cleared and tmp_dir and os.path.isdir(tmp_dir):
++                            # 现网已被清空，tmp_dir 是唯一数据副本：必须保留，并把路径写进提示
++                            backup_status.value = (f"❌ 恢复中断：备份内容已保留在 {tmp_dir}\n"
++                                                   f"（请勿删除该目录；核对无误后手动复制回 {DATA_DIR}）。\n"
++                                                   f"原因：{str(ex)[:60]}")
++                        else:
++                            backup_status.value = f"❌ 恢复失败（原数据未受影响）：{str(ex)[:80]}"
++                            if tmp_dir and os.path.isdir(tmp_dir):
++                                shutil.rmtree(tmp_dir, ignore_errors=True)
+                         backup_status.color = "#EF5350"
+-                        if tmp_dir and os.path.isdir(tmp_dir):
+-                            shutil.rmtree(tmp_dir, ignore_errors=True)
+                     finally:
+                         app_state["busy"] = None
+                         page.update()
+@@ -8436,6 +8506,13 @@ def main(page: ft.Page):
+                     _cleanup_pending_chat_imgs()   # 关聊天窗时清掉未发送的临时图
+                 except BaseException:
+                     pass
++                try:
++                    # R2-P1-7：错题录入表单选了图但没保存就切页 → 删掉已复制未入库的副本，不留孤儿图片
++                    reset_picker1(keep=False)
++                    reset_picker2(keep=False)
++                    reset_picker3(keep=False)
++                except BaseException:
++                    pass
+                 try:
+                     chat_dialog.visible = False
+                 except BaseException:

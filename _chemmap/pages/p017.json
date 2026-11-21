@@ -1,0 +1,112 @@
+{
+  "page": 17,
+  "book": "必修第一册",
+  "chapter": "第三章 铁 金属材料",
+  "section": "铝及其化合物 · 氧化还原本质",
+  "level": "detailed",
+  "points": [
+    {
+      "id": "3.2.1",
+      "title": "铝的两性",
+      "detail": "铝既能与酸反应又能与强碱反应，都生成 H₂，体现两性。",
+      "facts": [
+        "2Al + 6HCl → 2AlCl₃ + 3H₂↑",
+        "2Al + 2NaOH + 2H₂O → 2NaAlO₂ + 3H₂↑"
+      ],
+      "pitfalls": [
+        "铝与 NaOH 反应中，氧化剂是 H₂O，不是 NaOH"
+      ],
+      "equations": [
+        "2Al + 6H⁺ → 2Al³⁺ + 3H₂↑",
+        "2Al + 2OH⁻ + 2H₂O → 2AlO₂⁻ + 3H₂↑"
+      ]
+    },
+    {
+      "id": "3.2.2",
+      "title": "氧化铝与氢氧化铝的两性",
+      "detail": "Al₂O₃、Al(OH)₃ 都能与强酸、强碱反应，是典型的两性化合物。",
+      "facts": [
+        "Al₂O₃ + 6H⁺ → 2Al³⁺ + 3H₂O",
+        "Al₂O₃ + 2OH⁻ → 2AlO₂⁻ + H₂O",
+        "Al(OH)₃ + OH⁻ → AlO₂⁻ + 2H₂O"
+      ],
+      "pitfalls": [
+        "Al(OH)₃ 溶于强碱但不溶于氨水",
+        "Al(OH)₃ 不能溶于弱酸（如碳酸）"
+      ],
+      "equations": [
+        "Al(OH)₃ + 3H⁺ → Al³⁺ + 3H₂O",
+        "Al(OH)₃ + OH⁻ → AlO₂⁻ + 2H₂O"
+      ]
+    },
+    {
+      "id": "3.2.3",
+      "title": "Al³⁺ 与 AlO₂⁻ 的相互转化",
+      "detail": "Al³⁺ 加适量碱生成 Al(OH)₃，过量碱生成 AlO₂⁻；AlO₂⁻ 加适量酸生成 Al(OH)₃，过量酸生成 Al³⁺。",
+      "facts": [
+        "Al³⁺ + 3OH⁻ → Al(OH)₃↓",
+        "Al³⁺ + 4OH⁻ → AlO₂⁻ + 2H₂O",
+        "AlO₂⁻ + H⁺ + H₂O → Al(OH)₃↓",
+        "AlO₂⁻ + 4H⁺ → Al³⁺ + 2H₂O"
+      ],
+      "pitfalls": [
+        "“适量”与“过量”产物不同，这是与量有关题的核心"
+      ],
+      "equations": [
+        "Al³⁺ + 3OH⁻ → Al(OH)₃↓",
+        "AlO₂⁻ + H⁺ + H₂O → Al(OH)₃↓"
+      ]
+    },
+    {
+      "id": "1.5.1",
+      "title": "氧化还原的本质与特征",
+      "detail": "本质是电子转移（得失或偏移），特征是元素化合价升降。",
+      "facts": [
+        "失电子→化合价升高→被氧化→作还原剂",
+        "得电子→化合价降低→被还原→作氧化剂"
+      ],
+      "pitfalls": [
+        "“被氧化”对应还原剂，别记反"
+      ]
+    },
+    {
+      "id": "1.5.2",
+      "title": "歧化与归中",
+      "detail": "同一元素既升价又降价是歧化（如 Cl₂ + NaOH）；不同价态同一元素向中间价态靠拢是归中。",
+      "facts": [
+        "Cl₂ + 2NaOH → NaCl + NaClO + H₂O（歧化）",
+        "归中反应中价态只靠近不交叉"
+      ],
+      "pitfalls": [
+        "归中反应产物价态不会越过中间价态"
+      ],
+      "equations": [
+        "Cl₂ + 2OH⁻ → Cl⁻ + ClO⁻ + H₂O"
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "eq": "2Al + 2OH⁻ + 2H₂O → 2AlO₂⁻ + 3H₂↑",
+      "note": "两性"
+    },
+    {
+      "eq": "Al(OH)₃ + OH⁻ → AlO₂⁻ + 2H₂O",
+      "note": "溶于强碱"
+    },
+    {
+      "eq": "Al³⁺ + 4OH⁻ → AlO₂⁻ + 2H₂O",
+      "note": "过量碱"
+    },
+    {
+      "eq": "Cl₂ + 2OH⁻ → Cl⁻ + ClO⁻ + H₂O",
+      "note": "歧化"
+    }
+  ],
+  "pitfalls_summary": [
+    "Al 与 NaOH 反应，氧化剂是水",
+    "Al(OH)₃ 溶于强碱不溶于氨水",
+    "适量/过量产物不同"
+  ],
+  "how": "铝的两性来源是 Al³⁺ 电荷高、半径小，既能跟 OH⁻ 结合也能跟 H⁺ 结合。理解“电荷高就抢电子”，两性就不用背。"
+}

@@ -1,0 +1,114 @@
+{
+  "page": 8,
+  "book": "必修第一册",
+  "chapter": "第二章 钠和氯",
+  "section": "粗盐提纯 · 氯碱工业 · 金属钠制备 · 侯氏制碱",
+  "level": "detailed",
+  "points": [
+    {
+      "id": "2.4.1",
+      "title": "粗盐中的杂质与除杂顺序",
+      "detail": "粗盐含泥沙、Ca²⁺、Mg²⁺、SO₄²⁻。除杂试剂要过量，且顺序必须保证后续试剂能把前一步过量的离子除掉。",
+      "facts": [
+        "标准顺序：BaCl₂ → NaOH → Na₂CO₃ → 过滤 → 加适量盐酸",
+        "Na₂CO₃ 必须在 BaCl₂ 之后（用来沉淀过量的 Ba²⁺）",
+        "盐酸必须在过滤之后加（否则沉淀重新溶解）"
+      ],
+      "pitfalls": [
+        "先加 Na₂CO₃ 再加 BaCl₂ → 过量 Ba²⁺ 无法除去",
+        "过滤前加盐酸 → CaCO₃、BaCO₃ 又被溶解"
+      ]
+    },
+    {
+      "id": "2.4.2",
+      "title": "SO₄²⁻ 的检验",
+      "detail": "先加足量稀盐酸酸化（排除 CO₃²⁻、SO₃²⁻ 干扰），再加 BaCl₂ 溶液，产生白色沉淀即证明有 SO₄²⁻。",
+      "facts": [
+        "不能用 Ba(NO₃)₂ 酸化，会引入 NO₃⁻ 干扰",
+        "不能用稀硝酸酸化（可能把 SO₃²⁻ 氧化成 SO₄²⁻，造成误判）"
+      ],
+      "pitfalls": [
+        "顺序不能反：先加 BaCl₂ 再加酸，AgCl 也会沉淀造成误判"
+      ],
+      "equations": [
+        "Ba²⁺ + SO₄²⁻ → BaSO₄↓"
+      ]
+    },
+    {
+      "id": "2.4.3",
+      "title": "氯碱工业（电解饱和食盐水）",
+      "detail": "电解饱和 NaCl 溶液，阳极产 Cl₂、阴极产 H₂、溶液中生成 NaOH。用离子交换膜隔开阴阳极，防止 Cl₂ 与 NaOH 反应。",
+      "facts": [
+        "阳极：2Cl⁻ − 2e⁻ → Cl₂↑（氧化）",
+        "阴极：2H₂O + 2e⁻ → H₂↑ + 2OH⁻（还原）",
+        "总反应：2NaCl + 2H₂O →(电解) 2NaOH + H₂↑ + Cl₂↑"
+      ],
+      "pitfalls": [
+        "阳极产氯气、阴极产氢气，别记反",
+        "离子交换膜只允许阳离子通过，防止 OH⁻ 进入阳极室与 Cl₂ 反应"
+      ],
+      "equations": [
+        "2Cl⁻ − 2e⁻ → Cl₂↑",
+        "2H₂O + 2e⁻ → H₂↑ + 2OH⁻"
+      ]
+    },
+    {
+      "id": "2.4.4",
+      "title": "金属钠的制备",
+      "detail": "电解熔融 NaCl（加 CaCl₂ 降熔点），阴极得钠，阳极得氯气。不能用钠盐溶液电解（会先析氢）。",
+      "facts": [
+        "2NaCl(熔融) →(电解) 2Na + Cl₂↑",
+        "KCl 与 Na 反应制 K：KCl + Na →(高温) K↑ + NaCl（利用钾沸点低）"
+      ],
+      "pitfalls": [
+        "电解 NaCl 溶液得不到钠",
+        "钠要保存在煤油中，防与水和氧气反应"
+      ],
+      "equations": [
+        "2NaCl(熔融) →(电解) 2Na + Cl₂↑"
+      ]
+    },
+    {
+      "id": "2.4.5",
+      "title": "侯氏制碱法（联合制碱）",
+      "detail": "向饱和食盐水中先通 NH₃ 再通 CO₂，析出 NaHCO₃ 晶体，煅烧得纯碱；母液可回收 NH₄Cl 作氮肥。",
+      "facts": [
+        "先通 NH₃ 使溶液显碱性，才能大量吸收 CO₂",
+        "NaCl + NH₃ + CO₂ + H₂O → NaHCO₃↓ + NH₄Cl",
+        "2NaHCO₃ →(Δ) Na₂CO₃ + H₂O + CO₂↑"
+      ],
+      "pitfalls": [
+        "顺序不能反：先 CO₂ 后 NH₃ 几乎不析出",
+        "析出的是 NaHCO₃ 不是 Na₂CO₃"
+      ],
+      "equations": [
+        "NaCl + NH₃ + CO₂ + H₂O → NaHCO₃↓ + NH₄Cl",
+        "2NaHCO₃ →(Δ) Na₂CO₃ + H₂O + CO₂↑"
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "eq": "Ba²⁺ + SO₄²⁻ → BaSO₄↓",
+      "note": "除杂/检验"
+    },
+    {
+      "eq": "2NaCl + 2H₂O →(电解) 2NaOH + H₂↑ + Cl₂↑",
+      "note": "氯碱工业"
+    },
+    {
+      "eq": "2NaCl(熔融) →(电解) 2Na + Cl₂↑",
+      "note": "制钠"
+    },
+    {
+      "eq": "NaCl + NH₃ + CO₂ + H₂O → NaHCO₃↓ + NH₄Cl",
+      "note": "侯氏制碱"
+    }
+  ],
+  "pitfalls_summary": [
+    "除杂顺序：BaCl₂ → NaOH → Na₂CO₃ → 过滤 → 盐酸",
+    "SO₄²⁻ 检验：盐酸酸化 + BaCl₂，顺序不能反",
+    "侯氏制碱：先氨后碳"
+  ],
+  "how": "除杂的顺序不是背的，是推的：每加一种试剂都要能被后面的试剂除掉。所以 BaCl₂ 在前、Na₂CO₃ 在后（除 Ba²⁺）、盐酸最后（除 CO₃²⁻）。"
+}

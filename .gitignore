@@ -1,15 +1,15 @@
-# Python 虚拟环境和缓存
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
 
-# 构建输出
+# 构建产物
 build/
 *.apk
 *.aab
 
-# Android/Gradle 临时文件
+# Android / Gradle
 .gradle/
 local.properties
 *.iml
@@ -18,3 +18,27 @@ local.properties
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# ===== 个人数据（绝不提交）=====
+data/
+*.log
+
+# ===== 临时产物 =====
+*.bak
+_*.png
+_*.jpg
+_*.pdf
+_*.txt
+_*.md
+_dl*.ps1
+_dom.html
+1.rpk
+_assoc_backup/
+_backup*/
+
+# ===== 外部克隆 / 大型工具目录 =====
+_gk/
+_apkstart/
+_tools/
+_poem/node_modules/
+_poem/dist/

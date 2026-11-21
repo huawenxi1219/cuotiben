@@ -1,0 +1,116 @@
+{
+  "page": 6,
+  "book": "必修第一册",
+  "chapter": "第二章 钠和氯",
+  "section": "CO₃²⁻ 与 HCO₃⁻ 的性质、含量测定",
+  "level": "detailed",
+  "points": [
+    {
+      "id": "3.2.1",
+      "title": "与酸反应",
+      "detail": "CO₃²⁻ 分两步与 H⁺ 反应，HCO₃⁻ 一步。逐滴加酸时，CO₃²⁻ 先变 HCO₃⁻ 再放气，所以“开始无气泡、后来有气泡”。",
+      "facts": [
+        "CO₃²⁻ + H⁺ → HCO₃⁻（第一步，无气泡）",
+        "HCO₃⁻ + H⁺ → H₂O + CO₂↑（第二步，气泡）",
+        "NaHCO₃ 与盐酸反应比 Na₂CO₃ 快（一步到位）"
+      ],
+      "pitfalls": [
+        "向 Na₂CO₃ 中逐滴加盐酸：先无气泡后有；反向滴加：立即有气泡"
+      ],
+      "equations": [
+        "CO₃²⁻ + 2H⁺ → CO₂↑ + H₂O",
+        "HCO₃⁻ + H⁺ → CO₂↑ + H₂O"
+      ]
+    },
+    {
+      "id": "3.2.2",
+      "title": "与碱反应",
+      "detail": "HCO₃⁻ 能与 OH⁻ 反应，CO₃²⁻ 不能。",
+      "facts": [
+        "HCO₃⁻ + OH⁻ → CO₃²⁻ + H₂O"
+      ],
+      "pitfalls": [
+        "CO₃²⁻ 与 OH⁻ 不反应（无沉淀无气体无弱电解质）"
+      ]
+    },
+    {
+      "id": "3.2.3",
+      "title": "与 Ca²⁺/Ba²⁺ 反应",
+      "detail": "CO₃²⁻ 直接沉淀；HCO₃⁻ 需在碱性条件下（如加 Ca(OH)₂）才生成沉淀，因为 OH⁻ 先把 HCO₃⁻ 转成 CO₃²⁻。",
+      "facts": [
+        "CO₃²⁻ + Ca²⁺ → CaCO₃↓",
+        "HCO₃⁻ + Ca²⁺ + OH⁻ → CaCO₃↓ + H₂O"
+      ],
+      "pitfalls": [
+        "向 NaHCO₃ 溶液中加 CaCl₂ 溶液不产生沉淀（无 OH⁻），这是鉴别常用方法"
+      ]
+    },
+    {
+      "id": "3.2.4",
+      "title": "与 CO₂ 反应",
+      "detail": "CO₃²⁻ 能吸收 CO₂ 生成 HCO₃⁻，这是“Na₂CO₃ 溶液通 CO₂ 得 NaHCO₃”的原理。",
+      "facts": [
+        "CO₃²⁻ + CO₂ + H₂O → 2HCO₃⁻"
+      ],
+      "pitfalls": [
+        "NaHCO₃ 溶液通 CO₂ 不再反应"
+      ]
+    },
+    {
+      "id": "3.2.5",
+      "title": "除杂应用",
+      "detail": "利用酸性强弱：H₂CO₃ > HClO > HCO₃⁻，可用饱和 NaHCO₃ 除去 CO₂ 中混有的 HCl 或 SO₂。",
+      "facts": [
+        "CO₂(HCl)：通过饱和 NaHCO₃ 溶液 → NaHCO₃ + HCl → NaCl + H₂O + CO₂↑",
+        "CO₂(SO₂)：通过饱和 NaHCO₃ 溶液（SO₂ 被吸收，同时生成 CO₂）"
+      ],
+      "pitfalls": [
+        "不能用 Na₂CO₃ 溶液除 HCl，因为会吸收 CO₂"
+      ]
+    },
+    {
+      "id": "3.2.6",
+      "title": "含量测定（滴定）",
+      "detail": "Na₂CO₃ 可标定盐酸；混合碱用双指示剂法：酚酞终点（CO₃²⁻→HCO₃⁻）、甲基橙终点（HCO₃⁻→CO₂）。",
+      "facts": [
+        "以 Na₂CO₃ 为基准物标定 HCl，终点 pH≈3.9，用甲基橙",
+        "双指示剂法：先加酚酞，消耗体积 V₁（CO₃²⁻→HCO₃⁻）；再滴甲基橙，消耗 V₂（HCO₃⁻→CO₂）",
+        "由 V₁ 与 V₂ 的关系判断 NaOH/Na₂CO₃/NaHCO₃ 的组成"
+      ],
+      "pitfalls": [
+        "滴定终点看的是颜色突变且半分钟不变，不是“刚变色”"
+      ],
+      "equations": [
+        "CO₃²⁻ + 2H⁺ → CO₂↑ + H₂O"
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "eq": "CO₃²⁻ + 2H⁺ → CO₂↑ + H₂O",
+      "note": "最终"
+    },
+    {
+      "eq": "HCO₃⁻ + H⁺ → CO₂↑ + H₂O",
+      "note": "一步"
+    },
+    {
+      "eq": "HCO₃⁻ + OH⁻ → CO₃²⁻ + H₂O",
+      "note": "与碱"
+    },
+    {
+      "eq": "HCO₃⁻ + Ca²⁺ + OH⁻ → CaCO₃↓ + H₂O",
+      "note": "碱性条件"
+    },
+    {
+      "eq": "CO₃²⁻ + CO₂ + H₂O → 2HCO₃⁻",
+      "note": "吸收 CO₂"
+    }
+  ],
+  "pitfalls_summary": [
+    "逐滴加酸：先无气泡后有气泡，方向反了就立即冒泡",
+    "NaHCO₃ 溶液加 CaCl₂ 不沉淀 → 可用来区分",
+    "酸性：H₂CO₃ > HClO > HCO₃⁻"
+  ],
+  "how": "CO₃²⁻ 与 HCO₃⁻ 的区别就一句话：CO₃²⁻ 能再抢一个 H⁺，HCO₃⁻ 已经抢过一个了。所以 CO₃²⁻ 与酸分两步、与 CO₂ 结合、与 Ca²⁺ 直接沉淀；HCO₃⁻ 反过来。"
+}

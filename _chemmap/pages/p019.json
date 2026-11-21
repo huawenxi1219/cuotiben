@@ -1,0 +1,113 @@
+{
+  "page": 19,
+  "book": "必修第一册",
+  "chapter": "第一章 物质及其变化",
+  "section": "与量有关的离子反应（二）：先后型",
+  "level": "detailed",
+  "points": [
+    {
+      "id": "1.7.1",
+      "title": "先后型的总原则",
+      "detail": "多种离子都能与同一种试剂反应时，按“反应能力强弱”排队，强者先反应。",
+      "facts": [
+        "中和反应优先于沉淀反应",
+        "还原性强的离子先被氧化"
+      ],
+      "pitfalls": [
+        "顺序错会导致离子方程式完全写错"
+      ]
+    },
+    {
+      "id": "1.7.2",
+      "title": "NH₄HSO₄ 与 NaOH",
+      "detail": "OH⁻ 先中和 H⁺（酸碱中和更快），再与 NH₄⁺ 反应。",
+      "facts": [
+        "NaOH 少量：H⁺ + OH⁻ → H₂O",
+        "NaOH 足量：NH₄⁺ + OH⁻ → NH₃·H₂O"
+      ],
+      "pitfalls": [
+        "若先写 NH₄⁺ 反应，属于顺序错误"
+      ],
+      "equations": [
+        "H⁺ + OH⁻ → H₂O",
+        "NH₄⁺ + OH⁻ → NH₃·H₂O"
+      ]
+    },
+    {
+      "id": "1.7.3",
+      "title": "NH₄Al(SO₄)₂ 与 NaOH",
+      "detail": "OH⁻ 先与 Al³⁺ 生成沉淀（或与 H⁺ 中和），再与 NH₄⁺ 反应，最后使 Al(OH)₃ 溶解。",
+      "facts": [
+        "顺序：H⁺ > Al³⁺ > NH₄⁺ > Al(OH)₃ 溶解",
+        "图像题中表现为多段折线"
+      ],
+      "pitfalls": [
+        "Al(OH)₃ 的溶解发生在最后一段"
+      ]
+    },
+    {
+      "id": "1.7.4",
+      "title": "FeI₂ 与 Cl₂",
+      "detail": "I⁻ 还原性强于 Fe²⁺，Cl₂ 先氧化 I⁻，再氧化 Fe²⁺。",
+      "facts": [
+        "Cl₂ 少量：2I⁻ + Cl₂ → I₂ + 2Cl⁻",
+        "Cl₂ 过量：2Fe²⁺ + Cl₂ → 2Fe³⁺ + 2Cl⁻"
+      ],
+      "pitfalls": [
+        "还原性顺序 I⁻ > Fe²⁺ > Br⁻ 要背熟"
+      ],
+      "equations": [
+        "2I⁻ + Cl₂ → I₂ + 2Cl⁻",
+        "2Fe²⁺ + Cl₂ → 2Fe³⁺ + 2Cl⁻"
+      ]
+    },
+    {
+      "id": "1.7.5",
+      "title": "FeBr₂ 与 Cl₂",
+      "detail": "Fe²⁺ 还原性强于 Br⁻，Cl₂ 先氧化 Fe²⁺，再氧化 Br⁻。",
+      "facts": [
+        "Cl₂ 少量：2Fe²⁺ + Cl₂ → 2Fe³⁺ + 2Cl⁻",
+        "Cl₂ 过量：2Br⁻ + Cl₂ → Br₂ + 2Cl⁻"
+      ],
+      "pitfalls": [
+        "FeI₂ 与 FeBr₂ 的顺序不同：I⁻ 先于 Fe²⁺，Br⁻ 后于 Fe²⁺"
+      ],
+      "equations": [
+        "2Fe²⁺ + Cl₂ → 2Fe³⁺ + 2Cl⁻",
+        "2Br⁻ + Cl₂ → Br₂ + 2Cl⁻"
+      ]
+    },
+    {
+      "id": "1.7.6",
+      "title": "图像题的读法",
+      "detail": "横轴是加入试剂的量，纵轴是沉淀量/气体量；每段斜率变化对应一种离子反应结束。",
+      "facts": [
+        "平台段表示该阶段无沉淀生成",
+        "转折点对应某一离子恰好反应完"
+      ],
+      "pitfalls": [
+        "不要只看终点，转折点才是关键"
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "eq": "2I⁻ + Cl₂ → I₂ + 2Cl⁻",
+      "note": "先氧化 I⁻"
+    },
+    {
+      "eq": "2Fe²⁺ + Cl₂ → 2Fe³⁺ + 2Cl⁻",
+      "note": "后氧化 Fe²⁺"
+    },
+    {
+      "eq": "2Br⁻ + Cl₂ → Br₂ + 2Cl⁻",
+      "note": "最后氧化 Br⁻"
+    }
+  ],
+  "pitfalls_summary": [
+    "还原性：I⁻ > Fe²⁺ > Br⁻",
+    "中和优先于沉淀",
+    "图像看转折点"
+  ],
+  "how": "先后型考的是“谁更强”。中和最快、沉淀次之、氧化还原看还原性强弱。记住还原性 I⁻ > Fe²⁺ > Br⁻，两个经典题就都通了。"
+}

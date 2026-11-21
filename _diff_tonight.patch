@@ -1,0 +1,1110 @@
+﻿diff --git a/main.py b/main.py
+index 2d116f5..9945c65 100644
+--- a/main.py
++++ b/main.py
+@@ -80,6 +80,30 @@ def gen_uid():
+     return uuid.uuid4().hex[:16]
+ 
+ 
++_shared_file_picker = {"fp": None, "handler": None}
++
++
++def _on_shared_picker_result(e):
++    """全局唯一 FilePicker 的回调分发：每次调用前用 _use_picker 绑定当前处理函数"""
++    h = _shared_file_picker.get("handler")
++    if h:
++        try:
++            h(e)
++        except BaseException:
++            pass
++
++
++def _use_picker(page, handler=None):
++    """复用同一个 FilePicker 实例（避免每处新建实例导致的内存/覆盖层堆积）。
++    handler 可传 None，在真正 pick 之前再绑定，规避闭包回调尚未定义的问题。"""
++    if _shared_file_picker["fp"] is None:
++        _shared_file_picker["fp"] = ft.FilePicker(on_result=_on_shared_picker_result)
++        page.overlay.append(_shared_file_picker["fp"])
++    if handler is not None:
++        _shared_file_picker["handler"] = handler
++    return _shared_file_picker["fp"]
++
++
+ def dedup_keys(item, extra_fields):
+     """返回一条记录的去重键集合。任意一个键撞上就算重复"""
+     keys = set()
+@@ -1314,6 +1338,32 @@ def save_ai_config(config):
+         json.dump(config, f, ensure_ascii=False, indent=2)
+ 
+ 
++def resolve_deepseek_model(cfg):
++    """统一 DeepSeek 模型名：全文件只认 deepseek-flash 这一种写法。
++    旧名（deepseek-v4-flash 等）一律归一化为 deepseek-flash，与 load_ai_config 迁移一致。"""
++    _m = (cfg.get("deepseek_model") or "deepseek-flash").strip() or "deepseek-flash"
++    if _m in ("", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
++        return "deepseek-flash"
++    return _m
++
++
++def get_gaokao_days_left():
++    """高考倒计时：设置里可配置日期（YYYY-MM-DD）；未配置时按「下一个 6 月 7 日」动态计算；禁止返回负数。"""
++    try:
++        cfg = load_ai_config()
++        raw = str(cfg.get("gaokao_date") or "").strip()
++        if raw:
++            target = datetime.strptime(raw, "%Y-%m-%d")
++        else:
++            now = datetime.now()
++            target = datetime(now.year, 6, 7)
++            if (target - now).total_seconds() < 0:
++                target = datetime(now.year + 1, 6, 7)
++        return max((target - datetime.now()).days, 0)
++    except BaseException:
++        return 365
++
++
+ PROVIDERS = {
+     "zhipu": {
+         "name": "智谱 GLM",
+@@ -1342,8 +1392,8 @@ def get_api_endpoint():
+     key = cfg.get(info["key_field"], "").strip()
+     model = info["model"]
+     if provider == "deepseek":
+-        # DeepSeek 支持自定义模型：deepseek-chat / deepseek-reasoner / 新版模型 ID
+-        model = (cfg.get("deepseek_model") or "deepseek-v4-flash").strip() or "deepseek-v4-flash"
++        # DeepSeek 支持自定义模型：统一走 resolve_deepseek_model（旧名 deepseek-v4-flash 已由 load_ai_config 迁移）
++        model = resolve_deepseek_model(cfg)
+     return key, info["url"], model, info["vision_model"]
+ 
+ 
+@@ -1365,7 +1415,7 @@ def endpoint_for(task="smart"):
+     key_ds = cfg.get("api_key_deepseek", "").strip()
+     if key_ds:
+         dk = PROVIDERS["deepseek"]
+-        model = (cfg.get("deepseek_model") or "deepseek-v4-flash").strip() or "deepseek-v4-flash"
++        model = resolve_deepseek_model(cfg)
+         return key_ds, dk["url"], model, dk.get("vision_model", "")
+     return endpoint_for("cheap")
+ 
+@@ -1511,7 +1561,8 @@ def copy_file_to_lib(src_path, target_dir, allowed_exts):
+     new_name = str(uuid.uuid4().hex) + ext
+     dst = os.path.join(target_dir, new_name)
+     shutil.copy(src_path, dst)
+-    return dst
++    # 入库存「相对 DATA_DIR」的路径：切换数据文件夹/迁移设备后图片仍有效；读取处统一做相对→绝对转换
++    return os.path.relpath(dst, DATA_DIR)
+ 
+ 
+ IMG_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
+@@ -1661,7 +1712,8 @@ def save_note(subject, content, media, tags=None):
+     data = load_jsonl(NOTES_FILE)
+     data.append({"type": "note", "subject": subject, "content": content, "media": media,
+                  "tags": [str(t).strip() for t in (tags or []) if str(t).strip()],
+-                 "time": time.strftime("%Y-%m-%d %H:%M:%S"), "timestamp": int(time.time())})
++                 "time": time.strftime("%Y-%m-%d %H:%M:%S"),
++                 "timestamp": now_ms(), "event_id": gen_uid()})
+     save_jsonl(NOTES_FILE, data)
+     log_learning_event("note_upload", subject, detail=f"上传笔记：{content[:80] if content else '（图片笔记）'}")
+     # 带图笔记：后台让 AI 自动理解图片内容，写回 ai_text（不阻塞上传）
+@@ -2780,7 +2832,8 @@ def main(page: ft.Page):
+                     for i, p in enumerate(valid_paths):
+                         is_active = (i == state["index"])
+                         thumb = ft.Container(
+-                            content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER),
++                            content=ft.Image(src=p, width=44, height=44, fit=ft.ImageFit.COVER,
++                                             cache_width=96, cache_height=96),
+                             width=48, height=48,
+                             border_radius=8,
+                             border=ft.border.all(2, "#7AA2F7" if is_active else "#555555"),
+@@ -2875,8 +2928,7 @@ def main(page: ft.Page):
+                     show_toast(f"渲染失败：{str(ex)[:40]}", "red")
+ 
+             sync_status_text = ft.Text("", size=14)
+-            sync_folder_picker = ft.FilePicker(on_result=lambda e: on_sync_folder_selected(e))
+-            page.overlay.append(sync_folder_picker)
++            sync_folder_picker = _use_picker(page, None)   # 全局复用 FilePicker，避免重复挂 overlay
+ 
+             def on_sync_folder_selected(e: ft.FilePickerResultEvent):
+                 if e.path:
+@@ -2901,8 +2953,7 @@ def main(page: ft.Page):
+             def make_file_picker_button(button_text, allowed_types="image", on_complete=None):
+                 selected_files = []
+                 file_list = ft.Column(spacing=4)
+-                picker = ft.FilePicker(on_result=lambda e: handle_picker_result(e))
+-                page.overlay.append(picker)
++                picker = _use_picker(page, None)   # 全局复用同一 FilePicker，不重复挂 overlay
+                 progress_row = ft.Row(visible=False, spacing=10)
+                 progress_bar = ft.ProgressBar(width=200, height=8, value=0)
+                 progress_text = ft.Text("0%", size=14)
+@@ -2913,7 +2964,8 @@ def main(page: ft.Page):
+                     row = ft.Row(spacing=8, scroll=ft.ScrollMode.AUTO)
+                     for idx, f_path in enumerate(selected_files):
+                         try:
+-                            img = ft.Image(src=f_path, width=60, height=60,
++                            _src = f_path if os.path.isabs(f_path) else os.path.join(DATA_DIR, f_path)
++                            img = ft.Image(src=_src, width=60, height=60,
+                                            fit=ft.ImageFit.COVER, border_radius=8)
+                         except BaseException:
+                             img = ft.Text("🖼️", size=40)
+@@ -2944,11 +2996,20 @@ def main(page: ft.Page):
+ 
+                 def remove_file(idx):
+                     if 0 <= idx < len(selected_files):
++                        # 复制进来的临时文件：手动移除时一并删除（尚未入库，不留孤儿图片）
++                        try:
++                            _rm = selected_files[idx]
++                            _rm_full = _rm if os.path.isabs(_rm) else os.path.join(DATA_DIR, _rm)
++                            if os.path.exists(_rm_full):
++                                os.remove(_rm_full)
++                        except BaseException:
++                            pass
+                         selected_files.pop(idx)
+                         refresh_file_list()
+ 
+                 def pick_files(e):
+-                    picker.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
++                    _use_picker(page, handle_picker_result).pick_files(
++                        file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+ 
+                 complete_btn = ft.ElevatedButton(
+                     "✅ 完成上传", icon=ft.Icons.DONE,
+@@ -2956,7 +3017,16 @@ def main(page: ft.Page):
+                     disabled=True, visible=False,
+                 )
+ 
+-                def reset():
++                def reset(keep=False):
++                    # keep=True：文件已成功入库，仅清空选择列表；keep=False：删除已复制但未入库的文件
++                    if not keep:
++                        for _p in list(selected_files):
++                            try:
++                                _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
++                                if os.path.exists(_full):
++                                    os.remove(_full)
++                            except BaseException:
++                                pass
+                     selected_files.clear()
+                     file_list.controls.clear()
+                     complete_btn.disabled = True
+@@ -3119,9 +3189,9 @@ def main(page: ft.Page):
+                 answer_input.value = ""
+                 idea_input.value = ""
+                 tags_input.value = ""
+-                reset_picker1()
+-                reset_picker2()
+-                reset_picker3()
++                reset_picker1(keep=True)   # 文件已随 save_error 入库，只清列表不删文件
++                reset_picker2(keep=True)
++                reset_picker3(keep=True)
+                 show_toast(f"✅ {subj} 错题已保存！", "green")
+ 
+             note_subject_dd = ft.Dropdown(
+@@ -3143,7 +3213,7 @@ def main(page: ft.Page):
+                     return
+                 save_note(subj, content, list(note_files))
+                 note_content_input.value = ""
+-                reset_note_picker()
++                reset_note_picker(keep=True)   # 文件已随 save_note 入库，只清列表不删文件
+                 show_toast(f"✅ {subj} 笔记已保存！", "green")
+ 
+             # ===== 苹果风 UI 组件 =====
+@@ -3460,6 +3530,29 @@ def main(page: ft.Page):
+             current_chat_subject = "总AI"
+             stop_flag = False
+             generation_active = False
++            _pending_chat_imgs = set()  # 全局跟踪：聊天选图但尚未发送成功的临时文件（相对 DATA_DIR）
++
++            def _cleanup_pending_chat_imgs():
++                """删除「选了图但没发送」的临时副本，避免孤儿图片。
++                已写入当前科目历史的图片（含发送后 AI 失败等边缘情况）一律保留，防止历史图片失效。"""
++                try:
++                    _hist = load_jsonl(get_chat_history_file(current_chat_subject or "总AI"))
++                    _refs = set()
++                    for _m in _hist:
++                        for _t in re.findall(r"【图】(\S+)", str(_m.get("content", "") or "")):
++                            _refs.add(_t)
++                except BaseException:
++                    _refs = set()
++                while _pending_chat_imgs:
++                    _p = _pending_chat_imgs.pop()
++                    if _p in _refs:
++                        continue
++                    try:
++                        _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
++                        if os.path.exists(_full):
++                            os.remove(_full)
++                    except BaseException:
++                        pass
+ 
+             def open_chat(subject, initial_message=None, auto_send=False):
+                 nonlocal current_chat_subject, stop_flag, generation_active
+@@ -3468,6 +3561,7 @@ def main(page: ft.Page):
+                     time.sleep(0.2)
+                 generation_active = False
+                 stop_flag = False
++                _cleanup_pending_chat_imgs()   # 切聊天窗口前清掉未发送的临时图
+                 current_chat_subject = subject
+                 close_contact_panel()
+                 chat_dialog.content = build_chat_window(subject, initial_message, auto_send)
+@@ -4429,6 +4523,12 @@ def main(page: ft.Page):
+                                 ai_response["text"] = final_accum
+                         finally:
+                             if gen_token["id"] == my_gen:
++                                # 无论正常结束/异常/被停止，只要是当前代次就恢复按钮，避免停止后按钮卡死
++                                try:
++                                    send_btn.visible = True
++                                    stop_btn.visible = False
++                                except BaseException:
++                                    pass
+                                 generation_active = False
+                         if gen_token["id"] != my_gen:
+                             return  # 过期线程，不再写界面/不保存历史
+@@ -4479,11 +4579,11 @@ def main(page: ft.Page):
+                                         pass
+                         except Exception:
+                             pass
+-                        send_btn.visible = True
+-                        stop_btn.visible = False
+                         if ai_response["text"]:
+                             save_chat_message(subject, "assistant", ai_response["text"])
+                             update_chat_memory(subject, content, ai_response["text"])
++                        # 发送成功：本次消息里的临时图正式生效（从待清理集合移除，防止后续清历史/关窗误删）
++                        _pending_chat_imgs.difference_update(set(re.findall(r"【图】(\S+)", content)))
+                         update_chat_stats(subject)
+                         # —— 长记忆：历史过长时后台压缩早期对话为摘要（不阻塞，失败静默）——
+                         try:
+@@ -4579,9 +4679,22 @@ def main(page: ft.Page):
+                 continue_btn.on_click = _continue_generation
+ 
+                 def clear_history(e):
++                    nonlocal generation_active, stop_flag
++                    stop_flag = True
++                    gen_token["id"] += 1  # 使正在跑的旧生成线程过期：不再写已清空的历史、不再恢复按钮
++                    generation_active = False
+                     fp = get_chat_history_file(subject)
+                     save_jsonl(fp, [])
+                     chat_history_display.controls.clear()
++                    last_user_msg["text"] = ""
++                    last_ai_content_ref["col"] = None
++                    last_ai_content_ref["ref"] = None
++                    continuing["v"] = False
++                    _added_questions.clear()
++                    continue_btn.visible = False
++                    send_btn.visible = True
++                    stop_btn.visible = False
++                    _cleanup_pending_chat_imgs()   # 清历史的同时清掉未发送的临时图
+                     page.update()
+                     show_toast("✅ 对话历史已清除", "green")
+ 
+@@ -4613,9 +4726,13 @@ def main(page: ft.Page):
+                         _chat_dir = os.path.join(IMAGES_DIR, "chat")
+                         os.makedirs(_chat_dir, exist_ok=True)
+                         for _f in e.files:
+-                            _dest = os.path.join(_chat_dir, os.path.basename(_f.name))
++                            # 唯一命名（uid+扩展名）：避免同名文件互相覆盖；未发送前视为临时文件
++                            _ext = os.path.splitext(_f.name)[1].lower() or ".jpg"
++                            _dest = os.path.join(_chat_dir, f"chat_tmp_{gen_uid()}{_ext}")
+                             shutil.copy2(_f.path, _dest)
+-                            saved.append(os.path.relpath(_dest, DATA_DIR))
++                            _rel = os.path.relpath(_dest, DATA_DIR)
++                            saved.append(_rel)
++                            _pending_chat_imgs.add(_rel)
+                     except BaseException as _ex:
+                         show_toast(f"图片保存失败：{str(_ex)[:30]}", "red")
+                         return
+@@ -4628,10 +4745,8 @@ def main(page: ft.Page):
+                     show_toast(f"已添加 {len(saved)} 张图片，按发送即可", "green")
+ 
+                 def pick_chat_image():
+-                    _pkr = ft.FilePicker(on_result=on_chat_img_picked)
+-                    page.overlay.append(_pkr)
+-                    page.update()
+-                    _pkr.pick_files(file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
++                    _use_picker(page, on_chat_img_picked).pick_files(
++                        file_type=ft.FilePickerFileType.IMAGE, allow_multiple=True)
+ 
+                 def pick_chat_camera():
+                     """调用本机摄像头拍照：拍题 → 自动插入对话（与相册同一发送链路）"""
+@@ -4654,9 +4769,10 @@ def main(page: ft.Page):
+                                 return
+                             _chat_dir = os.path.join(IMAGES_DIR, "chat")
+                             os.makedirs(_chat_dir, exist_ok=True)
+-                            _dest = os.path.join(_chat_dir, f"cam_{now_ms()}.jpg")
++                            _dest = os.path.join(_chat_dir, f"chat_tmp_cam_{gen_uid()}.jpg")
+                             cv2.imwrite(_dest, frame)
+                             _rel = os.path.relpath(_dest, DATA_DIR)
++                            _pending_chat_imgs.add(_rel)
+                             cur = chat_input.value or ""
+                             marks = f"\n【图】{_rel}"
+                             chat_input.value = (cur + marks) if cur else marks.lstrip("\n")
+@@ -4681,7 +4797,9 @@ def main(page: ft.Page):
+                         content=ft.Row([
+                             ft.IconButton(icon=ft.Icons.ARROW_BACK, icon_size=22,
+                                           tooltip="返回",
+-                                          on_click=lambda e: (setattr(chat_dialog, 'visible', False), page.update())),
++                                          on_click=lambda e: (_cleanup_pending_chat_imgs(),
++                                                              setattr(chat_dialog, 'visible', False),
++                                                              page.update())),
+                             ft.Column([
+                                 ft.Text(f"💬 {display_name}", size=18, weight=ft.FontWeight.BOLD),
+                                 ft.Text(f"{_provider_name} · {_model_name}", size=11, color="#888888"),
+@@ -4764,8 +4882,10 @@ def main(page: ft.Page):
+                     return None   # 失败：调用处负责提示，避免假成功
+                 with _vocab_rw_lock:
+                     existing = load_jsonl(VOCAB_FILE)
++                    found = False
+                     for i, w in enumerate(existing):
+                         if w.get("word", "").lower() == word.lower():
++                            found = True
+                             for k, v in new_data.items():
+                                 if k == "grammar":
+                                     existing[i]["grammar"] = v if v else existing[i].get("grammar", {})
+@@ -4775,6 +4895,11 @@ def main(page: ft.Page):
+                                     existing[i][k] = v
+                             word_data = existing[i]
+                             break
++                    if not found:
++                        return None   # 词不在词库中：不写不存，调用处按失败处理
++                    # 成功判据：AI 返回的释义非空才算补齐成功；否则保留原数据并让调用处提示失败
++                    if not str(word_data.get("meaning", "") or "").strip():
++                        return None
+                     save_jsonl(VOCAB_FILE, existing)
+                 return word_data
+ 
+@@ -5086,7 +5211,21 @@ def main(page: ft.Page):
+                                 padding=ft.Padding(top=4, bottom=4)))
+                         page.update()
+ 
+-                    search_field.on_change = lambda e: _render_list(search_field.value, reset_offset=True)
++                    _search_timer = [None]
++
++                    def _on_search_change(e):
++                        # 300ms 防抖：停止输入后才真正搜索，避免每个按键全量过滤卡顿
++                        if _search_timer[0]:
++                            try:
++                                _search_timer[0].cancel()
++                            except BaseException:
++                                pass
++                        _search_timer[0] = threading.Timer(
++                            0.3, lambda: _render_list(search_field.value, reset_offset=True))
++                        _search_timer[0].daemon = True
++                        _search_timer[0].start()
++
++                    search_field.on_change = _on_search_change
+                     add_word_input = ft.TextField(label="新增单词", hint_text="英文或中文", expand=True)
+ 
+                     def _add_custom_word(e):
+@@ -5094,17 +5233,18 @@ def main(page: ft.Page):
+                         if not raw:
+                             return
+                         word = raw.lower()
+-                        existing = load_jsonl(VOCAB_FILE)
+-                        if any(w.get("word", "").lower() == word for w in existing):
+-                            show_toast(f"单词 {word} 已存在", "info")
+-                            add_word_input.value = ""
+-                            return
+-                        new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "",
+-                                     "forms": "", "grammar": {}, "phrases": []}
+-                        ensure_learning_field(new_entry)
+-                        new_entry["learning"]["synced"] = False   # 新词未同步手环
+-                        existing.append(new_entry)
+-                        save_jsonl(VOCAB_FILE, existing)
++                        with _vocab_rw_lock:   # 读→改→写 原子化，避免与导入/AI补齐并发丢数据
++                            existing = load_jsonl(VOCAB_FILE)
++                            if any(w.get("word", "").lower() == word for w in existing):
++                                show_toast(f"单词 {word} 已存在", "info")
++                                add_word_input.value = ""
++                                return
++                            new_entry = {"word": word, "phonetic": "", "meaning": "", "example": "",
++                                         "forms": "", "grammar": {}, "phrases": []}
++                            ensure_learning_field(new_entry)
++                            new_entry["learning"]["synced"] = False   # 新词未同步手环
++                            existing.append(new_entry)
++                            save_jsonl(VOCAB_FILE, existing)
+                         show_toast(f"已添加 {word}，点开自动补齐", "green")
+                         add_word_input.value = ""
+                         nonlocal all_vocab, all_words
+@@ -5113,8 +5253,7 @@ def main(page: ft.Page):
+                         _render_list(search_field.value)
+ 
+                     _render_list()
+-                    import_picker = ft.FilePicker(on_result=lambda e: on_import_result(e))
+-                    page.overlay.append(import_picker)
++                    import_picker = _use_picker(page, None)
+ 
+                     def on_import_result(e: ft.FilePickerResultEvent):
+                         if e.files:
+@@ -5127,19 +5266,20 @@ def main(page: ft.Page):
+                                 if not imported:
+                                     show_toast("文件内容为空", "red")
+                                     return
+-                                existing = load_jsonl(VOCAB_FILE)
+-                                existing_words = {w.get("word", "").lower() for w in existing}
+-                                added = 0
+-                                for w in imported:
+-                                    wd = w.get("word", "").lower()
+-                                    if not wd or wd in existing_words:
+-                                        continue
+-                                    ensure_learning_field(w)
+-                                    w["learning"]["synced"] = False   # 导入的新词未同步手环
+-                                    existing.append(w)
+-                                    existing_words.add(wd)
+-                                    added += 1
+-                                save_jsonl(VOCAB_FILE, existing)
++                                with _vocab_rw_lock:   # 读→改→写 原子化，避免并发丢数据
++                                    existing = load_jsonl(VOCAB_FILE)
++                                    existing_words = {w.get("word", "").lower() for w in existing}
++                                    added = 0
++                                    for w in imported:
++                                        wd = w.get("word", "").lower()
++                                        if not wd or wd in existing_words:
++                                            continue
++                                        ensure_learning_field(w)
++                                        w["learning"]["synced"] = False   # 导入的新词未同步手环
++                                        existing.append(w)
++                                        existing_words.add(wd)
++                                        added += 1
++                                    save_jsonl(VOCAB_FILE, existing)
+                                 show_toast(f"✅ 已追加 {added} 个词", "green")
+                                 nonlocal all_vocab, all_words
+                                 all_vocab = load_jsonl(VOCAB_FILE)
+@@ -5150,11 +5290,10 @@ def main(page: ft.Page):
+ 
+                     import_btn = ft.ElevatedButton(
+                         "📥 导入词汇文件", icon=ft.Icons.UPLOAD_FILE,
+-                        on_click=lambda e: import_picker.pick_files(
++                        on_click=lambda e: _use_picker(page, on_import_result).pick_files(
+                             file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["jsonl"]))
+ 
+-                    export_picker = ft.FilePicker(on_result=lambda e: on_export_result(e))
+-                    page.overlay.append(export_picker)
++                    export_picker = _use_picker(page, None)
+ 
+                     def on_export_result(e: ft.FilePickerResultEvent):
+                         if e.path:
+@@ -5166,7 +5305,7 @@ def main(page: ft.Page):
+ 
+                     export_btn = ft.ElevatedButton(
+                         "📤 导出单词本", icon=ft.Icons.DOWNLOAD,
+-                        on_click=lambda e: export_picker.save_file(
++                        on_click=lambda e: _use_picker(page, on_export_result).save_file(
+                             dialog_title="导出单词本",
+                             file_name="vocabulary.jsonl",
+                             file_type=ft.FilePickerFileType.CUSTOM,
+@@ -5438,22 +5577,45 @@ def main(page: ft.Page):
+                         if mode == "mix":
+                             mode = random.choice(["word2meaning", "meaning2word"])
+                         if mode == "word2meaning":
++                            # 干扰项按释义去重：避免重复按钮/两个“正确答案”；不足 4 项时从全词库补齐
+                             options = [meaning]
+-                            others = random.sample([x for x in queue if x.get("word", "") != word],
+-                                                   min(3, max(0, len(queue) - 1))) if len(queue) > 1 else []
+-                            for o in others:
+-                                options.append(o.get("meaning", ""))
++                            seen = {meaning}
++                            for o in (x for x in queue if x.get("word", "") != word):
++                                _m = str(o.get("meaning", "") or "").strip()
++                                if _m and _m not in seen:
++                                    seen.add(_m)
++                                    options.append(_m)
++                                if len(options) >= 4:
++                                    break
++                            if len(options) < 4:
++                                try:
++                                    for o in load_vocab_cached(0):
++                                        _m = str(o.get("meaning", "") or "").strip()
++                                        if _m and _m not in seen:
++                                            seen.add(_m)
++                                            options.append(_m)
++                                        if len(options) >= 4:
++                                            break
++                                except BaseException:
++                                    pass
+                             random.shuffle(options)
+                             correct = meaning
+                             opt_btns = []
+                             result_text = ft.Text("", size=14)
++                            next_btn = ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
++                                                         bgcolor="#7AA2F7", color="#FFFFFF", disabled=True)
+ 
+-                            def make_click(opt, is_correct):
++                            def make_click(opt):
+                                 def click(e):
+                                     if state["answered"]:
+                                         return
+                                     state["answered"] = True
+                                     score["total"] += 1
++                                    is_correct = (opt == correct)
++                                    # 作答后禁用所有选项，防连点/重复计分
++                                    for _b in opt_btns:
++                                        _b.disabled = True
++                                    next_btn.disabled = False
+                                     if is_correct:
+                                         score["correct"] += 1
+                                         update_word_learning(word, "quiz_correct")
+@@ -5469,7 +5631,7 @@ def main(page: ft.Page):
+                                 return click
+ 
+                             for opt in options:
+-                                b = ft.ElevatedButton(opt, on_click=make_click(opt, opt == correct),
++                                b = ft.ElevatedButton(opt, on_click=make_click(opt),
+                                                       expand=True, bgcolor="#24283B", color="#FFFFFF")
+                                 opt_btns.append(b)
+                             quiz_area.content = ft.Column([
+@@ -5481,27 +5643,48 @@ def main(page: ft.Page):
+                                 ft.Container(height=10),
+                                 result_text,
+                                 ft.Container(height=10),
+-                                ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+-                                                          bgcolor="#7AA2F7", color="#FFFFFF")],
+-                                       alignment=ft.MainAxisAlignment.CENTER),
++                                ft.Row([next_btn], alignment=ft.MainAxisAlignment.CENTER),
+                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
+                         elif mode == "meaning2word":
++                            # 干扰项按单词去重：避免重复按钮/两个“正确答案”；不足 4 项时从全词库补齐
+                             options = [word]
+-                            others = random.sample([x for x in queue if x.get("word", "") != word],
+-                                                   min(3, max(0, len(queue) - 1))) if len(queue) > 1 else []
+-                            for o in others:
+-                                options.append(o.get("word", ""))
++                            seen = {word}
++                            for o in (x for x in queue if x.get("word", "") != word):
++                                _w = str(o.get("word", "") or "").strip()
++                                if _w and _w not in seen:
++                                    seen.add(_w)
++                                    options.append(_w)
++                                if len(options) >= 4:
++                                    break
++                            if len(options) < 4:
++                                try:
++                                    for o in load_vocab_cached(0):
++                                        _w = str(o.get("word", "") or "").strip()
++                                        if _w and _w not in seen:
++                                            seen.add(_w)
++                                            options.append(_w)
++                                        if len(options) >= 4:
++                                            break
++                                except BaseException:
++                                    pass
+                             random.shuffle(options)
+                             correct = word
+                             opt_btns = []
+                             result_text = ft.Text("", size=14)
++                            next_btn = ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
++                                                         bgcolor="#7AA2F7", color="#FFFFFF", disabled=True)
+ 
+-                            def make_click2(opt, is_correct):
++                            def make_click2(opt):
+                                 def click(e):
+                                     if state["answered"]:
+                                         return
+                                     state["answered"] = True
+                                     score["total"] += 1
++                                    is_correct = (opt == correct)
++                                    # 作答后禁用所有选项，防连点/重复计分
++                                    for _b in opt_btns:
++                                        _b.disabled = True
++                                    next_btn.disabled = False
+                                     if is_correct:
+                                         score["correct"] += 1
+                                         update_word_learning(word, "quiz_correct")
+@@ -5517,7 +5700,7 @@ def main(page: ft.Page):
+                                 return click
+ 
+                             for opt in options:
+-                                b = ft.ElevatedButton(opt, on_click=make_click2(opt, opt == correct),
++                                b = ft.ElevatedButton(opt, on_click=make_click2(opt),
+                                                       expand=True, bgcolor="#24283B", color="#FFFFFF")
+                                 opt_btns.append(b)
+                             quiz_area.content = ft.Column([
+@@ -5528,9 +5711,7 @@ def main(page: ft.Page):
+                                 ft.Container(height=10),
+                                 result_text,
+                                 ft.Container(height=10),
+-                                ft.Row([ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+-                                                          bgcolor="#7AA2F7", color="#FFFFFF")],
+-                                       alignment=ft.MainAxisAlignment.CENTER),
++                                ft.Row([next_btn], alignment=ft.MainAxisAlignment.CENTER),
+                             ], spacing=8, scroll=ft.ScrollMode.AUTO)
+                         else:
+                             input_field = ft.TextField(label="输入英文单词", autofocus=True)
+@@ -5540,6 +5721,9 @@ def main(page: ft.Page):
+                                 if state["answered"]:
+                                     return
+                                 state["answered"] = True
++                                # 作答后禁提交、解锁下一题：防止重复提交/跳过未答
++                                submit_btn.disabled = True
++                                next_btn.disabled = False
+                                 user_ans = input_field.value.strip().lower()
+                                 score["total"] += 1
+                                 is_correct = user_ans == word.lower()
+@@ -5556,6 +5740,11 @@ def main(page: ft.Page):
+                                                    detail="spelling", correct=is_correct)
+                                 page.update()
+ 
++                            submit_btn = ft.ElevatedButton("提交", on_click=check,
++                                                           bgcolor="#7AA2F7", color="#FFFFFF")
++                            next_btn = ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
++                                                         bgcolor="#24283B", color="#FFFFFF", disabled=True)
++
+                             quiz_area.content = ft.Column([
+                                 ft.Text("根据释义拼写单词", size=13, color=ft.Colors.GREY_500),
+                                 ft.Text(meaning, size=20, weight=ft.FontWeight.BOLD),
+@@ -5563,9 +5752,8 @@ def main(page: ft.Page):
+                                 input_field,
+                                 ft.Container(height=10),
+                                 ft.Row([
+-                                    ft.ElevatedButton("提交", on_click=check, bgcolor="#7AA2F7", color="#FFFFFF"),
+-                                    ft.ElevatedButton("下一题", on_click=lambda e: next_question(),
+-                                                      bgcolor="#24283B", color="#FFFFFF"),
++                                    submit_btn,
++                                    next_btn,
+                                 ], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
+                                 ft.Container(height=10),
+                                 result_text,
+@@ -5598,7 +5786,7 @@ def main(page: ft.Page):
+                                     alignment=ft.alignment.center),
+                                 title=ft.Text(f"{word}  {w.get('phonetic', '')}", size=15),
+                                 subtitle=ft.Text(w.get("meaning", "")[:50], size=12, color=ft.Colors.GREY_400),
+-                                on_click=lambda e, wd=w: _open_word_detail(wd, on_close=lambda: build_wrong_tab()),
++                                on_click=lambda e, wd=w: _open_word_detail(wd, on_close=refresh_wrong_tab),
+                                 dense=True)
+                             ww_list.controls.append(tile)
+                     return ft.Column([
+@@ -5607,10 +5795,23 @@ def main(page: ft.Page):
+                         ft.Container(content=ww_list, expand=True),
+                     ], spacing=8, expand=True)
+ 
++                def refresh_wrong_tab():
++                    # 详情关闭后真正重建错词 tab 并挂回界面（此前只 build 未赋值，导致列表不刷新）
++                    try:
++                        tab_content.content = build_wrong_tab()
++                        page.update()
++                    except BaseException:
++                        pass
++
++                _tab_cache = {}   # P2-14：tab 构建结果缓存，切换 tab 复用已构建内容，保留搜索词/滚动位置
++
+                 def render_tab():
+                     idx = tab_index[0]
+                     if idx == 0:
+-                        tab_content.content = build_lib_tab()
++                        # 词库 tab 最重：只构建一次，之后复用（内部搜索/分页/滚动状态随之保留）
++                        if _tab_cache.get(0) is None:
++                            _tab_cache[0] = build_lib_tab()
++                        tab_content.content = _tab_cache[0]
+                     elif idx == 1:
+                         tab_content.content = build_nw_tab()
+                     elif idx == 2:
+@@ -5699,7 +5900,8 @@ def main(page: ft.Page):
+                                 if os.path.exists(full_path):
+                                     try:
+                                         thumb_img = ft.Image(src=full_path, width=80, height=80,
+-                                                             fit=ft.ImageFit.COVER)
++                                                             fit=ft.ImageFit.COVER,
++                                                             cache_width=160, cache_height=160)
+                                         thumb_container = ft.GestureDetector(
+                                             content=ft.Container(
+                                                 content=thumb_img, width=80, height=80,
+@@ -5793,7 +5995,8 @@ def main(page: ft.Page):
+                                                 try:
+                                                     img = ft.Container(
+                                                         content=ft.Image(src=full_path, width=100, height=100,
+-                                                                         fit=ft.ImageFit.COVER, border_radius=8),
++                                                                         fit=ft.ImageFit.COVER, border_radius=8,
++                                                                         cache_width=200, cache_height=200),
+                                                         on_click=lambda e, paths=unique_media,
+                                                                        idx=unique_media.index(img_path): show_image_gallery(paths, idx),
+                                                         ink=True, border_radius=8)
+@@ -5882,6 +6085,15 @@ def main(page: ft.Page):
+                                     q_val = item_data.get("question", "")
+                                     time_val = item_data.get("time", "")
+                                     ts_int = item_data.get("timestamp", 0)
++                                    ev_id = item_data.get("event_id", "")
++
++                                    def _same_item(d):
++                                        # 主键优先用 event_id；旧数据（无 event_id）回落 timestamp+内容匹配
++                                        if ev_id and d.get("event_id") == ev_id:
++                                            return True
++                                        if d.get("timestamp") == ts_int and d.get("question") == q_val and d.get("time") == time_val:
++                                            return True
++                                        return False
+                                     current_status = item_data.get("status", "未看")
+                                     orig_input = ft.TextField(label="题目 🔒（锁定中）", value=orig_val,
+                                                               multiline=True, min_lines=2, disabled=True)
+@@ -5925,8 +6137,7 @@ def main(page: ft.Page):
+                                         elif item_data.get("subject") not in new_tags:
+                                             new_tags.insert(0, item_data.get("subject", "未知"))
+                                         for d in all_items:
+-                                            if d.get("timestamp") == ts_int or (
+-                                                    d.get("question") == q_val and d.get("time") == time_val):
++                                            if _same_item(d):
+                                                 d["original"] = orig_input.value
+                                                 d["question"] = orig_input.value
+                                                 d["mistake"] = mis_input.value
+@@ -5945,9 +6156,7 @@ def main(page: ft.Page):
+ 
+                                     def delete_item(e):
+                                         all_items = load_jsonl(ERRORS_FILE)
+-                                        filtered = [d for d in all_items if not (
+-                                                d.get("timestamp") == ts_int or (
+-                                                d.get("question") == q_val and d.get("time") == time_val))]
++                                        filtered = [d for d in all_items if not _same_item(d)]
+                                         save_jsonl(ERRORS_FILE, filtered)
+                                         page.close(edit_dlg)
+                                         show_toast("🗑️ 已删除", "green")
+@@ -6045,13 +6254,21 @@ def main(page: ft.Page):
+                             search_status.color = "#EF5350"
+                             page.update()
+                             return
++                        # 本地加权预筛：只喂 AI 前 20 条最相关的错题，避免整库塞进超长 prompt
++                        candidates = subject_items[:20]
++                        try:
++                            _ordered, _ = weighted_search_errors(subject_items, query)
++                            if _ordered:
++                                candidates = _ordered[:20]
++                        except BaseException:
++                            pass
+                         prompt = f"""请分析以下错题列表，找出与用户查询匹配的题目。
+ 用户查询：{query}
+ 
+-错题列表：
+-{chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(subject_items)])}
++错题列表（最多显示前20条）：
++{chr(10).join([f"[{i+1}] {e.get('original', '')[:100]}" for i, e in enumerate(candidates)])}
+ 
+-返回匹配的题目序号（从1开始），JSON数组格式，如：[1, 3, 5]
++返回匹配的题目序号（从1开始，序号对应上面列表），JSON数组格式，如：[1, 3, 5]
+ 只返回JSON数组。"""
+                         try:
+                             resp = requests.post(api_url,
+@@ -6068,13 +6285,15 @@ def main(page: ft.Page):
+                                     match = re.search(r'\[[0-9,\s]*\]', content)
+                                     matches = json.loads(match.group()) if match else []
+                                 if matches and isinstance(matches, list):
+-                                    highlight_indices = [m - 1 for m in matches if 1 <= m <= len(subject_items)]
+-                                    if highlight_indices:
+-                                        matched_items = [(subject_items[i], 99) for i in highlight_indices]
++                                    # AI 返回的序号映射回候选列表，再映射回原 subject_items（保留原始索引语义）
++                                    matched_positions = [m - 1 for m in matches if 1 <= m <= len(candidates)]
++                                    if matched_positions:
++                                        highlight_items = [candidates[i] for i in matched_positions]
++                                        matched_items = [(it, 99) for it in highlight_items]
+                                         other_items = [(item, None) for i, item in enumerate(subject_items)
+-                                                       if i not in highlight_indices]
++                                                       if item not in highlight_items]
+                                         render_list(matched_items + other_items)
+-                                        search_status.value = f"✅ AI 找到 {len(highlight_indices)} 个匹配（已置顶）"
++                                        search_status.value = f"✅ AI 找到 {len(matched_positions)} 个匹配（已置顶）"
+                                         search_status.color = "#81C784"
+                                     else:
+                                         search_status.value = "❌ 未找到匹配的错题"
+@@ -6127,7 +6346,8 @@ def main(page: ft.Page):
+                                 if os.path.exists(full_path):
+                                     try:
+                                         thumb_img = ft.Image(src=full_path, width=80, height=80,
+-                                                             fit=ft.ImageFit.COVER)
++                                                             fit=ft.ImageFit.COVER,
++                                                             cache_width=160, cache_height=160)
+                                         thumb_container = ft.GestureDetector(
+                                             content=ft.Container(
+                                                 content=thumb_img, width=80, height=80,
+@@ -6163,7 +6383,8 @@ def main(page: ft.Page):
+                                                 try:
+                                                     img = ft.Container(
+                                                         content=ft.Image(src=full_path, width=100, height=100,
+-                                                                         fit=ft.ImageFit.COVER, border_radius=8),
++                                                                         fit=ft.ImageFit.COVER, border_radius=8,
++                                                                         cache_width=200, cache_height=200),
+                                                         on_click=lambda e, paths=note_images,
+                                                                        idx=note_images.index(img_path): show_image_gallery(paths, idx, on_close=lambda: show(None)),
+                                                         ink=True, border_radius=8)
+@@ -6217,6 +6438,15 @@ def main(page: ft.Page):
+                             def make_edit_note(item_data=item):
+                                 def show(e):
+                                     current_ts = item_data.get("timestamp", 0)
++                                    ev_id = item_data.get("event_id", "")
++
++                                    def _same_item(d):
++                                        # 主键优先用 event_id；旧数据（无 event_id）回落 timestamp 匹配
++                                        if ev_id and d.get("event_id") == ev_id:
++                                            return True
++                                        if d.get("timestamp") == current_ts:
++                                            return True
++                                        return False
+                                     content_input = ft.TextField(label="笔记内容",
+                                                                  value=item_data.get("content", ""),
+                                                                  multiline=True, min_lines=4)
+@@ -6224,7 +6454,7 @@ def main(page: ft.Page):
+                                     def save_edit(e):
+                                         all_items = load_jsonl(NOTES_FILE)
+                                         for d in all_items:
+-                                            if d.get("timestamp") == current_ts:
++                                            if _same_item(d):
+                                                 d["content"] = content_input.value
+                                                 break
+                                         save_jsonl(NOTES_FILE, all_items)
+@@ -6235,7 +6465,7 @@ def main(page: ft.Page):
+ 
+                                     def delete_item(e):
+                                         all_items = load_jsonl(NOTES_FILE)
+-                                        filtered = [d for d in all_items if d.get("timestamp") != current_ts]
++                                        filtered = [d for d in all_items if not _same_item(d)]
+                                         save_jsonl(NOTES_FILE, filtered)
+                                         page.close(edit_dlg)
+                                         show_toast("🗑️ 已删除", "green")
+@@ -6283,6 +6513,19 @@ def main(page: ft.Page):
+                     up_files = []
+                     up_picker_col, up_files, reset_picker = make_file_picker_button(
+                         "📷 图片（可多选）", "image", on_complete=None)
++                    _up_committed = {"v": False}   # 保存成功后才置 True；未保存关闭弹窗时清理已复制未入库的图片
++
++                    def _cleanup_uncommitted():
++                        if _up_committed["v"]:
++                            return
++                        for _p in list(up_files):
++                            try:
++                                _full = _p if os.path.isabs(_p) else os.path.join(DATA_DIR, _p)
++                                if os.path.exists(_full):
++                                    os.remove(_full)
++                            except BaseException:
++                                pass
++                        up_files.clear()
+ 
+                     def do_upload(e):
+                         nonlocal up_files
+@@ -6291,6 +6534,8 @@ def main(page: ft.Page):
+                             show_toast("请输入内容或选图片", "red")
+                             return
+                         save_note(up_subject, content, list(up_files))
++                        _up_committed["v"] = True   # 文件已随 save_note 入库，关闭弹窗时不再清理
++                        reset_picker(keep=True)
+                         page.close(up_dlg)
+                         show_toast(f"✅ {up_subject} 笔记已保存（已置顶）", "green")
+                         open_function_page(up_subject, "笔记本")
+@@ -6305,7 +6550,8 @@ def main(page: ft.Page):
+                         actions=[
+                             ft.TextButton("取消", on_click=lambda e: page.close(up_dlg)),
+                             ft.ElevatedButton("💾 保存", on_click=do_upload),
+-                        ])
++                        ],
++                        on_dismiss=lambda e: _cleanup_uncommitted())
+                     page.open(up_dlg)
+                     page.update()
+ 
+@@ -6620,14 +6866,18 @@ def main(page: ft.Page):
+                         view_state["open"].discard(t)
+                     else:
+                         view_state["open"].add(t)
+-                    # 重建视图（保持当前缩放/平移），刷新折叠状态
++                    # 重建视图（保持当前缩放/平移），刷新折叠状态；折叠=数据变更，强制重建内容
+                     viewport.content = ft.Transform(
+                         scale=view_state["scale"],
+                         translate=ft.Offset(view_state["dx"], view_state["dy"]),
+-                        content=rebuild_mindmap_view())
++                        content=rebuild_mindmap_view(force=True))
+                     viewport.update()
+ 
+-                def rebuild_mindmap_view():
++                _mm_content_cache = {"content": None}   # P2-16：内容只构建一次，缩放/平移只改 Transform
++
++                def rebuild_mindmap_view(force=False):
++                    if not force and _mm_content_cache["content"] is not None:
++                        return _mm_content_cache["content"]
+                     view_state["rebuild_count"] = view_state.get("rebuild_count", 0) + 1
+                     layout_node(tree, 24, 40)
+                     shapes = []
+@@ -6693,7 +6943,8 @@ def main(page: ft.Page):
+                                                            kp=ch.get("kp", "")),
+                                           (chp[0], chp[1])),
+                             ]))
+-                    return ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
++                    _mm_content_cache["content"] = ft.Stack([canvas] + nodes, width=LAYOUT_W, height=LAYOUT_H)
++                    return _mm_content_cache["content"]
+ 
+                 content_holder = ft.Container(content=rebuild_mindmap_view())
+ 
+@@ -7246,7 +7497,7 @@ def main(page: ft.Page):
+                     profile = load_user_profile()
+                     errors = load_jsonl(ERRORS_FILE)
+                     try:
+-                        days_left = (datetime(2026, 6, 7) - datetime.now()).days
++                        days_left = get_gaokao_days_left()
+                     except BaseException:
+                         days_left = 365
+                     subject_errors = {}
+@@ -7435,6 +7686,11 @@ def main(page: ft.Page):
+                 label="DeepSeek 思考模式",
+                 value=ai_config.get("deepseek_thinking", True),
+                 tooltip="开启后模型先深度思考再回答（更强但稍慢）")
++            gaokao_date_input = ft.TextField(
++                label="高考日期（可选，YYYY-MM-DD）",
++                hint_text="留空自动按「下一个 6 月 7 日」计算",
++                value=str(ai_config.get("gaokao_date") or ""),
++                width=280)
+ 
+             def save_keys(e):
+                 cfg = load_ai_config()
+@@ -7444,6 +7700,7 @@ def main(page: ft.Page):
+                 cfg["deepseek_model"] = (deepseek_model_input.value or "deepseek-flash").strip()
+                 cfg["deepseek_thinking"] = deepseek_thinking_switch.value
+                 cfg["deepseek_reasoning"] = str(deepseek_reasoning_dropdown.value or "medium")
++                cfg["gaokao_date"] = gaokao_date_input.value.strip()
+                 try:
+                     cfg["ctx_chars"] = memory_dropdown.value or "auto"
+                 except BaseException:
+@@ -7696,12 +7953,9 @@ def main(page: ft.Page):
+                 page.update()
+ 
+             backup_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+-            backup_picker = ft.FilePicker(on_result=lambda e: on_backup_result(e))
+-            restore_picker = ft.FilePicker(on_result=lambda e: on_restore_result(e))
+-            merge_picker = ft.FilePicker(on_result=lambda e: on_merge_result(e))
+-            page.overlay.append(backup_picker)
+-            page.overlay.append(restore_picker)
+-            page.overlay.append(merge_picker)
++            backup_picker = _use_picker(page, None)   # 备份/恢复/合并共用同一个 FilePicker 实例
++            restore_picker = backup_picker
++            merge_picker = backup_picker
+ 
+             # ---------- 手环背单词 操控中心 ----------
+             band_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
+@@ -7920,22 +8174,85 @@ def main(page: ft.Page):
+             def on_restore_result(e: ft.FilePickerResultEvent):
+                 if not e.files or len(e.files) == 0:
+                     return
++                if app_state["busy"]:
++                    backup_status.value = f"⏳ 正在「{app_state['busy']}」，先等它跑完"
++                    backup_status.color = "#E0AF68"
++                    page.update()
++                    return
+                 zip_path = e.files[0].path
+-                backup_status.value = "⏳ 正在恢复..."
++                backup_status.value = "⏳ 正在恢复（解压校验 + 自动备份当前数据）..."
+                 backup_status.color = "#A9B1D6"
+                 page.update()
+ 
++                def _validate_jsonl(fp):
++                    """严格校验 jsonl：任一行解析失败即视为备份损坏"""
++                    with open(fp, "r", encoding="utf-8") as f:
++                        for line in f:
++                            line = line.strip()
++                            if line:
++                                json.loads(line)
++
+                 def do_restore():
++                    tmp_dir = None
+                     try:
+-                        os.makedirs(DATA_DIR, exist_ok=True)
++                        app_state["busy"] = "覆盖恢复"
++                        # 1) 解压到临时目录（带 zip-slip 越界防护），绝不直接覆盖现网
++                        tmp_dir = os.path.join(DATA_DIR, "_restore_tmp_" + gen_uid())
++                        os.makedirs(tmp_dir, exist_ok=True)
+                         with zipfile.ZipFile(zip_path, "r") as zf:
+-                            zf.extractall(DATA_DIR)
+-                        backup_status.value = "✅ 恢复成功！请重启应用"
++                            for _n in zf.namelist():
++                                _tgt = os.path.realpath(os.path.join(tmp_dir, _n))
++                                if not _tgt.startswith(os.path.realpath(tmp_dir) + os.sep):
++                                    raise RuntimeError(f"备份包内存在越界路径：{_n}")
++                            zf.extractall(tmp_dir)
++                        # 2) 校验关键文件可解析，损坏则中止，原数据不受影响
++                        for _fname in ("errors.jsonl", "notes.jsonl", "vocabulary.jsonl"):
++                            _fp = os.path.join(tmp_dir, _fname)
++                            if os.path.exists(_fp):
++                                _validate_jsonl(_fp)
++                        _up = os.path.join(tmp_dir, "user_profile.json")
++                        if os.path.exists(_up):
++                            with open(_up, "r", encoding="utf-8") as f:
++                                json.load(f)
++                        # 3) 自动备份当前数据（放 DATA_DIR 同级，避免被恢复过程覆盖）
++                        _parent = os.path.dirname(os.path.normpath(DATA_DIR))
++                        _bak_ts = time.strftime("%Y%m%d_%H%M%S")
++                        _bak_zip = os.path.join(_parent, f"池鱼Study恢复前自动备份_{_bak_ts}.zip")
++                        with zipfile.ZipFile(_bak_zip, "w", zipfile.ZIP_DEFLATED) as zf:
++                            for root, dirs, files in os.walk(DATA_DIR):
++                                if "_restore_tmp" in root.split(os.sep):
++                                    continue
++                                for f in files:
++                                    if f.startswith("."):
++                                        continue
++                                    full = os.path.join(root, f)
++                                    zf.write(full, os.path.relpath(full, DATA_DIR))
++                        # 4) 原子替换：清空现网（保留本次临时目录），再把备份内容整体移入
++                        for _n in os.listdir(DATA_DIR):
++                            if _n.startswith("_restore_tmp"):
++                                continue
++                            _p = os.path.join(DATA_DIR, _n)
++                            if os.path.isdir(_p):
++                                shutil.rmtree(_p, ignore_errors=True)
++                            else:
++                                try:
++                                    os.remove(_p)
++                                except BaseException:
++                                    pass
++                        for _n in os.listdir(tmp_dir):
++                            shutil.move(os.path.join(tmp_dir, _n), os.path.join(DATA_DIR, _n))
++                        shutil.rmtree(tmp_dir, ignore_errors=True)
++                        _vocab_cache["data"] = None   # 词库缓存失效，重启后从新数据重新加载
++                        backup_status.value = f"✅ 恢复成功！恢复前数据已自动备份到：\n{_bak_zip}\n（建议重启应用）"
+                         backup_status.color = "#81C784"
+                     except Exception as ex:
+-                        backup_status.value = f"❌ 恢复失败：{str(ex)[:80]}"
++                        backup_status.value = f"❌ 恢复失败（原数据未受影响）：{str(ex)[:80]}"
+                         backup_status.color = "#EF5350"
+-                    page.update()
++                        if tmp_dir and os.path.isdir(tmp_dir):
++                            shutil.rmtree(tmp_dir, ignore_errors=True)
++                    finally:
++                        app_state["busy"] = None
++                        page.update()
+ 
+                 threading.Thread(target=do_restore, daemon=True).start()
+ 
+@@ -8068,6 +8385,7 @@ def main(page: ft.Page):
+                 deepseek_model_input,
+                 deepseek_reasoning_dropdown,
+                 deepseek_thinking_switch,
++                gaokao_date_input,
+                 ft.ElevatedButton("保存密钥", on_click=save_keys),
+                 ft.Row([ft.ElevatedButton("🔌 测试连接", on_click=test_ai_connection),
+                         test_conn_result]),
+@@ -8082,7 +8400,7 @@ def main(page: ft.Page):
+                 ], spacing=10),
+                 ft.Text(f"🔍 {DIAG_TEXT}", size=10, color="#888888", selectable=True),
+                 ft.ElevatedButton("📂 切换文件夹",
+-                                  on_click=lambda e: sync_folder_picker.get_directory_path(),
++                                  on_click=lambda e: _use_picker(page, on_sync_folder_selected).get_directory_path(),
+                                   icon=ft.Icons.FOLDER_OPEN),
+                 ft.Text("长按路径可复制", size=12, color="#888888"),
+                 sync_status_text,
+@@ -8090,15 +8408,15 @@ def main(page: ft.Page):
+                 ft.Text("💾 数据备份与恢复", size=18, weight=ft.FontWeight.BOLD),
+                 ft.Row([
+                     ft.ElevatedButton("📤 备份数据",
+-                                      on_click=lambda e: backup_picker.get_directory_path(),
++                                      on_click=lambda e: _use_picker(page, on_backup_result).get_directory_path(),
+                                       icon=ft.Icons.BACKUP),
+                     ft.ElevatedButton("📥 覆盖恢复",
+-                                      on_click=lambda e: restore_picker.pick_files(
++                                      on_click=lambda e: _use_picker(page, on_restore_result).pick_files(
+                                           file_type=ft.FilePickerFileType.CUSTOM,
+                                           allowed_extensions=["zip"]),
+                                       icon=ft.Icons.RESTORE),
+                     ft.ElevatedButton("🔀 合并恢复",
+-                                      on_click=lambda e: merge_picker.pick_files(
++                                      on_click=lambda e: _use_picker(page, on_merge_result).pick_files(
+                                           file_type=ft.FilePickerFileType.CUSTOM,
+                                           allowed_extensions=["zip"]),
+                                       icon=ft.Icons.MERGE_TYPE),
+@@ -8114,6 +8432,10 @@ def main(page: ft.Page):
+ 
+             def switch_page(index):
+                 # 层级治理：切换底部导航时，关掉聊天窗口与联系人面板，避免盖住新页面
++                try:
++                    _cleanup_pending_chat_imgs()   # 关聊天窗时清掉未发送的临时图
++                except BaseException:
++                    pass
+                 try:
+                     chat_dialog.visible = False
+                 except BaseException:
