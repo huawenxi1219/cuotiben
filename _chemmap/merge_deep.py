@@ -9,6 +9,7 @@ sys.path.insert(0, r"C:\myapp\_chemmap")
 from deep_maps import DEEP
 from deep_maps2 import DEEP2
 from deep_maps3 import DEEP3
+from deep_maps4 import DEEP4
 
 TREE = r"C:\myapp\assets\chem_tree.json"
 tree = json.load(io.open(TREE, encoding="utf-8"))
@@ -25,7 +26,7 @@ index = {(b["name"], c["name"]): c for b in tree["books"] for c in b["chapters"]
 books = {b["name"]: b for b in tree["books"]}
 
 total = 0
-for book, chap, sec_name, items in (DEEP + DEEP2 + DEEP3):
+for book, chap, sec_name, items in (DEEP + DEEP2 + DEEP3 + DEEP4):
     c = index.get((book, chap))
     if c is None:
         b = books.get(book)
