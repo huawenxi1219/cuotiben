@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0, r"C:\myapp\_chemmap")
 from book_maps import BOOK_MAPS
 from book_maps2 import BOOK_MAPS_2
+from book_maps3 import BOOK_MAPS_3
 
 TREE = r"C:\myapp\assets\chem_tree.json"
 tree = json.load(io.open(TREE, encoding="utf-8"))
@@ -18,7 +19,7 @@ for b in tree["books"]:
     for c in b["chapters"]:
         index[(b["name"], c["name"])] = c
 
-for book, chap, sec_name, pts in (BOOK_MAPS + BOOK_MAPS_2):
+for book, chap, sec_name, pts in (BOOK_MAPS + BOOK_MAPS_2 + BOOK_MAPS_3):
     c = index.get((book, chap))
     if c is None:
         # 新建
