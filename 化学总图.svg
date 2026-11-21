@@ -1,0 +1,1549 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="15832" viewBox="0 0 1500 15832" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+<rect width="1500" height="15832" fill="#FFFFFF"/>
+<text x="30" y="48" fill="#111827" font-size="24" font-weight="bold">人教A版高中化学 · 章末知识体系</text>
+<path d="M41,116 L41,7292" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,116 L51,116" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,4148 L51,4148" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,5756 L51,5756" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,6956 L51,6956" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,7292 L51,7292" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,140 L65,140" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,140 L75,140" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,164 L89,3620" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,164 L99,164" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,788 L99,788" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,956 L99,956" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,1940 L99,1940" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,2060 L99,2060" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,2276 L99,2276" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,2756 L99,2756" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,3620 L99,3620" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,188 L113,668" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,188 L123,188" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,380 L123,380" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,668 L123,668" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,212 L137,308" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,212 L147,212" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,308 L147,308" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,236 L161,284" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,236 L171,236" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,260 L171,260" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,284 L171,284" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,332 L161,356" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,332 L171,332" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,356 L171,356" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,404 L137,572" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,404 L147,404" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,452 L147,452" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,524 L147,524" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,572 L147,572" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,428 L161,428" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,428 L171,428" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,476 L161,500" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,476 L171,476" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,500 L171,500" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,548 L161,548" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,548 L171,548" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,596 L161,644" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,596 L171,596" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,620 L171,620" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,644 L171,644" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,692 L137,692" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,692 L147,692" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,716 L161,764" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,716 L171,716" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,740 L171,740" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,764 L171,764" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,812 L113,908" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,812 L123,812" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,860 L123,860" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,908 L123,908" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,836 L137,836" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,836 L147,836" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,884 L137,884" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,884 L147,884" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,932 L137,932" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,932 L147,932" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,980 L113,1724" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,980 L123,980" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,1028 L123,1028" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,1364 L123,1364" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,1532 L123,1532" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,1724 L123,1724" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1004 L137,1004" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1004 L147,1004" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1052 L137,1292" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1052 L147,1052" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1148 L147,1148" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1220 L147,1220" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1292 L147,1292" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1076 L161,1124" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1076 L171,1076" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1100 L171,1100" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1124 L171,1124" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1172 L161,1196" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1172 L171,1172" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1196 L171,1196" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1244 L161,1268" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1244 L171,1244" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1268 L171,1268" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1316 L161,1340" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1316 L171,1316" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1340 L171,1340" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1388 L137,1460" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1388 L147,1388" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1460 L147,1460" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1412 L161,1436" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1412 L171,1412" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1436 L171,1436" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1484 L161,1508" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1484 L171,1484" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1508 L171,1508" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1556 L137,1652" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1556 L147,1556" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1652 L147,1652" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1580 L161,1628" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1580 L171,1580" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1604 L171,1604" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1628 L171,1628" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1676 L161,1700" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1676 L171,1676" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1700 L171,1700" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1748 L137,1820" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1748 L147,1748" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1820 L147,1820" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1772 L161,1796" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1772 L171,1772" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1796 L171,1796" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1844 L161,1916" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1844 L171,1844" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1868 L171,1868" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1892 L171,1892" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,1916 L171,1916" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,1964 L113,2012" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,1964 L123,1964" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2012 L123,2012" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1988 L137,1988" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,1988 L147,1988" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2036 L137,2036" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2036 L147,2036" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2084 L113,2228" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2084 L123,2084" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2132 L123,2132" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2180 L123,2180" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2228 L123,2228" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2108 L137,2108" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2108 L147,2108" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2156 L137,2156" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2156 L147,2156" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2204 L137,2204" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2204 L147,2204" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2252 L137,2252" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2252 L147,2252" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2300 L113,2612" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2300 L123,2300" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2444 L123,2444" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2492 L123,2492" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2612 L123,2612" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2324 L137,2396" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2324 L147,2324" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2396 L147,2396" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2348 L161,2372" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2348 L171,2348" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2372 L171,2372" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2420 L161,2420" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2420 L171,2420" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2468 L137,2468" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2468 L147,2468" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2516 L137,2588" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2516 L147,2516" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2540 L147,2540" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2564 L147,2564" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2588 L147,2588" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2636 L137,2732" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2636 L147,2636" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2660 L147,2660" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2684 L147,2684" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2708 L147,2708" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2732 L147,2732" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2780 L113,3548" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2780 L123,2780" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2876 L123,2876" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,2924 L123,2924" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,3092 L123,3092" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,3236 L123,3236" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,3548 L123,3548" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2804 L137,2852" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2804 L147,2804" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2828 L147,2828" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2852 L147,2852" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2900 L137,2900" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2900 L147,2900" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2948 L137,3020" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,2948 L147,2948" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3020 L147,3020" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2972 L161,2996" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2972 L171,2972" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,2996 L171,2996" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3044 L161,3068" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3044 L171,3044" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3068 L171,3068" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3116 L137,3212" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3116 L147,3116" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3140 L147,3140" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3164 L147,3164" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3188 L147,3188" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3212 L147,3212" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3260 L137,3476" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3260 L147,3260" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3308 L147,3308" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3380 L147,3380" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3476 L147,3476" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3284 L161,3284" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3284 L171,3284" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3332 L161,3356" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3332 L171,3332" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3356 L171,3356" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3404 L161,3452" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3404 L171,3404" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3428 L171,3428" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3452 L171,3452" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3500 L161,3524" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3500 L171,3500" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3524 L171,3524" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3572 L137,3596" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3572 L147,3572" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3596 L147,3596" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,3644 L113,4052" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,3644 L123,3644" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4052 L123,4052" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3668 L137,3932" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3668 L147,3668" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3812 L147,3812" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,3932 L147,3932" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3692 L161,3788" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3692 L171,3692" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3716 L171,3716" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3740 L171,3740" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3764 L171,3764" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3788 L171,3788" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3836 L161,3908" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3836 L171,3836" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3860 L171,3860" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3884 L171,3884" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3908 L171,3908" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3956 L161,4028" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3956 L171,3956" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,3980 L171,3980" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,4004 L171,4004" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,4028 L171,4028" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4076 L137,4124" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4076 L147,4076" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4100 L147,4100" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4124 L147,4124" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,4172 L65,4172" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,4172 L75,4172" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,4196 L89,5540" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,4196 L99,4196" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,4364 L99,4364" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,4556 L99,4556" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,4724 L99,4724" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,4964 L99,4964" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,5156 L99,5156" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,5540 L99,5540" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4220 L113,4292" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4220 L123,4220" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4292 L123,4292" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4244 L137,4268" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4244 L147,4244" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4268 L147,4268" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4316 L137,4340" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4316 L147,4316" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4340 L147,4340" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4388 L113,4484" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4388 L123,4388" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4436 L123,4436" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4484 L123,4484" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4412 L137,4412" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4412 L147,4412" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4460 L137,4460" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4460 L147,4460" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4508 L137,4532" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4508 L147,4508" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4532 L147,4532" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4580 L113,4676" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4580 L123,4580" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4628 L123,4628" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4676 L123,4676" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4604 L137,4604" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4604 L147,4604" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4652 L137,4652" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4652 L147,4652" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4700 L137,4700" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4700 L147,4700" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4748 L113,4916" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4748 L123,4748" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4796 L123,4796" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4868 L123,4868" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4916 L123,4916" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4772 L137,4772" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4772 L147,4772" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4820 L137,4844" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4820 L147,4820" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4844 L147,4844" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4892 L137,4892" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4892 L147,4892" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4940 L137,4940" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,4940 L147,4940" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4988 L113,5084" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,4988 L123,4988" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5036 L123,5036" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5084 L123,5084" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5012 L137,5012" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5012 L147,5012" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5060 L137,5060" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5060 L147,5060" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5108 L137,5132" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5108 L147,5108" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5132 L147,5132" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5180 L113,5324" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5180 L123,5180" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5228 L123,5228" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5276 L123,5276" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5324 L123,5324" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5204 L137,5204" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5204 L147,5204" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5252 L137,5252" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5252 L147,5252" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5300 L137,5300" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5300 L147,5300" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5348 L137,5468" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5348 L147,5348" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5420 L147,5420" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5468 L147,5468" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5372 L161,5396" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5372 L171,5372" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5396 L171,5396" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5444 L161,5444" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5444 L171,5444" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5492 L161,5516" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5492 L171,5492" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M161,5516 L171,5516" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5564 L113,5708" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5564 L123,5564" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5612 L123,5612" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5660 L123,5660" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5708 L123,5708" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5588 L137,5588" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5588 L147,5588" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5636 L137,5636" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5636 L147,5636" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5684 L137,5684" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5684 L147,5684" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5732 L137,5732" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M137,5732 L147,5732" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,5780 L65,5780" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,5780 L75,5780" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,5804 L89,6836" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,5804 L99,5804" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,5924 L99,5924" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6020 L99,6020" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6164 L99,6164" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6236 L99,6236" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6308 L99,6308" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6428 L99,6428" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6572 L99,6572" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6668 L99,6668" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6764 L99,6764" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,6836 L99,6836" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5828 L113,5900" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5828 L123,5828" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5852 L123,5852" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5876 L123,5876" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5900 L123,5900" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5948 L113,5996" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5948 L123,5948" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5972 L123,5972" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,5996 L123,5996" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6044 L113,6140" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6044 L123,6044" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6068 L123,6068" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6092 L123,6092" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6116 L123,6116" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6140 L123,6140" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6188 L113,6212" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6188 L123,6188" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6212 L123,6212" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6260 L113,6284" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6260 L123,6260" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6284 L123,6284" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6332 L113,6404" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6332 L123,6332" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6356 L123,6356" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6380 L123,6380" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6404 L123,6404" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6452 L113,6548" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6452 L123,6452" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6476 L123,6476" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6500 L123,6500" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6524 L123,6524" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6548 L123,6548" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6596 L113,6644" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6596 L123,6596" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6620 L123,6620" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6644 L123,6644" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6692 L113,6740" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6692 L123,6692" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6716 L123,6716" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6740 L123,6740" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6788 L113,6812" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6788 L123,6788" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6812 L123,6812" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6860 L113,6932" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6860 L123,6860" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6884 L123,6884" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6908 L123,6908" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,6932 L123,6932" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,6980 L65,6980" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,6980 L75,6980" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7004 L89,7220" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7004 L99,7004" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7076 L99,7076" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7148 L99,7148" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7220 L99,7220" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7028 L113,7052" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7028 L123,7028" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7052 L123,7052" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7100 L113,7124" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7100 L123,7100" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7124 L123,7124" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7172 L113,7196" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7172 L123,7172" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7196 L123,7196" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7244 L113,7268" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7244 L123,7244" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7268 L123,7268" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,7316 L65,7316" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,7316 L75,7316" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7340 L89,7796" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7340 L99,7340" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7436 L99,7436" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7556 L99,7556" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7700 L99,7700" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,7796 L99,7796" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7364 L113,7412" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7364 L123,7364" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7388 L123,7388" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7412 L123,7412" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7460 L113,7532" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7460 L123,7460" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7484 L123,7484" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7508 L123,7508" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7532 L123,7532" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7580 L113,7676" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7580 L123,7580" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7604 L123,7604" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7628 L123,7628" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7652 L123,7652" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7676 L123,7676" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7724 L113,7772" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7724 L123,7724" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7748 L123,7748" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7772 L123,7772" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7820 L113,7916" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7820 L123,7820" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7844 L123,7844" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7868 L123,7868" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7892 L123,7892" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,7916 L123,7916" stroke="#2563EB" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,7964 L41,9620" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,7964 L51,7964" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,8828 L51,8828" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,9092 L51,9092" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,9620 L51,9620" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,7988 L65,7988" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,7988 L75,7988" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8012 L89,8732" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8012 L99,8012" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8132 L99,8132" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8204 L99,8204" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8324 L99,8324" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8396 L99,8396" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8540 L99,8540" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8660 L99,8660" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8732 L99,8732" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8036 L113,8108" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8036 L123,8036" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8060 L123,8060" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8084 L123,8084" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8108 L123,8108" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8156 L113,8180" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8156 L123,8156" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8180 L123,8180" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8228 L113,8300" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8228 L123,8228" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8252 L123,8252" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8276 L123,8276" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8300 L123,8300" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8348 L113,8372" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8348 L123,8348" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8372 L123,8372" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8420 L113,8516" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8420 L123,8420" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8444 L123,8444" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8468 L123,8468" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8492 L123,8492" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8516 L123,8516" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8564 L113,8636" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8564 L123,8564" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8588 L123,8588" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8612 L123,8612" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8636 L123,8636" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8684 L113,8708" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8684 L123,8684" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8708 L123,8708" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8756 L113,8804" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8756 L123,8756" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8780 L123,8780" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8804 L123,8804" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,8852 L65,8852" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,8852 L75,8852" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8876 L89,9020" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8876 L99,8876" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,8948 L99,8948" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9020 L99,9020" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8900 L113,8924" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8900 L123,8900" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8924 L123,8924" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8972 L113,8996" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8972 L123,8972" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,8996 L123,8996" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9044 L113,9068" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9044 L123,9044" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9068 L123,9068" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9116 L65,9380" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9116 L75,9116" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9380 L75,9380" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9140 L89,9308" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9140 L99,9140" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9212 L99,9212" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9308 L99,9308" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9164 L113,9188" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9164 L123,9164" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9188 L123,9188" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9236 L113,9284" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9236 L123,9236" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9260 L123,9260" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9284 L123,9284" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9332 L113,9356" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9332 L123,9332" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9356 L123,9356" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9404 L89,9548" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9404 L99,9404" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9476 L99,9476" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9548 L99,9548" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9428 L113,9452" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9428 L123,9428" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9452 L123,9452" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9500 L113,9524" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9500 L123,9500" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9524 L123,9524" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9572 L113,9596" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9572 L123,9572" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9596 L123,9596" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9644 L65,9644" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9644 L75,9644" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9668 L89,9836" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9668 L99,9668" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9764 L99,9764" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9836 L99,9836" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9692 L113,9740" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9692 L123,9692" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9716 L123,9716" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9740 L123,9740" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9788 L113,9812" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9788 L123,9788" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9812 L123,9812" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9860 L113,9884" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9860 L123,9860" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,9884 L123,9884" stroke="#0D9488" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,9932 L41,12380" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,9932 L51,9932" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,10196 L51,10196" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,10844 L51,10844" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,11876 L51,11876" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,12380 L51,12380" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9956 L65,9956" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,9956 L75,9956" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9980 L89,10124" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,9980 L99,9980" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10052 L99,10052" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10124 L99,10124" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10004 L113,10028" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10004 L123,10004" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10028 L123,10028" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10076 L113,10100" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10076 L123,10076" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10100 L123,10100" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10148 L113,10172" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10148 L123,10148" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10172 L123,10172" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,10220 L65,10220" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,10220 L75,10220" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10244 L89,10772" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10244 L99,10244" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10364 L99,10364" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10460 L99,10460" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10580 L99,10580" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10676 L99,10676" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10772 L99,10772" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10268 L113,10340" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10268 L123,10268" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10292 L123,10292" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10316 L123,10316" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10340 L123,10340" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10388 L113,10436" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10388 L123,10388" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10412 L123,10412" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10436 L123,10436" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10484 L113,10556" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10484 L123,10484" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10508 L123,10508" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10532 L123,10532" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10556 L123,10556" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10604 L113,10652" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10604 L123,10604" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10628 L123,10628" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10652 L123,10652" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10700 L113,10748" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10700 L123,10700" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10724 L123,10724" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10748 L123,10748" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10796 L113,10820" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10796 L123,10796" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10820 L123,10820" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,10868 L65,10868" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,10868 L75,10868" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10892 L89,11708" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,10892 L99,10892" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11036 L99,11036" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11180 L99,11180" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11276 L99,11276" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11348 L99,11348" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11540 L99,11540" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11708 L99,11708" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10916 L113,11012" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10916 L123,10916" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10940 L123,10940" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10964 L123,10964" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,10988 L123,10988" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11012 L123,11012" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11060 L113,11156" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11060 L123,11060" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11084 L123,11084" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11108 L123,11108" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11132 L123,11132" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11156 L123,11156" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11204 L113,11252" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11204 L123,11204" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11228 L123,11228" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11252 L123,11252" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11300 L113,11324" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11300 L123,11300" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11324 L123,11324" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11372 L113,11516" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11372 L123,11372" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11396 L123,11396" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11420 L123,11420" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11444 L123,11444" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11468 L123,11468" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11492 L123,11492" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11516 L123,11516" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11564 L113,11684" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11564 L123,11564" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11588 L123,11588" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11612 L123,11612" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11636 L123,11636" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11660 L123,11660" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11684 L123,11684" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11732 L113,11852" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11732 L123,11732" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11756 L123,11756" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11780 L123,11780" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11804 L123,11804" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11828 L123,11828" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11852 L123,11852" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,11900 L65,11900" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,11900 L75,11900" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11924 L89,12308" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,11924 L99,11924" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12044 L99,12044" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12140 L99,12140" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12236 L99,12236" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12308 L99,12308" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11948 L113,12020" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11948 L123,11948" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11972 L123,11972" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,11996 L123,11996" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12020 L123,12020" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12068 L113,12116" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12068 L123,12068" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12092 L123,12092" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12116 L123,12116" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12164 L113,12212" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12164 L123,12164" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12188 L123,12188" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12212 L123,12212" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12260 L113,12284" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12260 L123,12260" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12284 L123,12284" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12332 L113,12356" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12332 L123,12332" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12356 L123,12356" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,12404 L65,12404" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,12404 L75,12404" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12428 L89,12668" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12428 L99,12428" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12524 L99,12524" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12596 L99,12596" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12668 L99,12668" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12452 L113,12500" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12452 L123,12452" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12476 L123,12476" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12500 L123,12500" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12548 L113,12572" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12548 L123,12548" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12572 L123,12572" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12620 L113,12644" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12620 L123,12620" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12644 L123,12644" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12692 L113,12740" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12692 L123,12692" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12716 L123,12716" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12740 L123,12740" stroke="#7C3AED" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,12788 L41,13412" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,12788 L51,12788" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,13076 L51,13076" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,13412 L51,13412" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,12812 L65,12812" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,12812 L75,12812" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12836 L89,12932" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12836 L99,12836" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,12932 L99,12932" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12860 L113,12908" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12860 L123,12860" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12884 L123,12884" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12908 L123,12908" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12956 L113,13052" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12956 L123,12956" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,12980 L123,12980" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13004 L123,13004" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13028 L123,13028" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13052 L123,13052" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,13100 L65,13100" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,13100 L75,13100" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13124 L89,13268" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13124 L99,13124" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13268 L99,13268" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13148 L113,13244" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13148 L123,13148" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13172 L123,13172" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13196 L123,13196" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13220 L123,13220" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13244 L123,13244" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13292 L113,13388" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13292 L123,13292" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13316 L123,13316" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13340 L123,13340" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13364 L123,13364" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13388 L123,13388" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,13436 L65,13436" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,13436 L75,13436" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13460 L89,13460" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13460 L99,13460" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13484 L113,13556" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13484 L123,13484" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13508 L123,13508" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13532 L123,13532" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13556 L123,13556" stroke="#B45309" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,13604 L41,15572" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,13604 L51,13604" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,14060 L51,14060" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,14468 L51,14468" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,15332 L51,15332" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M41,15572 L51,15572" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,13628 L65,13628" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,13628 L75,13628" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13652 L89,13892" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13652 L99,13652" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13796 L99,13796" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,13892 L99,13892" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13676 L113,13772" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13676 L123,13676" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13700 L123,13700" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13724 L123,13724" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13748 L123,13748" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13772 L123,13772" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13820 L113,13868" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13820 L123,13820" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13844 L123,13844" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13868 L123,13868" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13916 L113,14036" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13916 L123,13916" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13940 L123,13940" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13964 L123,13964" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,13988 L123,13988" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14012 L123,14012" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14036 L123,14036" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,14084 L65,14084" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,14084 L75,14084" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14108 L89,14348" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14108 L99,14108" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14180 L99,14180" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14252 L99,14252" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14348 L99,14348" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14132 L113,14156" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14132 L123,14132" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14156 L123,14156" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14204 L113,14228" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14204 L123,14204" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14228 L123,14228" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14276 L113,14324" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14276 L123,14276" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14300 L123,14300" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14324 L123,14324" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14372 L113,14444" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14372 L123,14372" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14396 L123,14396" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14420 L123,14420" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14444 L123,14444" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,14492 L65,14492" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,14492 L75,14492" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14516 L89,15236" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14516 L99,14516" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14708 L99,14708" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14804 L99,14804" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14900 L99,14900" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,14972 L99,14972" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15044 L99,15044" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15140 L99,15140" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15236 L99,15236" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14540 L113,14684" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14540 L123,14540" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14564 L123,14564" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14588 L123,14588" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14612 L123,14612" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14636 L123,14636" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14660 L123,14660" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14684 L123,14684" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14732 L113,14780" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14732 L123,14732" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14756 L123,14756" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14780 L123,14780" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14828 L113,14876" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14828 L123,14828" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14852 L123,14852" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14876 L123,14876" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14924 L113,14948" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14924 L123,14924" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14948 L123,14948" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14996 L113,15020" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,14996 L123,14996" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15020 L123,15020" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15068 L113,15116" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15068 L123,15068" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15092 L123,15092" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15116 L123,15116" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15164 L113,15212" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15164 L123,15164" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15188 L123,15188" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15212 L123,15212" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15260 L113,15308" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15260 L123,15260" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15284 L123,15284" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15308 L123,15308" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,15356 L65,15356" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,15356 L75,15356" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15380 L89,15476" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15380 L99,15380" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15476 L99,15476" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15404 L113,15452" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15404 L123,15404" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15428 L123,15428" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15452 L123,15452" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15500 L113,15548" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15500 L123,15500" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15524 L123,15524" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15548 L123,15548" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,15596 L65,15596" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M65,15596 L75,15596" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15620 L89,15692" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15620 L99,15620" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M89,15692 L99,15692" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15644 L113,15668" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15644 L123,15644" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15668 L123,15668" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15716 L113,15764" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15716 L123,15716" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15740 L123,15740" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<path d="M113,15764 L123,15764" stroke="#DC2626" stroke-width="1.1" opacity="0.5" fill="none"/>
+<rect x="22" y="76" width="107.0" height="24" rx="5" fill="#2563EB" opacity="0.14"/>
+<text x="30" y="92" fill="#2563EB" font-size="17" font-weight="bold">必修第一册</text>
+<text x="54" y="116" fill="#111827" font-size="15" font-weight="600">第一章 物质及其变化</text>
+<text x="78" y="140" fill="#2563EB" font-size="13.5" font-weight="600">物质分类与转化（章末图 · 深度版）</text>
+<text x="102" y="164" fill="#1F2937" font-size="13">混合物 · 胶体</text>
+<text x="126" y="188" fill="#1F2937" font-size="13">分类</text>
+<text x="150" y="212" fill="#1F2937" font-size="13">按分散剂状态</text>
+<text x="174" y="236" fill="#6B7280" font-size="12">气溶胶（烟、雾）</text>
+<text x="174" y="260" fill="#6B7280" font-size="12">液溶胶（Fe(OH)₃ 胶体）</text>
+<text x="174" y="284" fill="#6B7280" font-size="12">固溶胶（有色玻璃）</text>
+<text x="150" y="308" fill="#1F2937" font-size="13">按分散质构成</text>
+<text x="174" y="332" fill="#6B7280" font-size="12">粒子胶体：分散质为许多分子集合体</text>
+<text x="174" y="356" fill="#6B7280" font-size="12">分子胶体：分散质为单个大分子（如蛋白质溶液）</text>
+<text x="126" y="380" fill="#1F2937" font-size="13">氢氧化铁胶体的制备</text>
+<text x="150" y="404" fill="#1F2937" font-size="13">原理</text>
+<text x="174" y="428" fill="#6B7280" font-size="12">FeCl₃ + 3H₂O →(Δ) Fe(OH)₃(胶体) + 3HCl</text>
+<text x="150" y="452" fill="#1F2937" font-size="13">操作</text>
+<text x="174" y="476" fill="#6B7280" font-size="12">向沸水中逐滴加入饱和 FeCl₃ 溶液</text>
+<text x="174" y="500" fill="#6B7280" font-size="12">继续煮沸至液体呈红褐色，立即停止加热</text>
+<text x="150" y="524" fill="#1F2937" font-size="13">现象</text>
+<text x="174" y="548" fill="#6B7280" font-size="12">得到红褐色透明液体</text>
+<text x="150" y="572" fill="#1F2937" font-size="13">注意事项</text>
+<text x="174" y="596" fill="#6B7280" font-size="12">不能用 NaOH 代替</text>
+<text x="174" y="620" fill="#6B7280" font-size="12">不能长时间煮沸（会聚沉）</text>
+<text x="174" y="644" fill="#6B7280" font-size="12">不能搅拌</text>
+<text x="126" y="668" fill="#1F2937" font-size="13">性质</text>
+<text x="150" y="692" fill="#1F2937" font-size="13">丁达尔效应</text>
+<text x="174" y="716" fill="#6B7280" font-size="12">光通过胶体出现光路</text>
+<text x="174" y="740" fill="#6B7280" font-size="12">用于区分溶液和胶体</text>
+<text x="174" y="764" fill="#6B7280" font-size="12">属于物理现象</text>
+<text x="102" y="788" fill="#1F2937" font-size="13">纯净物 · 单质</text>
+<text x="126" y="812" fill="#1F2937" font-size="13">金属单质</text>
+<text x="150" y="836" fill="#6B7280" font-size="12">Na、Mg、Al、Fe、Cu 等</text>
+<text x="126" y="860" fill="#1F2937" font-size="13">非金属单质</text>
+<text x="150" y="884" fill="#6B7280" font-size="12">Cl₂、O₂、S、N₂、Si 等</text>
+<text x="126" y="908" fill="#1F2937" font-size="13">稀有气体</text>
+<text x="150" y="932" fill="#6B7280" font-size="12">He、Ne、Ar 等，单原子分子</text>
+<text x="102" y="956" fill="#1F2937" font-size="13">纯净物 · 化合物</text>
+<text x="126" y="980" fill="#1F2937" font-size="13">有机化合物</text>
+<text x="150" y="1004" fill="#6B7280" font-size="12">含碳的化合物（CO、CO₂、碳酸盐除外）</text>
+<text x="126" y="1028" fill="#1F2937" font-size="13">无机化合物 · 酸</text>
+<text x="150" y="1052" fill="#1F2937" font-size="13">按电离出 H⁺ 数目</text>
+<text x="174" y="1076" fill="#6B7280" font-size="12">一元酸（HCl、CH₃COOH）</text>
+<text x="174" y="1100" fill="#6B7280" font-size="12">二元酸（H₂SO₄、H₂CO₃）</text>
+<text x="174" y="1124" fill="#6B7280" font-size="12">三元酸（H₃PO₄）</text>
+<text x="150" y="1148" fill="#1F2937" font-size="13">按酸性强弱</text>
+<text x="174" y="1172" fill="#6B7280" font-size="12">强酸：HCl、H₂SO₄、HNO₃</text>
+<text x="174" y="1196" fill="#6B7280" font-size="12">弱酸：CH₃COOH、H₂CO₃、HClO</text>
+<text x="150" y="1220" fill="#1F2937" font-size="13">按有无挥发性</text>
+<text x="174" y="1244" fill="#6B7280" font-size="12">挥发性酸：HCl、HNO₃</text>
+<text x="174" y="1268" fill="#6B7280" font-size="12">难挥发性酸：H₂SO₄、H₃PO₄</text>
+<text x="150" y="1292" fill="#1F2937" font-size="13">按溶解性</text>
+<text x="174" y="1316" fill="#6B7280" font-size="12">可溶性酸</text>
+<text x="174" y="1340" fill="#6B7280" font-size="12">难溶性酸（H₂SiO₃）</text>
+<text x="126" y="1364" fill="#1F2937" font-size="13">无机化合物 · 碱</text>
+<text x="150" y="1388" fill="#1F2937" font-size="13">按溶解性</text>
+<text x="174" y="1412" fill="#6B7280" font-size="12">可溶性碱：NaOH、KOH、Ba(OH)₂</text>
+<text x="174" y="1436" fill="#6B7280" font-size="12">难溶性碱：Fe(OH)₃、Cu(OH)₂、Mg(OH)₂</text>
+<text x="150" y="1460" fill="#1F2937" font-size="13">按碱性强弱</text>
+<text x="174" y="1484" fill="#6B7280" font-size="12">强碱：NaOH、KOH、Ba(OH)₂</text>
+<text x="174" y="1508" fill="#6B7280" font-size="12">弱碱：NH₃·H₂O</text>
+<text x="126" y="1532" fill="#1F2937" font-size="13">无机化合物 · 盐</text>
+<text x="150" y="1556" fill="#1F2937" font-size="13">按组成</text>
+<text x="174" y="1580" fill="#6B7280" font-size="12">正盐（Na₂CO₃）</text>
+<text x="174" y="1604" fill="#6B7280" font-size="12">酸式盐（NaHCO₃）</text>
+<text x="174" y="1628" fill="#6B7280" font-size="12">碱式盐（Cu₂(OH)₂CO₃）</text>
+<text x="150" y="1652" fill="#1F2937" font-size="13">按溶解性</text>
+<text x="174" y="1676" fill="#6B7280" font-size="12">可溶性盐</text>
+<text x="174" y="1700" fill="#6B7280" font-size="12">难溶性盐（BaSO₄、AgCl）</text>
+<text x="126" y="1724" fill="#1F2937" font-size="13">无机化合物 · 氧化物</text>
+<text x="150" y="1748" fill="#1F2937" font-size="13">按组成</text>
+<text x="174" y="1772" fill="#6B7280" font-size="12">金属氧化物（Na₂O、Fe₂O₃）</text>
+<text x="174" y="1796" fill="#6B7280" font-size="12">非金属氧化物（CO₂、SO₂）</text>
+<text x="150" y="1820" fill="#1F2937" font-size="13">按性质</text>
+<text x="174" y="1844" fill="#6B7280" font-size="12">酸性氧化物（CO₂、SO₃）</text>
+<text x="174" y="1868" fill="#6B7280" font-size="12">碱性氧化物（Na₂O、CaO）</text>
+<text x="174" y="1892" fill="#6B7280" font-size="12">两性氧化物（Al₂O₃）</text>
+<text x="174" y="1916" fill="#6B7280" font-size="12">不成盐氧化物（CO、NO）</text>
+<text x="102" y="1940" fill="#1F2937" font-size="13">分类方法</text>
+<text x="126" y="1964" fill="#1F2937" font-size="13">树状分类法</text>
+<text x="150" y="1988" fill="#6B7280" font-size="12">逐级细分，如 物质→混合物/纯净物→…</text>
+<text x="126" y="2012" fill="#1F2937" font-size="13">交叉分类法</text>
+<text x="150" y="2036" fill="#6B7280" font-size="12">同一物质同时属于多个类别（Na₂CO₃ 既是钠盐又是碳酸盐）</text>
+<text x="102" y="2060" fill="#1F2937" font-size="13">化学反应分类 · 基本反应类型</text>
+<text x="126" y="2084" fill="#1F2937" font-size="13">化合反应</text>
+<text x="150" y="2108" fill="#6B7280" font-size="12">A + B → AB</text>
+<text x="126" y="2132" fill="#1F2937" font-size="13">分解反应</text>
+<text x="150" y="2156" fill="#6B7280" font-size="12">AB → A + B</text>
+<text x="126" y="2180" fill="#1F2937" font-size="13">置换反应</text>
+<text x="150" y="2204" fill="#6B7280" font-size="12">A + BC → AC + B（一定是氧化还原）</text>
+<text x="126" y="2228" fill="#1F2937" font-size="13">复分解反应</text>
+<text x="150" y="2252" fill="#6B7280" font-size="12">AB + CD → AD + CB（生成沉淀/气体/弱电解质）</text>
+<text x="102" y="2276" fill="#1F2937" font-size="13">离子反应</text>
+<text x="126" y="2300" fill="#1F2937" font-size="13">离子方程式书写</text>
+<text x="150" y="2324" fill="#1F2937" font-size="13">改写</text>
+<text x="174" y="2348" fill="#6B7280" font-size="12">拆：强酸、强碱、可溶盐</text>
+<text x="174" y="2372" fill="#6B7280" font-size="12">不拆：弱电解质、沉淀、气体、氧化物、单质</text>
+<text x="150" y="2396" fill="#1F2937" font-size="13">直写</text>
+<text x="174" y="2420" fill="#6B7280" font-size="12">按离子形式直接写，再配平</text>
+<text x="126" y="2444" fill="#1F2937" font-size="13">意义</text>
+<text x="150" y="2468" fill="#6B7280" font-size="12">表示同一类反应，而不只是一个具体反应</text>
+<text x="126" y="2492" fill="#1F2937" font-size="13">发生条件</text>
+<text x="150" y="2516" fill="#6B7280" font-size="12">生成沉淀</text>
+<text x="150" y="2540" fill="#6B7280" font-size="12">放出气体</text>
+<text x="150" y="2564" fill="#6B7280" font-size="12">生成难电离的物质（水、弱酸、弱碱）</text>
+<text x="150" y="2588" fill="#6B7280" font-size="12">发生氧化还原反应</text>
+<text x="126" y="2612" fill="#1F2937" font-size="13">应用 · 离子共存</text>
+<text x="150" y="2636" fill="#6B7280" font-size="12">生成沉淀不能共存</text>
+<text x="150" y="2660" fill="#6B7280" font-size="12">生成气体不能共存</text>
+<text x="150" y="2684" fill="#6B7280" font-size="12">生成弱电解质不能共存</text>
+<text x="150" y="2708" fill="#6B7280" font-size="12">发生氧化还原不能共存</text>
+<text x="150" y="2732" fill="#6B7280" font-size="12">注意隐含条件：无色、酸性、碱性</text>
+<text x="102" y="2756" fill="#1F2937" font-size="13">氧化还原反应</text>
+<text x="126" y="2780" fill="#1F2937" font-size="13">实质</text>
+<text x="150" y="2804" fill="#6B7280" font-size="12">电子转移（得失或偏移）</text>
+<text x="150" y="2828" fill="#6B7280" font-size="12">双线桥法：标得失电子数</text>
+<text x="150" y="2852" fill="#6B7280" font-size="12">单线桥法：标电子转移方向与数目</text>
+<text x="126" y="2876" fill="#1F2937" font-size="13">特征</text>
+<text x="150" y="2900" fill="#6B7280" font-size="12">元素化合价升降（宏观判断依据）</text>
+<text x="126" y="2924" fill="#1F2937" font-size="13">基本概念</text>
+<text x="150" y="2948" fill="#1F2937" font-size="13">氧化剂与还原剂</text>
+<text x="174" y="2972" fill="#6B7280" font-size="12">氧化剂：得电子、化合价降低、被还原</text>
+<text x="174" y="2996" fill="#6B7280" font-size="12">还原剂：失电子、化合价升高、被氧化</text>
+<text x="150" y="3020" fill="#1F2937" font-size="13">产物</text>
+<text x="174" y="3044" fill="#6B7280" font-size="12">氧化剂 → 还原产物</text>
+<text x="174" y="3068" fill="#6B7280" font-size="12">还原剂 → 氧化产物</text>
+<text x="126" y="3092" fill="#1F2937" font-size="13">配平方法</text>
+<text x="150" y="3116" fill="#6B7280" font-size="12">标变价</text>
+<text x="150" y="3140" fill="#6B7280" font-size="12">列得失</text>
+<text x="150" y="3164" fill="#6B7280" font-size="12">求总数（最小公倍数）</text>
+<text x="150" y="3188" fill="#6B7280" font-size="12">配系数</text>
+<text x="150" y="3212" fill="#6B7280" font-size="12">查守恒（质量、电荷、电子）</text>
+<text x="126" y="3236" fill="#1F2937" font-size="13">规律总结</text>
+<text x="150" y="3260" fill="#1F2937" font-size="13">守恒规律</text>
+<text x="174" y="3284" fill="#6B7280" font-size="12">得失电子总数相等</text>
+<text x="150" y="3308" fill="#1F2937" font-size="13">强弱规律</text>
+<text x="174" y="3332" fill="#6B7280" font-size="12">氧化性：氧化剂 &gt; 氧化产物</text>
+<text x="174" y="3356" fill="#6B7280" font-size="12">还原性：还原剂 &gt; 还原产物</text>
+<text x="150" y="3380" fill="#1F2937" font-size="13">价态规律</text>
+<text x="174" y="3404" fill="#6B7280" font-size="12">最高价只有氧化性</text>
+<text x="174" y="3428" fill="#6B7280" font-size="12">最低价只有还原性</text>
+<text x="174" y="3452" fill="#6B7280" font-size="12">中间价态两者都有</text>
+<text x="150" y="3476" fill="#1F2937" font-size="13">先后规律</text>
+<text x="174" y="3500" fill="#6B7280" font-size="12">还原性强的先被氧化</text>
+<text x="174" y="3524" fill="#6B7280" font-size="12">氧化性强的先被还原</text>
+<text x="126" y="3548" fill="#1F2937" font-size="13">信息型方程式书写</text>
+<text x="150" y="3572" fill="#6B7280" font-size="12">先由信息确定产物与价态</text>
+<text x="150" y="3596" fill="#6B7280" font-size="12">再按配平五步走</text>
+<text x="102" y="3620" fill="#1F2937" font-size="13">物质的转化</text>
+<text x="126" y="3644" fill="#1F2937" font-size="13">从物质类别角度</text>
+<text x="150" y="3668" fill="#1F2937" font-size="13">酸的通性</text>
+<text x="174" y="3692" fill="#6B7280" font-size="12">使酸碱指示剂显色</text>
+<text x="174" y="3716" fill="#6B7280" font-size="12">与活泼金属反应（置换）</text>
+<text x="174" y="3740" fill="#6B7280" font-size="12">与碱性氧化物反应（复分解）</text>
+<text x="174" y="3764" fill="#6B7280" font-size="12">与碱反应（复分解）</text>
+<text x="174" y="3788" fill="#6B7280" font-size="12">与某些盐反应（复分解）</text>
+<text x="150" y="3812" fill="#1F2937" font-size="13">碱的通性</text>
+<text x="174" y="3836" fill="#6B7280" font-size="12">使酸碱指示剂显色</text>
+<text x="174" y="3860" fill="#6B7280" font-size="12">与酸性氧化物反应</text>
+<text x="174" y="3884" fill="#6B7280" font-size="12">与酸反应</text>
+<text x="174" y="3908" fill="#6B7280" font-size="12">与某些盐反应</text>
+<text x="150" y="3932" fill="#1F2937" font-size="13">盐的通性</text>
+<text x="174" y="3956" fill="#6B7280" font-size="12">与金属反应（置换）</text>
+<text x="174" y="3980" fill="#6B7280" font-size="12">与碱反应</text>
+<text x="174" y="4004" fill="#6B7280" font-size="12">与酸反应</text>
+<text x="174" y="4028" fill="#6B7280" font-size="12">与某些盐反应</text>
+<text x="126" y="4052" fill="#1F2937" font-size="13">从元素价态角度</text>
+<text x="150" y="4076" fill="#6B7280" font-size="12">最高价态：只有氧化性</text>
+<text x="150" y="4100" fill="#6B7280" font-size="12">最低价态：只有还原性</text>
+<text x="150" y="4124" fill="#6B7280" font-size="12">中间价态：既有氧化性又有还原性</text>
+<text x="54" y="4148" fill="#111827" font-size="15" font-weight="600">第二章 海水中的重要元素——钠和氯</text>
+<text x="78" y="4172" fill="#2563EB" font-size="13.5" font-weight="600">物质的量（章末图 · 深度版）</text>
+<text x="102" y="4196" fill="#1F2937" font-size="13">物质的量</text>
+<text x="126" y="4220" fill="#1F2937" font-size="13">符号与单位</text>
+<text x="150" y="4244" fill="#6B7280" font-size="12">符号 n</text>
+<text x="150" y="4268" fill="#6B7280" font-size="12">单位 摩尔（mol）</text>
+<text x="126" y="4292" fill="#1F2937" font-size="13">使用范围</text>
+<text x="150" y="4316" fill="#6B7280" font-size="12">只用于微观粒子（分子、原子、离子、电子、质子、中子）</text>
+<text x="150" y="4340" fill="#6B7280" font-size="12">或它们的特定组合（原子团、官能团）</text>
+<text x="102" y="4364" fill="#1F2937" font-size="13">阿伏加德罗常数</text>
+<text x="126" y="4388" fill="#1F2937" font-size="13">概念</text>
+<text x="150" y="4412" fill="#6B7280" font-size="12">1 mol 任何粒子的粒子数</text>
+<text x="126" y="4436" fill="#1F2937" font-size="13">数值</text>
+<text x="150" y="4460" fill="#6B7280" font-size="12">N_A ≈ 6.02×10²³ mol⁻¹</text>
+<text x="126" y="4484" fill="#1F2937" font-size="13">公式</text>
+<text x="150" y="4508" fill="#6B7280" font-size="12">n = N / N_A</text>
+<text x="150" y="4532" fill="#6B7280" font-size="12">N = n · N_A</text>
+<text x="102" y="4556" fill="#1F2937" font-size="13">摩尔质量</text>
+<text x="126" y="4580" fill="#1F2937" font-size="13">概念</text>
+<text x="150" y="4604" fill="#6B7280" font-size="12">单位物质的量的物质所具有的质量</text>
+<text x="126" y="4628" fill="#1F2937" font-size="13">数值</text>
+<text x="150" y="4652" fill="#6B7280" font-size="12">以 g/mol 为单位时，数值上等于相对分子（原子）质量</text>
+<text x="126" y="4676" fill="#1F2937" font-size="13">公式</text>
+<text x="150" y="4700" fill="#6B7280" font-size="12">M = m / n</text>
+<text x="102" y="4724" fill="#1F2937" font-size="13">气体摩尔体积</text>
+<text x="126" y="4748" fill="#1F2937" font-size="13">概念</text>
+<text x="150" y="4772" fill="#6B7280" font-size="12">单位物质的量的气体所占的体积</text>
+<text x="126" y="4796" fill="#1F2937" font-size="13">单位</text>
+<text x="150" y="4820" fill="#6B7280" font-size="12">L/mol 或 L·mol⁻¹</text>
+<text x="150" y="4844" fill="#6B7280" font-size="12">m³/mol 或 m³·mol⁻¹</text>
+<text x="126" y="4868" fill="#1F2937" font-size="13">公式</text>
+<text x="150" y="4892" fill="#6B7280" font-size="12">Vm = V / n</text>
+<text x="126" y="4916" fill="#1F2937" font-size="13">特例</text>
+<text x="150" y="4940" fill="#6B7280" font-size="12">标准状况（0 ℃，101 kPa）下 Vm ≈ 22.4 L/mol</text>
+<text x="102" y="4964" fill="#1F2937" font-size="13">阿伏加德罗定律</text>
+<text x="126" y="4988" fill="#1F2937" font-size="13">含义</text>
+<text x="150" y="5012" fill="#6B7280" font-size="12">同温同压下，相同体积的任何气体都含有相同数目的粒子</text>
+<text x="126" y="5036" fill="#1F2937" font-size="13">三同定一同</text>
+<text x="150" y="5060" fill="#6B7280" font-size="12">T₁=T₂、p₁=p₂、V₁=V₂ ⇒ N₁=N₂</text>
+<text x="126" y="5084" fill="#1F2937" font-size="13">推论</text>
+<text x="150" y="5108" fill="#6B7280" font-size="12">同温同压：V₁/V₂ = n₁/n₂</text>
+<text x="150" y="5132" fill="#6B7280" font-size="12">同温同体积：p₁/p₂ = n₁/n₂</text>
+<text x="102" y="5156" fill="#1F2937" font-size="13">物质的量浓度</text>
+<text x="126" y="5180" fill="#1F2937" font-size="13">定义</text>
+<text x="150" y="5204" fill="#6B7280" font-size="12">单位体积溶液里所含溶质 B 的物质的量</text>
+<text x="126" y="5228" fill="#1F2937" font-size="13">表达式</text>
+<text x="150" y="5252" fill="#6B7280" font-size="12">c_B = n_B / V</text>
+<text x="126" y="5276" fill="#1F2937" font-size="13">单位</text>
+<text x="150" y="5300" fill="#6B7280" font-size="12">mol/L 或 mol·L⁻¹</text>
+<text x="126" y="5324" fill="#1F2937" font-size="13">配制一定物质的量浓度溶液</text>
+<text x="150" y="5348" fill="#1F2937" font-size="13">仪器使用</text>
+<text x="174" y="5372" fill="#6B7280" font-size="12">容量瓶：不能加热、不能作反应容器</text>
+<text x="174" y="5396" fill="#6B7280" font-size="12">定容时用胶头滴管</text>
+<text x="150" y="5420" fill="#1F2937" font-size="13">操作步骤</text>
+<text x="174" y="5444" fill="#6B7280" font-size="12">计算 → 称量 → 溶解 → 冷却 → 转移 → 洗涤 → 定容 → 摇匀</text>
+<text x="150" y="5468" fill="#1F2937" font-size="13">误差分析</text>
+<text x="174" y="5492" fill="#6B7280" font-size="12">n 偏小 → c 偏小（如溶质损失、未洗涤）</text>
+<text x="174" y="5516" fill="#6B7280" font-size="12">V 偏小 → c 偏大（如俯视定容）</text>
+<text x="102" y="5540" fill="#1F2937" font-size="13">化学计算常用方法</text>
+<text x="126" y="5564" fill="#1F2937" font-size="13">守恒法</text>
+<text x="150" y="5588" fill="#6B7280" font-size="12">电子守恒、原子守恒、电荷守恒</text>
+<text x="126" y="5612" fill="#1F2937" font-size="13">关系式法</text>
+<text x="150" y="5636" fill="#6B7280" font-size="12">多步反应找比例关系</text>
+<text x="126" y="5660" fill="#1F2937" font-size="13">差量法</text>
+<text x="150" y="5684" fill="#6B7280" font-size="12">看质量或体积的变化量</text>
+<text x="126" y="5708" fill="#1F2937" font-size="13">热重分析法</text>
+<text x="150" y="5732" fill="#6B7280" font-size="12">看加热过程中的失重</text>
+<text x="54" y="5756" fill="#111827" font-size="15" font-weight="600">第三章 铁 金属材料</text>
+<text x="78" y="5780" fill="#2563EB" font-size="13.5" font-weight="600">3. 金属及其化合物（章末知识体系）</text>
+<text x="102" y="5804" fill="#1F2937" font-size="13">钠的性质</text>
+<text x="126" y="5828" fill="#6B7280" font-size="12">与 O₂：不加热生成 Na₂O，加热生成 Na₂O₂</text>
+<text x="126" y="5852" fill="#6B7280" font-size="12">与水：浮、熔、游、响、红</text>
+<text x="126" y="5876" fill="#6B7280" font-size="12">与碱溶液：先与水反应，不置换碱中的金属</text>
+<text x="126" y="5900" fill="#6B7280" font-size="12">与盐溶液：先与水反应，再考虑沉淀</text>
+<text x="102" y="5924" fill="#1F2937" font-size="13">钠的氧化物</text>
+<text x="126" y="5948" fill="#6B7280" font-size="12">Na₂O + H₂O → 2NaOH；Na₂O + CO₂ → Na₂CO₃</text>
+<text x="126" y="5972" fill="#6B7280" font-size="12">2Na₂O₂ + 2H₂O → 4NaOH + O₂↑；2Na₂O₂ + 2CO₂ → 2Na₂CO₃ + O₂</text>
+<text x="126" y="5996" fill="#6B7280" font-size="12">Na₂O₂ 可作供氧剂、漂白剂</text>
+<text x="102" y="6020" fill="#1F2937" font-size="13">碳酸钠与碳酸氢钠</text>
+<text x="126" y="6044" fill="#6B7280" font-size="12">碱性：Na₂CO₃ &gt; NaHCO₃</text>
+<text x="126" y="6068" fill="#6B7280" font-size="12">溶解性：Na₂CO₃ &gt; NaHCO₃</text>
+<text x="126" y="6092" fill="#6B7280" font-size="12">热稳定性：Na₂CO₃ 稳定，NaHCO₃ 受热分解</text>
+<text x="126" y="6116" fill="#6B7280" font-size="12">与酸反应：NaHCO₃ 更快</text>
+<text x="126" y="6140" fill="#6B7280" font-size="12">鉴别：固体加热法；溶液测 pH、加盐酸法</text>
+<text x="102" y="6164" fill="#1F2937" font-size="13">侯氏制碱法</text>
+<text x="126" y="6188" fill="#6B7280" font-size="12">NaCl + NH₃ + CO₂ + H₂O → NaHCO₃↓ + NH₄Cl</text>
+<text x="126" y="6212" fill="#6B7280" font-size="12">2NaHCO₃ →(Δ) Na₂CO₃ + H₂O + CO₂↑</text>
+<text x="102" y="6236" fill="#1F2937" font-size="13">焰色试验</text>
+<text x="126" y="6260" fill="#6B7280" font-size="12">操作：洗→烧→蘸→烧→洗（用盐酸洗铂丝）</text>
+<text x="126" y="6284" fill="#6B7280" font-size="12">钠：黄色；钾：紫色（透过蓝色钴玻璃）</text>
+<text x="102" y="6308" fill="#1F2937" font-size="13">铁的性质</text>
+<text x="126" y="6332" fill="#6B7280" font-size="12">与非金属：Cl₂→FeCl₃，S→FeS</text>
+<text x="126" y="6356" fill="#6B7280" font-size="12">与水蒸气：3Fe + 4H₂O(g) →(高温) Fe₃O₄ + 4H₂</text>
+<text x="126" y="6380" fill="#6B7280" font-size="12">与酸：非氧化性酸→Fe²⁺；氧化性酸→Fe³⁺（铁过量最终 Fe²⁺）</text>
+<text x="126" y="6404" fill="#6B7280" font-size="12">与盐溶液：Fe + Cu²⁺ → Fe²⁺ + Cu</text>
+<text x="102" y="6428" fill="#1F2937" font-size="13">铁的氧化物与氢氧化物</text>
+<text x="126" y="6452" fill="#6B7280" font-size="12">FeO：黑色粉末，不稳定</text>
+<text x="126" y="6476" fill="#6B7280" font-size="12">Fe₂O₃：红棕色，俗称铁红，稳定</text>
+<text x="126" y="6500" fill="#6B7280" font-size="12">Fe₃O₄：黑色晶体，有磁性</text>
+<text x="126" y="6524" fill="#6B7280" font-size="12">Fe(OH)₂：白色→灰绿色→红褐色（被氧化）</text>
+<text x="126" y="6548" fill="#6B7280" font-size="12">Fe(OH)₃：红褐色，受热分解</text>
+<text x="102" y="6572" fill="#1F2937" font-size="13">铁盐与亚铁盐</text>
+<text x="126" y="6596" fill="#6B7280" font-size="12">Fe³⁺ 检验：KSCN 变红；加 NaOH 生成红褐色沉淀；加苯酚显紫色</text>
+<text x="126" y="6620" fill="#6B7280" font-size="12">Fe²⁺ 检验：加 KSCN 无现象，再加氯水变红；加 NaOH 白色→灰绿→红褐</text>
+<text x="126" y="6644" fill="#6B7280" font-size="12">转化：2Fe³⁺ + Fe → 3Fe²⁺；2Fe²⁺ + Cl₂ → 2Fe³⁺ + 2Cl⁻</text>
+<text x="102" y="6668" fill="#1F2937" font-size="13">铝及其化合物</text>
+<text x="126" y="6692" fill="#6B7280" font-size="12">2Al + 6H⁺ → 2Al³⁺ + 3H₂↑；2Al + 2OH⁻ + 2H₂O → 2AlO₂⁻ + 3H₂↑</text>
+<text x="126" y="6716" fill="#6B7280" font-size="12">Al₂O₃、Al(OH)₃ 都两性</text>
+<text x="126" y="6740" fill="#6B7280" font-size="12">铝热反应：2Al + Fe₂O₃ →(高温) 2Fe + Al₂O₃</text>
+<text x="102" y="6764" fill="#1F2937" font-size="13">铜及其化合物</text>
+<text x="126" y="6788" fill="#6B7280" font-size="12">Cu + 2Fe³⁺ → Cu²⁺ + 2Fe²⁺</text>
+<text x="126" y="6812" fill="#6B7280" font-size="12">Cu + 4HNO₃(浓) → Cu(NO₃)₂ + 2NO₂↑ + 2H₂O</text>
+<text x="102" y="6836" fill="#1F2937" font-size="13">金属冶炼</text>
+<text x="126" y="6860" fill="#6B7280" font-size="12">电解法：K、Ca、Na、Mg、Al</text>
+<text x="126" y="6884" fill="#6B7280" font-size="12">热还原法：Zn、Fe、Sn、Pb、Cu</text>
+<text x="126" y="6908" fill="#6B7280" font-size="12">热分解法：Hg、Ag</text>
+<text x="126" y="6932" fill="#6B7280" font-size="12">实质：Mⁿ⁺ + ne⁻ → M</text>
+<text x="54" y="6956" fill="#111827" font-size="15" font-weight="600">第四章 物质结构 元素周期律</text>
+<text x="78" y="6980" fill="#2563EB" font-size="13.5" font-weight="600">4.1 原子结构与元素周期律</text>
+<text x="102" y="7004" fill="#1F2937" font-size="13">原子结构</text>
+<text x="126" y="7028" fill="#6B7280" font-size="12">质量数 A = 质子数 Z + 中子数 N</text>
+<text x="126" y="7052" fill="#6B7280" font-size="12">同位素：质子数相同、中子数不同</text>
+<text x="102" y="7076" fill="#1F2937" font-size="13">元素周期表</text>
+<text x="126" y="7100" fill="#6B7280" font-size="12">周期序数 = 电子层数；主族序数 = 最外层电子数</text>
+<text x="126" y="7124" fill="#6B7280" font-size="12">金属与非金属分界线附近找半导体</text>
+<text x="102" y="7148" fill="#1F2937" font-size="13">元素周期律</text>
+<text x="126" y="7172" fill="#6B7280" font-size="12">原子半径：同周期减小，同主族增大</text>
+<text x="126" y="7196" fill="#6B7280" font-size="12">金属性越强，最高价氧化物对应水化物碱性越强</text>
+<text x="102" y="7220" fill="#1F2937" font-size="13">化学键</text>
+<text x="126" y="7244" fill="#6B7280" font-size="12">离子化合物：NaCl、Na₂O、NaOH（含共价键）</text>
+<text x="126" y="7268" fill="#6B7280" font-size="12">共价化合物：HCl、H₂O、CO₂</text>
+<text x="54" y="7292" fill="#111827" font-size="15" font-weight="600">化学实验基础</text>
+<text x="78" y="7316" fill="#2563EB" font-size="13.5" font-weight="600">11. 化学实验基础（章末知识体系）</text>
+<text x="102" y="7340" fill="#1F2937" font-size="13">常用仪器及使用方法</text>
+<text x="126" y="7364" fill="#6B7280" font-size="12">可加热仪器：直接加热（试管、坩埚、蒸发皿）、间接加热（烧杯、烧瓶、锥形瓶）</text>
+<text x="126" y="7388" fill="#6B7280" font-size="12">计量仪器：托盘天平、量筒、温度计、容量瓶、滴定管</text>
+<text x="126" y="7412" fill="#6B7280" font-size="12">分离提纯仪器：漏斗、蒸馏烧瓶、冷凝管、干燥管、洗气瓶</text>
+<text x="102" y="7436" fill="#1F2937" font-size="13">试剂的取用与试纸</text>
+<text x="126" y="7460" fill="#6B7280" font-size="12">固体：药匙、纸槽；块状用镊子</text>
+<text x="126" y="7484" fill="#6B7280" font-size="12">液体：倾倒、胶头滴管</text>
+<text x="126" y="7508" fill="#6B7280" font-size="12">试纸：石蕊试纸、pH 试纸、淀粉-KI 试纸、品红试纸</text>
+<text x="126" y="7532" fill="#6B7280" font-size="12">pH 试纸不能润湿，不能伸入溶液</text>
+<text x="102" y="7556" fill="#1F2937" font-size="13">物质的溶解、加热与气密性检查</text>
+<text x="126" y="7580" fill="#6B7280" font-size="12">固体的溶解：搅拌、加热促溶</text>
+<text x="126" y="7604" fill="#6B7280" font-size="12">气体的溶解或吸收：防倒吸（用倒扣漏斗、安全瓶）</text>
+<text x="126" y="7628" fill="#6B7280" font-size="12">液体物质的溶解（稀释）：浓硫酸沿器壁慢慢注入水中并搅拌</text>
+<text x="126" y="7652" fill="#6B7280" font-size="12">加热方式：直接加热、水浴、油浴、沙浴</text>
+<text x="126" y="7676" fill="#6B7280" font-size="12">气密性检查：微热法、液差法</text>
+<text x="102" y="7700" fill="#1F2937" font-size="13">实验安全与试剂保存</text>
+<text x="126" y="7724" fill="#6B7280" font-size="12">实验安全图标、危险化学品标识</text>
+<text x="126" y="7748" fill="#6B7280" font-size="12">实验安全事故的处理方法：烫伤、酸灼伤、碱灼伤、起火</text>
+<text x="126" y="7772" fill="#6B7280" font-size="12">试剂的保存：见光分解（棕色瓶）、易吸水（密封）、易挥发（阴凉）、碱性溶液（橡胶塞）</text>
+<text x="102" y="7796" fill="#1F2937" font-size="13">物质的分离与提纯</text>
+<text x="126" y="7820" fill="#6B7280" font-size="12">过滤：分离不溶性固体和液体</text>
+<text x="126" y="7844" fill="#6B7280" font-size="12">蒸发结晶：分离易溶性固体和溶剂</text>
+<text x="126" y="7868" fill="#6B7280" font-size="12">蒸馏：分离互溶且沸点相差较大的液体混合物</text>
+<text x="126" y="7892" fill="#6B7280" font-size="12">萃取、分液：用一种溶剂把溶质从它与另一种溶剂组成的溶液里提取出来</text>
+<text x="126" y="7916" fill="#6B7280" font-size="12">化学方法：热分解法、沉淀法、杂转纯法、酸碱溶解法、氧化还原法、气化法、水解法</text>
+<rect x="22" y="7924" width="107.0" height="24" rx="5" fill="#0D9488" opacity="0.14"/>
+<text x="30" y="7940" fill="#0D9488" font-size="17" font-weight="bold">必修第二册</text>
+<text x="54" y="7964" fill="#111827" font-size="15" font-weight="600">第五章 化工生产中的重要非金属元素</text>
+<text x="78" y="7988" fill="#0D9488" font-size="13.5" font-weight="600">5. 非金属及其化合物（章末知识体系）</text>
+<text x="102" y="8012" fill="#1F2937" font-size="13">氯气</text>
+<text x="126" y="8036" fill="#6B7280" font-size="12">与金属：Na→NaCl（白烟）、Cu→CuCl₂（棕黄烟）、Fe→FeCl₃（棕红烟）</text>
+<text x="126" y="8060" fill="#6B7280" font-size="12">与非金属：H₂ 在 Cl₂ 中燃烧，苍白色火焰，生成 HCl</text>
+<text x="126" y="8084" fill="#6B7280" font-size="12">与水：Cl₂ + H₂O ⇌ HCl + HClO</text>
+<text x="126" y="8108" fill="#6B7280" font-size="12">与碱：Cl₂ + 2NaOH → NaCl + NaClO + H₂O；2Cl₂ + 2Ca(OH)₂ → CaCl₂ + Ca(ClO)₂ + 2H₂O</text>
+<text x="102" y="8132" fill="#1F2937" font-size="13">次氯酸及其盐</text>
+<text x="126" y="8156" fill="#6B7280" font-size="12">实验室制法：MnO₂ + 4HCl(浓) →(Δ) MnCl₂ + Cl₂↑ + 2H₂O</text>
+<text x="126" y="8180" fill="#6B7280" font-size="12">漂白原理：ClO⁻ + CO₂ + H₂O → HClO + HCO₃⁻</text>
+<text x="102" y="8204" fill="#1F2937" font-size="13">硫及其化合物</text>
+<text x="126" y="8228" fill="#6B7280" font-size="12">SO₂ 还原性：使氯水、酸性 KMnO₄ 褪色</text>
+<text x="126" y="8252" fill="#6B7280" font-size="12">SO₂ 氧化性：与 H₂S 反应生成 S</text>
+<text x="126" y="8276" fill="#6B7280" font-size="12">SO₂ 漂白性：可逆（化合）</text>
+<text x="126" y="8300" fill="#6B7280" font-size="12">稀硫酸：酸的通性；浓硫酸：吸水性、脱水性、强氧化性</text>
+<text x="102" y="8324" fill="#1F2937" font-size="13">硫酸根检验与硫的转化</text>
+<text x="126" y="8348" fill="#6B7280" font-size="12">Ba²⁺ + SO₄²⁻ → BaSO₄↓</text>
+<text x="126" y="8372" fill="#6B7280" font-size="12">含硫物质转化：S → SO₂ → SO₃ → H₂SO₄ → 硫酸盐</text>
+<text x="102" y="8396" fill="#1F2937" font-size="13">氮及其化合物</text>
+<text x="126" y="8420" fill="#6B7280" font-size="12">NO₂：红棕色，与水反应 3NO₂ + H₂O → 2HNO₃ + NO</text>
+<text x="126" y="8444" fill="#6B7280" font-size="12">NO：无色，与 O₂ 生成红棕色 NO₂</text>
+<text x="126" y="8468" fill="#6B7280" font-size="12">NH₃：极易溶于水，与酸成盐，有还原性可催化氧化</text>
+<text x="126" y="8492" fill="#6B7280" font-size="12">铵盐：受热分解，与碱反应放 NH₃</text>
+<text x="126" y="8516" fill="#6B7280" font-size="12">硝酸：强氧化性，可氧化 Cu、C、Fe²⁺、SO₂ 等</text>
+<text x="102" y="8540" fill="#1F2937" font-size="13">常见气体的制备、净化与收集</text>
+<text x="126" y="8564" fill="#6B7280" font-size="12">发生装置：固固加热、固液常温、固液加热</text>
+<text x="126" y="8588" fill="#6B7280" font-size="12">除杂：洗气、干燥、灼烧</text>
+<text x="126" y="8612" fill="#6B7280" font-size="12">收集：向上排空气（密度大于空气）、向下排空气、排水法</text>
+<text x="126" y="8636" fill="#6B7280" font-size="12">防堵塞、防倒吸装置</text>
+<text x="102" y="8660" fill="#1F2937" font-size="13">物质的检验、鉴别与推断</text>
+<text x="126" y="8684" fill="#6B7280" font-size="12">检验思路：取样→加试剂→看现象→得结论</text>
+<text x="126" y="8708" fill="#6B7280" font-size="12">常见：Cl⁻（AgNO₃）、SO₄²⁻（BaCl₂）、CO₃²⁻（盐酸）、NH₄⁺（碱+湿润石蕊）</text>
+<text x="102" y="8732" fill="#1F2937" font-size="13">卤素</text>
+<text x="126" y="8756" fill="#6B7280" font-size="12">Cl₂ + 2Br⁻ → Br₂ + 2Cl⁻；Cl₂ + 2I⁻ → I₂ + 2Cl⁻</text>
+<text x="126" y="8780" fill="#6B7280" font-size="12">卤离子检验：AgNO₃ + 稀硝酸</text>
+<text x="126" y="8804" fill="#6B7280" font-size="12">氯、溴、碘的提取：氧化—萃取—分液</text>
+<text x="54" y="8828" fill="#111827" font-size="15" font-weight="600">第六章 化学反应与能量</text>
+<text x="78" y="8852" fill="#0D9488" font-size="13.5" font-weight="600">6.1 化学能与热能、电能</text>
+<text x="102" y="8876" fill="#1F2937" font-size="13">反应热</text>
+<text x="126" y="8900" fill="#6B7280" font-size="12">放热反应：燃烧、中和、金属与酸、铝热反应</text>
+<text x="126" y="8924" fill="#6B7280" font-size="12">吸热反应：大多数分解、Ba(OH)₂·8H₂O + NH₄Cl</text>
+<text x="102" y="8948" fill="#1F2937" font-size="13">原电池</text>
+<text x="126" y="8972" fill="#6B7280" font-size="12">构成条件：两电极、电解质溶液、闭合回路、自发氧化还原</text>
+<text x="126" y="8996" fill="#6B7280" font-size="12">Zn-Cu 原电池：Zn 溶解、Cu 上析出 H₂</text>
+<text x="102" y="9020" fill="#1F2937" font-size="13">化学反应速率与限度</text>
+<text x="126" y="9044" fill="#6B7280" font-size="12">影响因素：浓度、温度、压强、催化剂</text>
+<text x="126" y="9068" fill="#6B7280" font-size="12">平衡特征：定（浓度不变）、动（动态）、变（条件变则平衡移）</text>
+<text x="54" y="9092" fill="#111827" font-size="15" font-weight="600">第七章 有机化合物</text>
+<text x="78" y="9116" fill="#0D9488" font-size="13.5" font-weight="600">7.1 烃</text>
+<text x="102" y="9140" fill="#1F2937" font-size="13">甲烷</text>
+<text x="126" y="9164" fill="#6B7280" font-size="12">CH₄ + Cl₂ →(光照) CH₃Cl + HCl（取代，分步）</text>
+<text x="126" y="9188" fill="#6B7280" font-size="12">CH₄ + 2O₂ →(点燃) CO₂ + 2H₂O</text>
+<text x="102" y="9212" fill="#1F2937" font-size="13">乙烯</text>
+<text x="126" y="9236" fill="#6B7280" font-size="12">CH₂=CH₂ + Br₂ → CH₂BrCH₂Br（加成，溴水褪色）</text>
+<text x="126" y="9260" fill="#6B7280" font-size="12">nCH₂=CH₂ →(催化剂) [-CH₂-CH₂-]ₙ</text>
+<text x="126" y="9284" fill="#6B7280" font-size="12">CH₂=CH₂ + 3O₂ →(点燃) 2CO₂ + 2H₂O</text>
+<text x="102" y="9308" fill="#1F2937" font-size="13">苯</text>
+<text x="126" y="9332" fill="#6B7280" font-size="12">C₆H₆ + Br₂ →(FeBr₃) C₆H₅Br + HBr</text>
+<text x="126" y="9356" fill="#6B7280" font-size="12">C₆H₆ + 3H₂ →(Ni,Δ) C₆H₁₂</text>
+<text x="78" y="9380" fill="#0D9488" font-size="13.5" font-weight="600">7.2 烃的衍生物与营养物质</text>
+<text x="102" y="9404" fill="#1F2937" font-size="13">乙醇</text>
+<text x="126" y="9428" fill="#6B7280" font-size="12">2CH₃CH₂OH + 2Na → 2CH₃CH₂ONa + H₂↑</text>
+<text x="126" y="9452" fill="#6B7280" font-size="12">2CH₃CH₂OH + O₂ →(Cu,Δ) 2CH₃CHO + 2H₂O</text>
+<text x="102" y="9476" fill="#1F2937" font-size="13">乙酸</text>
+<text x="126" y="9500" fill="#6B7280" font-size="12">CH₃COOH + CH₃CH₂OH ⇌(浓H₂SO₄,Δ) CH₃COOCH₂CH₃ + H₂O</text>
+<text x="126" y="9524" fill="#6B7280" font-size="12">2CH₃COOH + Na₂CO₃ → 2CH₃COONa + H₂O + CO₂↑</text>
+<text x="102" y="9548" fill="#1F2937" font-size="13">基本营养物质</text>
+<text x="126" y="9572" fill="#6B7280" font-size="12">葡萄糖 + 银氨溶液 →(Δ) 银镜</text>
+<text x="126" y="9596" fill="#6B7280" font-size="12">淀粉 →(水解) 葡萄糖</text>
+<text x="54" y="9620" fill="#111827" font-size="15" font-weight="600">第八章 化学与可持续发展</text>
+<text x="78" y="9644" fill="#0D9488" font-size="13.5" font-weight="600">8.1 资源利用与环境保护</text>
+<text x="102" y="9668" fill="#1F2937" font-size="13">金属矿物利用</text>
+<text x="126" y="9692" fill="#6B7280" font-size="12">电解法：活泼金属（Na、Mg、Al）</text>
+<text x="126" y="9716" fill="#6B7280" font-size="12">热还原法：中等活泼（Fe、Cu）</text>
+<text x="126" y="9740" fill="#6B7280" font-size="12">热分解法：不活泼（Hg、Ag）</text>
+<text x="102" y="9764" fill="#1F2937" font-size="13">海水资源与化石燃料</text>
+<text x="126" y="9788" fill="#6B7280" font-size="12">Cl₂ + 2Br⁻ → Br₂ + 2Cl⁻</text>
+<text x="126" y="9812" fill="#6B7280" font-size="12">石油分馏是物理变化，裂化是化学变化</text>
+<text x="102" y="9836" fill="#1F2937" font-size="13">环境保护与绿色化学</text>
+<text x="126" y="9860" fill="#6B7280" font-size="12">酸雨主要成分：SO₂、NO₂</text>
+<text x="126" y="9884" fill="#6B7280" font-size="12">温室气体：CO₂、CH₄</text>
+<rect x="22" y="9892" width="116.52" height="24" rx="5" fill="#7C3AED" opacity="0.14"/>
+<text x="30" y="9908" fill="#7C3AED" font-size="17" font-weight="bold">选择性必修1</text>
+<text x="54" y="9932" fill="#111827" font-size="15" font-weight="600">第一章 化学反应的热效应</text>
+<text x="78" y="9956" fill="#7C3AED" font-size="13.5" font-weight="600">1.1 反应热与盖斯定律</text>
+<text x="102" y="9980" fill="#1F2937" font-size="13">焓变与反应热</text>
+<text x="126" y="10004" fill="#6B7280" font-size="12">热化学方程式要标状态、ΔH</text>
+<text x="126" y="10028" fill="#6B7280" font-size="12">ΔH = 生成物总键能 − 反应物总键能（键能法）</text>
+<text x="102" y="10052" fill="#1F2937" font-size="13">盖斯定律</text>
+<text x="126" y="10076" fill="#6B7280" font-size="12">可将已知方程式相加减求未知 ΔH</text>
+<text x="126" y="10100" fill="#6B7280" font-size="12">方程式反向则 ΔH 变号；乘系数则 ΔH 同乘</text>
+<text x="102" y="10124" fill="#1F2937" font-size="13">燃烧热与中和热</text>
+<text x="126" y="10148" fill="#6B7280" font-size="12">中和热测定用环形玻璃搅拌棒</text>
+<text x="126" y="10172" fill="#6B7280" font-size="12">强酸强碱稀溶液反应 ΔH ≈ −57.3 kJ/mol</text>
+<text x="54" y="10196" fill="#111827" font-size="15" font-weight="600">第二章 化学反应速率与化学平衡</text>
+<text x="78" y="10220" fill="#7C3AED" font-size="13.5" font-weight="600">8. 化学反应速率与化学平衡（章末知识体系）</text>
+<text x="102" y="10244" fill="#1F2937" font-size="13">化学反应速率</text>
+<text x="126" y="10268" fill="#6B7280" font-size="12">v = Δc / Δt，单位 mol·L⁻¹·s⁻¹ 或 mol·L⁻¹·min⁻¹</text>
+<text x="126" y="10292" fill="#6B7280" font-size="12">计算：公式法、化学计量数之比法</text>
+<text x="126" y="10316" fill="#6B7280" font-size="12">内因：反应物组成、结构、性质（活化分子）</text>
+<text x="126" y="10340" fill="#6B7280" font-size="12">外因：浓度、压强、温度、催化剂；其他：固体表面积、光照、超声波</text>
+<text x="102" y="10364" fill="#1F2937" font-size="13">反应机理与催化</text>
+<text x="126" y="10388" fill="#6B7280" font-size="12">有效碰撞理论、活化能</text>
+<text x="126" y="10412" fill="#6B7280" font-size="12">基元反应、过渡态理论</text>
+<text x="126" y="10436" fill="#6B7280" font-size="12">催化机理、催化剂对反应的影响</text>
+<text x="102" y="10460" fill="#1F2937" font-size="13">化学平衡</text>
+<text x="126" y="10484" fill="#6B7280" font-size="12">概念：可逆反应、条件一定、v正 = v逆、各组分浓度不变</text>
+<text x="126" y="10508" fill="#6B7280" font-size="12">移动原因：外界条件改变 → v正 ≠ v逆</text>
+<text x="126" y="10532" fill="#6B7280" font-size="12">移动结果：再次 v正 = v逆，含量又不变</text>
+<text x="126" y="10556" fill="#6B7280" font-size="12">移动方向：勒夏特列原理判断</text>
+<text x="102" y="10580" fill="#1F2937" font-size="13">化学平衡常数</text>
+<text x="126" y="10604" fill="#6B7280" font-size="12">表达式：K = c^p(C)·c^q(D) / c^m(A)·c^n(B)</text>
+<text x="126" y="10628" fill="#6B7280" font-size="12">影响因素：只与温度有关，与浓度、压强、催化剂无关</text>
+<text x="126" y="10652" fill="#6B7280" font-size="12">应用：判断反应程度、判断移动方向、计算反应热</text>
+<text x="102" y="10676" fill="#1F2937" font-size="13">反应方向与调控</text>
+<text x="126" y="10700" fill="#6B7280" font-size="12">焓判据：能量降低的方向</text>
+<text x="126" y="10724" fill="#6B7280" font-size="12">熵判据：熵增的方向</text>
+<text x="126" y="10748" fill="#6B7280" font-size="12">复合判据 ΔG = ΔH − TΔS：&lt;0 自发，&gt;0 不自发，=0 平衡</text>
+<text x="102" y="10772" fill="#1F2937" font-size="13">图像分析</text>
+<text x="126" y="10796" fill="#6B7280" font-size="12">速率—时间图：看突变方向判断条件改变</text>
+<text x="126" y="10820" fill="#6B7280" font-size="12">转化率—时间图：先拐先平数值大</text>
+<text x="54" y="10844" fill="#111827" font-size="15" font-weight="600">第三章 水溶液中的离子反应与平衡</text>
+<text x="78" y="10868" fill="#7C3AED" font-size="13.5" font-weight="600">9. 水溶液中的离子反应与平衡（章末知识体系）</text>
+<text x="102" y="10892" fill="#1F2937" font-size="13">弱电解质的电离平衡</text>
+<text x="126" y="10916" fill="#6B7280" font-size="12">建立条件：v电离 = v结合</text>
+<text x="126" y="10940" fill="#6B7280" font-size="12">影响因素：浓度、温度、同离子效应</text>
+<text x="126" y="10964" fill="#6B7280" font-size="12">电离常数 K：表达式、意义（K 越大电离能力越强）、只随温度变化（升温 K 增大）</text>
+<text x="126" y="10988" fill="#6B7280" font-size="12">电离度 α = 已电离的分子数 / 原有分子总数 × 100%</text>
+<text x="126" y="11012" fill="#6B7280" font-size="12">同温度下，浓度越大电离度越小；温度越高电离度越大</text>
+<text x="102" y="11036" fill="#1F2937" font-size="13">水的电离与离子积</text>
+<text x="126" y="11060" fill="#6B7280" font-size="12">H₂O ⇌ H⁺ + OH⁻</text>
+<text x="126" y="11084" fill="#6B7280" font-size="12">影响因素：温度、加酸或碱（抑制）、加可水解的盐（促进）</text>
+<text x="126" y="11108" fill="#6B7280" font-size="12">表达式：Kw = c(H⁺)·c(OH⁻)</text>
+<text x="126" y="11132" fill="#6B7280" font-size="12">升温 Kw 增大，降温 Kw 减小</text>
+<text x="126" y="11156" fill="#6B7280" font-size="12">适用范围：纯水及酸、碱、盐的稀溶液</text>
+<text x="102" y="11180" fill="#1F2937" font-size="13">溶液的酸碱性</text>
+<text x="126" y="11204" fill="#6B7280" font-size="12">酸性：c(H⁺) &gt; c(OH⁻)</text>
+<text x="126" y="11228" fill="#6B7280" font-size="12">中性：c(H⁺) = c(OH⁻)</text>
+<text x="126" y="11252" fill="#6B7280" font-size="12">碱性：c(H⁺) &lt; c(OH⁻)</text>
+<text x="102" y="11276" fill="#1F2937" font-size="13">pH 的计算与测定</text>
+<text x="126" y="11300" fill="#6B7280" font-size="12">pH 试纸、pH 计测溶液的 pH</text>
+<text x="126" y="11324" fill="#6B7280" font-size="12">常用指示剂：石蕊（红/紫/蓝 5.0~8.0）、甲基橙（红/橙/黄 3.1~4.4）、酚酞（无/浅红/红 8.2~10.0）</text>
+<text x="102" y="11348" fill="#1F2937" font-size="13">盐类的水解</text>
+<text x="126" y="11372" fill="#6B7280" font-size="12">定义：盐电离出的离子与水电离出的 H⁺ 或 OH⁻ 结合生成弱电解质</text>
+<text x="126" y="11396" fill="#6B7280" font-size="12">特点：可逆、吸热、微弱</text>
+<text x="126" y="11420" fill="#6B7280" font-size="12">规律：有弱才水解，越弱越水解，谁强显谁性</text>
+<text x="126" y="11444" fill="#6B7280" font-size="12">影响因素：温度、浓度、同离子效应</text>
+<text x="126" y="11468" fill="#6B7280" font-size="12">水解常数 Kh = Kw / Ka，仅与温度有关</text>
+<text x="126" y="11492" fill="#6B7280" font-size="12">应用：明矾净水、热纯碱溶液除油污、草木灰不与铵盐混用、泡沫灭火器原理</text>
+<text x="126" y="11516" fill="#6B7280" font-size="12">科研与实验：试剂的配制与保存、除杂、判断盐溶液蒸干灼烧所得产物</text>
+<text x="102" y="11540" fill="#1F2937" font-size="13">难溶电解质的沉淀溶解平衡</text>
+<text x="126" y="11564" fill="#6B7280" font-size="12">建立：一定温度下 v溶解 = v沉淀</text>
+<text x="126" y="11588" fill="#6B7280" font-size="12">特点：逆、等、定、动、变；影响因素：温度和同离子浓度</text>
+<text x="126" y="11612" fill="#6B7280" font-size="12">溶度积 Ksp(AmBn) = c^m(Aⁿ⁺)·c^n(B^m⁻)</text>
+<text x="126" y="11636" fill="#6B7280" font-size="12">Q &gt; Ksp：过饱和，有沉淀析出；Q = Ksp：饱和，平衡；Q &lt; Ksp：未饱和，无沉淀</text>
+<text x="126" y="11660" fill="#6B7280" font-size="12">影响因素：仅与温度有关</text>
+<text x="126" y="11684" fill="#6B7280" font-size="12">应用：沉淀的生成、溶解和转化</text>
+<text x="102" y="11708" fill="#1F2937" font-size="13">酸碱中和滴定</text>
+<text x="126" y="11732" fill="#6B7280" font-size="12">原理：用已知浓度的酸（碱）测定未知浓度的碱（酸）</text>
+<text x="126" y="11756" fill="#6B7280" font-size="12">仪器：酸式滴定管、碱式滴定管、滴定管夹、铁架台、锥形瓶</text>
+<text x="126" y="11780" fill="#6B7280" font-size="12">用品：标准液、待测液、酸碱指示剂、蒸馏水</text>
+<text x="126" y="11804" fill="#6B7280" font-size="12">操作：准备标准液与待测液 → 滴定 → 终点判断 → 数据处理</text>
+<text x="126" y="11828" fill="#6B7280" font-size="12">指示剂：强酸强碱用酚酞或甲基橙；强酸弱碱用甲基橙；强碱弱酸用酚酞</text>
+<text x="126" y="11852" fill="#6B7280" font-size="12">误差分析：仪器洗涤（滴定管润洗、锥形瓶不润洗）、读数（俯视/仰视）、操作（液体溅出、气泡）</text>
+<text x="54" y="11876" fill="#111827" font-size="15" font-weight="600">第四章 化学反应与电能</text>
+<text x="78" y="11900" fill="#7C3AED" font-size="13.5" font-weight="600">7. 化学反应与能量转化（章末知识体系）</text>
+<text x="102" y="11924" fill="#1F2937" font-size="13">化学反应的热效应</text>
+<text x="126" y="11948" fill="#6B7280" font-size="12">放热 ΔH&lt;0，吸热 ΔH&gt;0</text>
+<text x="126" y="11972" fill="#6B7280" font-size="12">热化学方程式书写五步：写方程式→标状态→标条件→标 ΔH→标数值</text>
+<text x="126" y="11996" fill="#6B7280" font-size="12">计算依据：ΔH = ΣE(生成物) − ΣE(反应物)；键能法；盖斯定律</text>
+<text x="126" y="12020" fill="#6B7280" font-size="12">测量：中和反应反应热的测定；燃烧热和能源</text>
+<text x="102" y="12044" fill="#1F2937" font-size="13">原电池</text>
+<text x="126" y="12068" fill="#6B7280" font-size="12">构成：能自发进行的氧化还原反应、两电极、形成闭合回路、电解质溶液</text>
+<text x="126" y="12092" fill="#6B7280" font-size="12">原理：负极氧化反应，正极还原反应</text>
+<text x="126" y="12116" fill="#6B7280" font-size="12">化学电源：一次电池、二次电池、燃料电池、新型化学电源</text>
+<text x="102" y="12140" fill="#1F2937" font-size="13">电解池</text>
+<text x="126" y="12164" fill="#6B7280" font-size="12">构成：外接直流电源、与电解质溶液或熔融电解质相连的两个电极、闭合回路</text>
+<text x="126" y="12188" fill="#6B7280" font-size="12">原理：阳极氧化反应，阴极还原反应</text>
+<text x="126" y="12212" fill="#6B7280" font-size="12">应用：氯碱工业、电镀、电解精炼、电冶金</text>
+<text x="102" y="12236" fill="#1F2937" font-size="13">多池、多室的电化学装置</text>
+<text x="126" y="12260" fill="#6B7280" font-size="12">离子交换膜在电化学中的应用</text>
+<text x="126" y="12284" fill="#6B7280" font-size="12">多池串联：前一池的产物是后一池的反应物</text>
+<text x="102" y="12308" fill="#1F2937" font-size="13">金属的腐蚀与防护</text>
+<text x="126" y="12332" fill="#6B7280" font-size="12">类型：化学腐蚀；电化学腐蚀（析氢腐蚀、吸氧腐蚀）</text>
+<text x="126" y="12356" fill="#6B7280" font-size="12">防护：牺牲阳极法（原电池原理）、外加电流法（电解池原理）、改变金属材料组成、覆盖防护层</text>
+<text x="54" y="12380" fill="#111827" font-size="15" font-weight="600">化学综合实验</text>
+<text x="78" y="12404" fill="#7C3AED" font-size="13.5" font-weight="600">12. 化学综合实验（章末知识体系）</text>
+<text x="102" y="12428" fill="#1F2937" font-size="13">“微”实验方案设计与评价</text>
+<text x="126" y="12452" fill="#6B7280" font-size="12">仪器组装与创新使用</text>
+<text x="126" y="12476" fill="#6B7280" font-size="12">实验装置、操作的目的性评价</text>
+<text x="126" y="12500" fill="#6B7280" font-size="12">实验操作、现象、结论的逻辑性评价</text>
+<text x="102" y="12524" fill="#1F2937" font-size="13">物质制备型综合实验</text>
+<text x="126" y="12548" fill="#6B7280" font-size="12">无机物制备的综合实验：实验的操作顺序、实验条件的控制</text>
+<text x="126" y="12572" fill="#6B7280" font-size="12">有机化合物制备的综合实验：实验流程、典型装置、注意事项、有机物的提纯流程</text>
+<text x="102" y="12596" fill="#1F2937" font-size="13">探究型综合实验</text>
+<text x="126" y="12620" fill="#6B7280" font-size="12">提出假设 → 设计对照 → 观察现象 → 得出结论</text>
+<text x="126" y="12644" fill="#6B7280" font-size="12">注意控制变量</text>
+<text x="102" y="12668" fill="#1F2937" font-size="13">定量型综合实验</text>
+<text x="126" y="12692" fill="#6B7280" font-size="12">重量分析法：称量沉淀质量反推</text>
+<text x="126" y="12716" fill="#6B7280" font-size="12">滴定分析法：测浓度</text>
+<text x="126" y="12740" fill="#6B7280" font-size="12">气体体积法：测气体体积换算物质的量</text>
+<rect x="22" y="12748" width="116.52" height="24" rx="5" fill="#B45309" opacity="0.14"/>
+<text x="30" y="12764" fill="#B45309" font-size="17" font-weight="bold">选择性必修2</text>
+<text x="54" y="12788" fill="#111827" font-size="15" font-weight="600">第一章 原子结构与性质</text>
+<text x="78" y="12812" fill="#B45309" font-size="13.5" font-weight="600">6.1 原子结构与元素周期律（章末知识体系）</text>
+<text x="102" y="12836" fill="#1F2937" font-size="13">原子结构</text>
+<text x="126" y="12860" fill="#6B7280" font-size="12">构造原理（能量最低）、泡利原理、洪特规则</text>
+<text x="126" y="12884" fill="#6B7280" font-size="12">核外电子运动状态：能层、能级、轨道、自旋方向</text>
+<text x="126" y="12908" fill="#6B7280" font-size="12">表达方式：电子排布式、轨道表示式、电子式（基态原子或离子）</text>
+<text x="102" y="12932" fill="#1F2937" font-size="13">元素周期表与周期律</text>
+<text x="126" y="12956" fill="#6B7280" font-size="12">周期表结构：周期、族、分区</text>
+<text x="126" y="12980" fill="#6B7280" font-size="12">粒子半径比较：先看电子层数，再看核电荷数</text>
+<text x="126" y="13004" fill="#6B7280" font-size="12">金属性/非金属性强弱比较</text>
+<text x="126" y="13028" fill="#6B7280" font-size="12">电离能、电负性的变化规律及应用</text>
+<text x="126" y="13052" fill="#6B7280" font-size="12">“位—构—性”推断</text>
+<text x="54" y="13076" fill="#111827" font-size="15" font-weight="600">第二章 分子结构与性质</text>
+<text x="78" y="13100" fill="#B45309" font-size="13.5" font-weight="600">6.2 分子结构与性质（章末知识体系）</text>
+<text x="102" y="13124" fill="#1F2937" font-size="13">化学键</text>
+<text x="126" y="13148" fill="#6B7280" font-size="12">类型：离子键、共价键、金属键</text>
+<text x="126" y="13172" fill="#6B7280" font-size="12">离子键特征：方向性和饱和性（无）</text>
+<text x="126" y="13196" fill="#6B7280" font-size="12">共价键成键形式：σ 键和 π 键</text>
+<text x="126" y="13220" fill="#6B7280" font-size="12">键参数：键能、键长、键角</text>
+<text x="126" y="13244" fill="#6B7280" font-size="12">物质类别：离子化合物、共价化合物</text>
+<text x="102" y="13268" fill="#1F2937" font-size="13">分子结构与性质</text>
+<text x="126" y="13292" fill="#6B7280" font-size="12">空间结构：价层电子对互斥模型（VSEPR）、杂化轨道理论</text>
+<text x="126" y="13316" fill="#6B7280" font-size="12">分子极性：正负电中心是否重合；“相似相溶”规律</text>
+<text x="126" y="13340" fill="#6B7280" font-size="12">分子间作用力：范德华力、氢键</text>
+<text x="126" y="13364" fill="#6B7280" font-size="12">手性分子与手性异构体</text>
+<text x="126" y="13388" fill="#6B7280" font-size="12">配合物与超分子</text>
+<text x="54" y="13412" fill="#111827" font-size="15" font-weight="600">第三章 晶体结构与性质</text>
+<text x="78" y="13436" fill="#B45309" font-size="13.5" font-weight="600">6.3 晶体结构与性质（章末知识体系）</text>
+<text x="102" y="13460" fill="#1F2937" font-size="13">晶体结构与性质</text>
+<text x="126" y="13484" fill="#6B7280" font-size="12">物质聚集状态、晶体特征、获得途径、晶体结构的测定</text>
+<text x="126" y="13508" fill="#6B7280" font-size="12">四种晶体：分子晶体、共价晶体、金属晶体、离子晶体</text>
+<text x="126" y="13532" fill="#6B7280" font-size="12">晶体性质比较：熔沸点、硬度、导电性</text>
+<text x="126" y="13556" fill="#6B7280" font-size="12">晶胞：概念、结构分析及相关判断</text>
+<rect x="22" y="13564" width="116.52" height="24" rx="5" fill="#DC2626" opacity="0.14"/>
+<text x="30" y="13580" fill="#DC2626" font-size="17" font-weight="bold">选择性必修3</text>
+<text x="54" y="13604" fill="#111827" font-size="15" font-weight="600">第一章 有机化合物的结构特点与研究方法</text>
+<text x="78" y="13628" fill="#DC2626" font-size="13.5" font-weight="600">10.1 结构特点与研究方法（章末知识体系）</text>
+<text x="102" y="13652" fill="#1F2937" font-size="13">有机物的结构特点</text>
+<text x="126" y="13676" fill="#6B7280" font-size="12">碳骨架：链状化合物、环状化合物</text>
+<text x="126" y="13700" fill="#6B7280" font-size="12">官能团：烷烃、烯烃、炔烃、芳香烃、卤代烃、醇、酚、醛、酮、羧酸、酯、胺、酰胺</text>
+<text x="126" y="13724" fill="#6B7280" font-size="12">同分异构：碳架异构、位置异构、官能团异构、顺反异构、对映异构</text>
+<text x="126" y="13748" fill="#6B7280" font-size="12">同系物：结构相似、分子组成相差一个或若干个 CH₂ 原子团</text>
+<text x="126" y="13772" fill="#6B7280" font-size="12">表示方法：电子式、键线式、结构简式、空间填充模型、球棍模型</text>
+<text x="102" y="13796" fill="#1F2937" font-size="13">有机物的命名</text>
+<text x="126" y="13820" fill="#6B7280" font-size="12">烷烃的命名：选最长碳链、从离支链近的一端编号</text>
+<text x="126" y="13844" fill="#6B7280" font-size="12">含官能团的有机物：选含官能团的最长链，官能团编号尽量小</text>
+<text x="126" y="13868" fill="#6B7280" font-size="12">苯的同系物：以苯环为母体，侧链编号</text>
+<text x="102" y="13892" fill="#1F2937" font-size="13">研究有机物的方法</text>
+<text x="126" y="13916" fill="#6B7280" font-size="12">分离提纯：蒸馏、萃取、重结晶</text>
+<text x="126" y="13940" fill="#6B7280" font-size="12">李比希元素分析仪——确定实验式</text>
+<text x="126" y="13964" fill="#6B7280" font-size="12">质谱仪——确定相对分子质量</text>
+<text x="126" y="13988" fill="#6B7280" font-size="12">核磁共振氢谱——确定氢原子的类型和相对数目</text>
+<text x="126" y="14012" fill="#6B7280" font-size="12">红外光谱仪——确定化学键和官能团</text>
+<text x="126" y="14036" fill="#6B7280" font-size="12">X 射线衍射——确定键角、键长等分子结构</text>
+<text x="54" y="14060" fill="#111827" font-size="15" font-weight="600">第二章 烃</text>
+<text x="78" y="14084" fill="#DC2626" font-size="13.5" font-weight="600">10.2 烃（章末知识体系）</text>
+<text x="102" y="14108" fill="#1F2937" font-size="13">烷烃</text>
+<text x="126" y="14132" fill="#6B7280" font-size="12">燃烧、取代反应、分解反应</text>
+<text x="126" y="14156" fill="#6B7280" font-size="12">代表物：甲烷 CH₄（正四面体）</text>
+<text x="102" y="14180" fill="#1F2937" font-size="13">烯烃与炔烃</text>
+<text x="126" y="14204" fill="#6B7280" font-size="12">烯烃：加成反应、氧化反应、加聚反应；代表物乙烯 CH₂=CH₂</text>
+<text x="126" y="14228" fill="#6B7280" font-size="12">炔烃：加成反应、氧化反应、加聚反应；代表物乙炔 CH≡CH</text>
+<text x="102" y="14252" fill="#1F2937" font-size="13">芳香烃</text>
+<text x="126" y="14276" fill="#6B7280" font-size="12">苯：易取代、难加成、能氧化</text>
+<text x="126" y="14300" fill="#6B7280" font-size="12">苯的同系物：烷基和苯环相互影响</text>
+<text x="126" y="14324" fill="#6B7280" font-size="12">甲苯可被酸性 KMnO₄ 氧化为苯甲酸</text>
+<text x="102" y="14348" fill="#1F2937" font-size="13">化石燃料的综合利用</text>
+<text x="126" y="14372" fill="#6B7280" font-size="12">煤：干馏、气化、液化</text>
+<text x="126" y="14396" fill="#6B7280" font-size="12">石油分馏原理：利用各组分沸点不同进行分离</text>
+<text x="126" y="14420" fill="#6B7280" font-size="12">裂化：获得更多的汽油等轻质油；裂解：获得更多的乙烯</text>
+<text x="126" y="14444" fill="#6B7280" font-size="12">天然气：清洁燃料、合成氨和甲醇</text>
+<text x="54" y="14468" fill="#111827" font-size="15" font-weight="600">第三章 烃的衍生物</text>
+<text x="78" y="14492" fill="#DC2626" font-size="13.5" font-weight="600">10.3 烃的衍生物（章末知识体系）</text>
+<text x="102" y="14516" fill="#1F2937" font-size="13">烃的衍生物总览</text>
+<text x="126" y="14540" fill="#6B7280" font-size="12">卤代烃：水解反应（NaOH 水溶液）、消去反应（NaOH 醇溶液）</text>
+<text x="126" y="14564" fill="#6B7280" font-size="12">醇：置换、取代、消去、氧化、酯化</text>
+<text x="126" y="14588" fill="#6B7280" font-size="12">酚：弱酸性、取代、显色反应、加成反应</text>
+<text x="126" y="14612" fill="#6B7280" font-size="12">醛：加成、氧化、羟醛缩合；酮：加成</text>
+<text x="126" y="14636" fill="#6B7280" font-size="12">羧酸：弱酸性、酯化反应（取代反应）</text>
+<text x="126" y="14660" fill="#6B7280" font-size="12">酯：水解反应；酰胺：水解反应</text>
+<text x="126" y="14684" fill="#6B7280" font-size="12">油脂：水解（碱性条件为皂化）、加成（油脂的氢化）、氧化（油脂的变质）</text>
+<text x="102" y="14708" fill="#1F2937" font-size="13">代表物结构：乙醇</text>
+<text x="126" y="14732" fill="#6B7280" font-size="12">与钠反应放 H₂，比水缓和</text>
+<text x="126" y="14756" fill="#6B7280" font-size="12">催化氧化成乙醛</text>
+<text x="126" y="14780" fill="#6B7280" font-size="12">与羧酸发生酯化</text>
+<text x="102" y="14804" fill="#1F2937" font-size="13">代表物结构：乙醛</text>
+<text x="126" y="14828" fill="#6B7280" font-size="12">银镜反应</text>
+<text x="126" y="14852" fill="#6B7280" font-size="12">与新制 Cu(OH)₂ 反应生成砖红沉淀</text>
+<text x="126" y="14876" fill="#6B7280" font-size="12">可被还原成乙醇</text>
+<text x="102" y="14900" fill="#1F2937" font-size="13">代表物结构：乙酸</text>
+<text x="126" y="14924" fill="#6B7280" font-size="12">酸性：比碳酸强</text>
+<text x="126" y="14948" fill="#6B7280" font-size="12">酯化反应：羧酸脱羟基、醇脱氢</text>
+<text x="102" y="14972" fill="#1F2937" font-size="13">代表物结构：丙酮</text>
+<text x="126" y="14996" fill="#6B7280" font-size="12">能发生加成反应</text>
+<text x="126" y="15020" fill="#6B7280" font-size="12">不能被银氨溶液氧化（区别于醛）</text>
+<text x="102" y="15044" fill="#1F2937" font-size="13">代表物结构：苯</text>
+<text x="126" y="15068" fill="#6B7280" font-size="12">键介于单双键之间</text>
+<text x="126" y="15092" fill="#6B7280" font-size="12">易取代、难加成</text>
+<text x="126" y="15116" fill="#6B7280" font-size="12">不能使酸性 KMnO₄ 褪色</text>
+<text x="102" y="15140" fill="#1F2937" font-size="13">代表物结构：苯酚</text>
+<text x="126" y="15164" fill="#6B7280" font-size="12">弱酸性，能与 NaOH 反应</text>
+<text x="126" y="15188" fill="#6B7280" font-size="12">遇 FeCl₃ 显紫色</text>
+<text x="126" y="15212" fill="#6B7280" font-size="12">与溴水生成三溴苯酚白色沉淀</text>
+<text x="102" y="15236" fill="#1F2937" font-size="13">代表物结构：乙酸乙酯</text>
+<text x="126" y="15260" fill="#6B7280" font-size="12">酸性水解可逆</text>
+<text x="126" y="15284" fill="#6B7280" font-size="12">碱性水解趋于完全</text>
+<text x="126" y="15308" fill="#6B7280" font-size="12">有果香味</text>
+<text x="54" y="15332" fill="#111827" font-size="15" font-weight="600">第四章 生物大分子</text>
+<text x="78" y="15356" fill="#DC2626" font-size="13.5" font-weight="600">10.4 生物大分子（章末知识体系）</text>
+<text x="102" y="15380" fill="#1F2937" font-size="13">糖类</text>
+<text x="126" y="15404" fill="#6B7280" font-size="12">单糖：葡萄糖与银氨溶液、新制氢氧化铜发生氧化反应</text>
+<text x="126" y="15428" fill="#6B7280" font-size="12">二糖：蔗糖水解生成葡萄糖和果糖；麦芽糖水解生成葡萄糖</text>
+<text x="126" y="15452" fill="#6B7280" font-size="12">多糖：淀粉、纤维素水解生成葡萄糖；淀粉遇碘变蓝</text>
+<text x="102" y="15476" fill="#1F2937" font-size="13">蛋白质与核酸</text>
+<text x="126" y="15500" fill="#6B7280" font-size="12">氨基酸：两性、成肽反应</text>
+<text x="126" y="15524" fill="#6B7280" font-size="12">蛋白质：水解、变性、两性、盐析、显色反应、灼烧有烧焦羽毛气味</text>
+<text x="126" y="15548" fill="#6B7280" font-size="12">核酸</text>
+<text x="54" y="15572" fill="#111827" font-size="15" font-weight="600">第五章 合成高分子</text>
+<text x="78" y="15596" fill="#DC2626" font-size="13.5" font-weight="600">10.5 合成高分子（章末知识体系）</text>
+<text x="102" y="15620" fill="#1F2937" font-size="13">聚合反应</text>
+<text x="126" y="15644" fill="#6B7280" font-size="12">加聚反应：单体含双键，链节与单体组成相同</text>
+<text x="126" y="15668" fill="#6B7280" font-size="12">缩聚反应：单体间脱小分子，链节比单体少</text>
+<text x="102" y="15692" fill="#1F2937" font-size="13">高分子材料</text>
+<text x="126" y="15716" fill="#6B7280" font-size="12">天然高分子材料：淀粉、纤维素、蛋白质、天然橡胶</text>
+<text x="126" y="15740" fill="#6B7280" font-size="12">合成高分子材料：塑料、合成橡胶、合成纤维、功能高分子材料</text>
+<text x="126" y="15764" fill="#6B7280" font-size="12">有机合成及推断</text>
+</svg>
