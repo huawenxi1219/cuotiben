@@ -19,6 +19,7 @@ for b in tree["books"]:
     for c in b["chapters"]:
         index[(b["name"], c["name"])] = c
 
+_cleared = set()
 for book, chap, sec_name, pts in (BOOK_MAPS + BOOK_MAPS_2 + BOOK_MAPS_3):
     c = index.get((book, chap))
     if c is None:
@@ -44,13 +45,12 @@ for book, chap, sec_name, pts in (BOOK_MAPS + BOOK_MAPS_2 + BOOK_MAPS_3):
             "facts": facts,
             "pitfalls": pitfalls,
         })
-    # 同名节则替换，否则追加
-    for s in c["sections"]:
-        if s["section"] == sec_name:
-            s["points"] = points
-            break
-    else:
-        c["sections"].append({"section": sec_name, "points": points})
+    # 章末图是更权威的版本：第一次遇到这一章时，清掉通用内容，只保留章末图
+    key = (book, chap)
+    if key not in _cleared:
+        c["sections"] = []
+        _cleared.add(key)
+    c["sections"].append({"section": sec_name, "points": points})
 
 io.open(TREE, "w", encoding="utf-8", newline="\n").write(json.dumps(tree, ensure_ascii=False, indent=1))
 io.open(r"C:\myapp\data\chem_tree.json", "w", encoding="utf-8", newline="\n").write(
