@@ -87,9 +87,16 @@ h1 {{ font-size: {H1}; margin: 0 0 3pt; }}
 
 out = [f"<!doctype html><html><head><meta charset='utf-8'><style>{CSS}</style></head><body>"]
 out.append("<h1>人教A版高中化学 · 重点背诵版" + ("（紧凑版）" if COMPACT else "") + "</h1>")
+def _cnt(items):
+    n = 0
+    for it in items:
+        n += 1 + _cnt(it.get("sub") or [])
+    return n
+
+
 tp = sum(len(s["points"]) for b in tree["books"] for c in b["chapters"] for s in c["sections"])
-te = sum(len(s.get("equations", [])) for b in tree["books"] for c in b["chapters"] for s in c["sections"])
-out.append(f"<div class='sub'>按教材顺序 · {tp} 个知识点 · {te} 个方程式 · 只含知识点，不含错题</div>")
+ta = sum(_cnt(s["points"]) for b in tree["books"] for c in b["chapters"] for s in c["sections"])
+out.append(f"<div class='sub'>按教材顺序 · {tp} 个知识点 / {ta} 条明细 · 只含知识点，不含错题</div>")
 
 for b in tree["books"]:
     out.append(f"<div class='book'>{html.escape(b['name'])}</div>")
