@@ -7124,6 +7124,27 @@ def main(page: ft.Page):
                         return ""
                     return re.sub(r'\s+', ' ', t).strip()
 
+                def _ask_with_errors(e=None):
+                    """把最近 8 道错题当上下文，直接问 AI。"""
+                    try:
+                        _recent = subject_items[:8]
+                        if not _recent:
+                            show_toast("这个科目还没有错题", "orange")
+                            return
+                        parts = []
+                        for n, it in enumerate(_recent, 1):
+                            parts.append(
+                                f"{n}. [{it.get('status') or '未解决'}] "
+                                + (it.get("original") or "（无题干）")[:120]
+                                + (f"｜错因：{it.get('mistake')}" if it.get("mistake") else ""))
+                        _msg = ("下面是我最近的错题。先看整体：我主要错在哪几类？"
+                                "按出现频率排序，并指出我该优先补哪个知识点。\n\n"
+                                + "\n".join(parts))
+                        open_chat(subject, initial_message=_msg, auto_send=True)
+                    except BaseException as _be:
+                        _diag_log(_be, "ask_with_errors")
+                        show_toast("打开失败，稍后再试", "red")
+
                 search_input = ft.TextField(
                     label="🔍 搜索错题",
                     hint_text="多个词用空格分隔，如：导数 单调性 易错",
@@ -7135,6 +7156,8 @@ def main(page: ft.Page):
                     "🤖 AI 深度搜索", on_click=lambda e: perform_search(e))
                 search_status = ft.Text("", size=13, color=ft.Colors.GREY_500)
                 search_row = ft.Row([search_input, local_search_btn, ai_search_btn], spacing=10)
+                ask_ai_btn = ft.ElevatedButton("🤖 结合我的错题问 AI", icon=ft.Icons.PSYCHOLOGY,
+                                               on_click=_ask_with_errors)
 
                 _flt = {"v": "全部"}
                 _chips_row = ft.Row(spacing=8, wrap=True)
@@ -7673,6 +7696,7 @@ def main(page: ft.Page):
                     ft.Text("🔍 本地加权搜索（多个词空格分隔）｜AI 深度搜索可选", size=13,
                             color="#7AA2F7"),
                     search_row,
+                    ask_ai_btn,
                     _chips_row,
                     search_status,
                     ft.Divider(height=1),
@@ -8772,9 +8796,8 @@ def main(page: ft.Page):
                     ("📋", "错题本", "#24283B"),
                     ("📝", "笔记本", "#223A22"),
                     ("🧠", "思维导图", "#1F2A44"),
-                    ("📖", "单词本", "#3A2F22"),
                 ]
-                cards_config = all_cards if subject == "英语" else all_cards[:3]
+                cards_config = all_cards[:3]
                 # 手机端纵向排布，三张卡平分高度，避免底部大片留白
                 grid = ft.Column(spacing=14, expand=True,
                                   horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
@@ -10491,8 +10514,6 @@ def main(page: ft.Page):
                 ft.Container(height=26),
                 ft.Text("我的", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 u_card(ft.Column([
-                _row_btn(ft.ElevatedButton("🎯 学习画像", on_click=lambda e: show_learning_profile(e),
-                                  icon=ft.Icons.PERSON_OUTLINE)),
                 _row_btn(ft.ElevatedButton("🖨 错题卡排版 / 导出", icon=ft.Icons.PRINT,
                                   on_click=lambda e: open_function_page(None, "错题卡排版"))),
                 _row_btn(ft.ElevatedButton("📄 导出学习档案(.md)", icon=ft.Icons.DOWNLOAD,
