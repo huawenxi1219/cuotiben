@@ -4230,6 +4230,10 @@ def main(page: ft.Page):
                     _mk_sym_bar(),
                     mistake_input,
                 ], spacing=12)),
+                ft.Row([
+                    u_primary_btn("保存错题", submit_error, ft.Icons.SAVE),
+                    u_primary_btn("批量录题", batch_import, ft.Icons.PHOTO_LIBRARY, color="#9ECE6A"),
+                ], spacing=10),
                 u_section("可选补充", "✨"),
                 u_card(ft.Column([
                     answer_input,
@@ -4245,10 +4249,6 @@ def main(page: ft.Page):
                     progress_row,
                 ], spacing=10)),
                 ft.Container(height=4),
-                ft.Row([
-                    u_primary_btn("保存错题", submit_error, ft.Icons.SAVE),
-                    u_primary_btn("批量录题", batch_import, ft.Icons.PHOTO_LIBRARY, color="#9ECE6A"),
-                ], spacing=10),
                 ft.Container(height=18),
                 ft.Text("记笔记", size=28, weight=ft.FontWeight.W_700, color=C_TEXT),
                 ft.Text("随手记录课堂重点与灵感", size=13, color=C_TEXT2),
