@@ -9247,8 +9247,24 @@ def main(page: ft.Page):
                             _nav_tiles.append(_t1)
                             sec_tiles.append(_t1)
                             if sec_tiles:
+                                _kw = [chap.get("name", "")] + [s.get("section", "") for s in chap["sections"]]
+                                _kws = []
+                                for _k in _kw:
+                                    for _p in str(_k).replace("（", " ").replace("）", " ").split():
+                                        if len(_p) >= 2:
+                                            _kws.append(_p)
+
+                                def _hit(rec):
+                                    blob = " ".join(str(rec.get(x, "")) for x in
+                                                    ("original", "mistake", "idea", "answer", "content"))
+                                    blob += " " + " ".join(str(x) for x in (rec.get("tags") or []))
+                                    return any(k in blob for k in _kws if len(k) >= 3)
+
+                                _ne = sum(1 for e2 in errs if _hit(e2))
+                                _nn = sum(1 for n2 in notes if _hit(n2))
+                                _badge = (f"   📕{_ne}" if _ne else "") + (f"  📓{_nn}" if _nn else "")
                                 book_tiles.append(ft.ExpansionTile(
-                                    title=ft.Text(chap.get("name", ""), size=14,
+                                    title=ft.Text(chap.get("name", "") + _badge, size=14,
                                                   weight=ft.FontWeight.W_600, color="#C9CFE0"),
                                     controls=sec_tiles,
                                     tile_padding=ft.Padding(left=10, right=10, top=6, bottom=6)))
@@ -9369,11 +9385,25 @@ def main(page: ft.Page):
                     _seg_items.append(ft.ElevatedButton(
                         "📖 背诵版", icon=ft.Icons.MENU_BOOK,
                         on_click=lambda e: _switch_recite()))
-                    _seg_items.append(ft.ElevatedButton(
-                        "🧪 三年总览", icon=ft.Icons.MAP,
-                        on_click=lambda e: _switch_overview()))
                 _seg = ft.Row(_seg_items, spacing=8)
+                def _save_map(e):
+                    try:
+                        if not getattr(e, "path", ""):
+                            return
+                        _src = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                            "assets", "chem_map.png")
+                        p2 = e.path if str(e.path).lower().endswith(".png") else str(e.path) + ".png"
+                        shutil.copyfile(_src, p2)
+                        show_toast("✅ 总图已保存，可分享或打印", "green")
+                    except Exception as ex:
+                        show_toast(f"保存失败：{str(ex)[:40]}", "red")
+
                 _expand_row = ft.Row([
+                    ft.ElevatedButton("🖼 导出总图", icon=ft.Icons.IMAGE,
+                                      on_click=lambda e: _use_picker(page, _save_map).save_file(
+                                          dialog_title="保存化学总图", file_name="化学总图.png",
+                                          file_type=ft.FilePickerFileType.CUSTOM,
+                                          allowed_extensions=["png"])),
                     ft.ElevatedButton("⤢ 全部展开", icon=ft.Icons.UNFOLD_MORE,
                                       on_click=lambda e: _toggle_all(True)),
                     ft.ElevatedButton("⤡ 全部收起", icon=ft.Icons.UNFOLD_LESS,
@@ -9469,7 +9499,6 @@ def main(page: ft.Page):
                     _graph_box,
                     _nav_box,
                     _recite_box,
-                    _overview_box,
                 ], spacing=10, expand=True)
 
             def build_subject_left_panel(subj):
