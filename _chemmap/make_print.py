@@ -68,6 +68,8 @@ h1 {{ font-size: {H1}; margin: 0 0 3pt; }}
 .pt .d {{ text-align: justify; }}
 .facts {{ margin: 1pt 0 0 12pt; padding: 0; font-size: {FACT}; }}
 .facts li {{ margin: 0; }}
+.note {{ background: #eef7ff; border-left: 3px solid #3b82f6; padding: 2pt 6pt;
+        margin: 2pt 0 0; font-size: {FACT}; color: #1e3a5f; }}
 .sub {{ margin: 1pt 0 2pt 14pt; padding: 0; list-style: none; }}
 .sub li {{ margin: 1pt 0; }}
 .sub .d2 {{ margin-left: 14pt; }}
@@ -121,6 +123,8 @@ for b in tree["books"]:
                     for f in pits:
                         out.append(f"<li>⚠ {html.escape(str(f))}</li>")
                     out.append("</ul>")
+                if p.get("note"):
+                    out.append(f"<div class='note'>💡 {html.escape(p['note'])}</div>")
                 _render_sub(p.get("sub") or [], out)
                 out.append("</div>")
             if s.get("equations"):
