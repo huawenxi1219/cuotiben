@@ -8,7 +8,13 @@
 import html
 import io
 import json
+import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from structures import STRUCTS as _STRUCTS
+except BaseException:
+    _STRUCTS = {}
 
 TREE = r"C:\myapp\assets\chem_tree.json"
 COMPACT = "compact" in sys.argv
@@ -51,6 +57,8 @@ h1 {{ font-size: {H1}; margin: 0 0 3pt; }}
 .pit li {{ margin: 0; }}
 .how {{ background: #fffbe6; border-left: 3px solid #d4a017; padding: 2pt 5pt;
        margin: 2pt 0 0; font-size: {FACT}; page-break-inside: avoid; }}
+.mol {{ display: inline-block; margin: 2pt 6pt 2pt 0; border: 1px solid #e5e7eb;
+       border-radius: 4pt; vertical-align: middle; }}
 .eq {{ font-family: Consolas, "Courier New", monospace; font-size: {EQ};
       background: #f5f7fa; padding: 1pt 5pt; margin: 2pt 0 0; border-left: 3px solid #9ab;
       page-break-inside: avoid; }}
@@ -75,6 +83,13 @@ for b in tree["books"]:
                 out.append(f"<div class='t'>{html.escape(p.get('id',''))}　{html.escape(p.get('title',''))}</div>")
                 if p.get("detail"):
                     out.append(f"<div class='d'>{html.escape(p['detail'])}</div>")
+                _ttl = p.get("title", "")
+                _best = None
+                for _k in _STRUCTS:
+                    if _k in _ttl and (_best is None or len(_k) > len(_best)):
+                        _best = _k
+                if _best:
+                    out.append("<div>" + _STRUCTS[_best] + "</div>")
                 facts = p.get("facts") or []
                 if facts:
                     out.append("<ul class='facts'>")
