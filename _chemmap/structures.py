@@ -10,10 +10,11 @@ _W, _H = 300, 110
 
 
 def _wrap(body):
-    return (f'<svg width="{_W}" height="{_H}" viewBox="0 0 {_W} {_H}" '
+    w2, h2 = int(_W * 0.45), int(_H * 0.45)
+    return (f'<svg width="{w2}" height="{h2}" viewBox="0 0 {_W} {_H}" '
             f'xmlns="http://www.w3.org/2000/svg" class="mol">'
             f'<rect width="{_W}" height="{_H}" fill="#fafbfc"/>'
-            f'<g stroke="#222" stroke-width="2.2" fill="none" stroke-linecap="round">'
+            f'<g stroke="#222" stroke-width="3.4" fill="none" stroke-linecap="round">'
             + body +
             '</g></svg>')
 
@@ -106,6 +107,11 @@ def ethyl_acetate():
 
 STRUCTS = {
     "乙醇": ethanol(),
+    "醇": ethanol(),
+    "酚": phenol(),
+    "醛": acetaldehyde(),
+    "酮": acetone(),
+    "羧酸": acetic_acid(),
     "乙醛": acetaldehyde(),
     "乙酸": acetic_acid(),
     "丙酮": acetone(),

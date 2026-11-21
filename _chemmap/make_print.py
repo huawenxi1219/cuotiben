@@ -78,8 +78,8 @@ h1 {{ font-size: {H1}; margin: 0 0 3pt; }}
 .pit li {{ margin: 0; }}
 .how {{ background: #fffbe6; border-left: 3px solid #d4a017; padding: 2pt 5pt;
        margin: 2pt 0 0; font-size: {FACT}; page-break-inside: avoid; }}
-.mol {{ display: inline-block; margin: 2pt 6pt 2pt 0; border: 1px solid #e5e7eb;
-       border-radius: 4pt; vertical-align: middle; }}
+.mol {{ float: right; margin: 0 0 3pt 8pt; border: 1px solid #e5e7eb;
+       border-radius: 4pt; background: #fafbfc; }}
 .eq {{ font-family: Consolas, "Courier New", monospace; font-size: {EQ};
       background: #f5f7fa; padding: 1pt 5pt; margin: 2pt 0 0; border-left: 3px solid #9ab;
       page-break-inside: avoid; }}
