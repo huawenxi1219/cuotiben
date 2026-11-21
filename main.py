@@ -9142,6 +9142,7 @@ def main(page: ft.Page):
 
                 search = ft.TextField(label="搜索知识点 / 笔记内容", dense=True, expand=True)
                 body = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
+                _stage = ft.Container(expand=True, content=body)
 
                 # —— 图谱视图：渲染成 PNG，可缩放拖动 ——
                 _graph_box = ft.Container(expand=True, visible=False,
@@ -9185,7 +9186,8 @@ def main(page: ft.Page):
                             alignment=ft.alignment.center,
                             content=ft.Text("还没有知识图，点右上角「导入」", color="#8B93A7"))
                         return
-                    _nav_box.content = _build_nav_column(tree)
+                    _nav_box.content = ft.Column(
+                        [_expand_row, _build_nav_column(tree)], spacing=6, expand=True)
 
                 _nav_tiles = []
 
@@ -9326,50 +9328,24 @@ def main(page: ft.Page):
                                                     scroll=ft.ScrollMode.AUTO, expand=True)
 
                 def _switch_recite():
-                    body.visible = False
-                    _graph_box.visible = False
-                    _overview_box.visible = False
-                    _nav_box.visible = False
-                    _recite_box.visible = True
                     _render_recite()
+                    _stage.content = _recite_box
                     page.update()
 
                 def _switch_nav():
-                    body.visible = False
-                    _graph_box.visible = False
-                    _overview_box.visible = False
-                    _recite_box.visible = False
-                    _nav_box.visible = True
                     _render_nav()
-                    page.update()
-
-                _overview_box = ft.Container(expand=True, visible=False,
-                                             bgcolor="#0F0F16", border_radius=12, padding=4,
-                                             content=ft.InteractiveViewer(
-                                                 content=ft.Image(src="assets/chem_map.png",
-                                                                  fit=ft.ImageFit.CONTAIN),
-                                                 min_scale=0.3, max_scale=8.0,
-                                                 constrained=True, expand=True))
-
-                def _switch_overview():
-                    body.visible = False
-                    _graph_box.visible = False
-                    _nav_box.visible = False
-                    _recite_box.visible = False
-                    _overview_box.visible = True
+                    _stage.content = _nav_box
                     page.update()
 
                 _view_state = {"graph": True}
 
                 def _switch_view(to_graph):
                     _view_state["graph"] = to_graph
-                    _overview_box.visible = False
-                    _nav_box.visible = False
-                    _recite_box.visible = False
-                    body.visible = not to_graph
-                    _graph_box.visible = to_graph
                     if to_graph:
                         _render_graph()
+                        _stage.content = _graph_box
+                    else:
+                        _stage.content = body
                     page.update()
 
                 _seg_items = [
@@ -9493,13 +9469,9 @@ def main(page: ft.Page):
                     ]),
                     search,
                     _seg,
-                    _expand_row,
                     ft.Divider(height=1, color="#262B3D"),
-                    body,
-                    _graph_box,
-                    _nav_box,
-                    _recite_box,
-                ], spacing=10, expand=True)
+                    _stage,
+                ], spacing=8, expand=True)
 
             def build_subject_left_panel(subj):
                 subjects = ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]
