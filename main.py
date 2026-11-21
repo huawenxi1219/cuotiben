@@ -9187,7 +9187,18 @@ def main(page: ft.Page):
                         return
                     _nav_box.content = _build_nav_column(tree)
 
+                _nav_tiles = []
+
+                def _toggle_all(expand):
+                    for _t in _nav_tiles:
+                        try:
+                            _t.expanded = bool(expand)
+                        except BaseException:
+                            pass
+                    page.update()
+
                 def _build_nav_column(tree):
+                    _nav_tiles.clear()
                     cols = []
                     for book in tree.get("books", []):
                         book_tiles = []
@@ -9207,6 +9218,19 @@ def main(page: ft.Page):
                                         lines.append(ft.Text("· " + str(fact), size=12, color="#9AA3B8"))
                                     for pf in pt.get("pitfalls", []) or []:
                                         lines.append(ft.Text("⚠ " + str(pf), size=12, color="#F7768E"))
+
+                                    def _sub_rows(items, ind=0):
+                                        rowz = []
+                                        for it2 in items:
+                                            rowz.append(ft.Text("  " * ind + "· " + str(it2.get("title", "")),
+                                                                size=12, color="#9AA3B8"))
+                                            for f2 in (it2.get("facts") or []):
+                                                rowz.append(ft.Text("  " * (ind + 1) + str(f2),
+                                                                    size=11, color="#7E879C"))
+                                            rowz.extend(_sub_rows(it2.get("sub") or [], ind + 1))
+                                        return rowz
+
+                                    lines.extend(_sub_rows(pt.get("sub") or []))
                                     pt_col.append(ft.Container(
                                         content=ft.Column(lines, spacing=3),
                                         padding=8, border_radius=8, bgcolor=bg,
@@ -9215,11 +9239,13 @@ def main(page: ft.Page):
                                     eq_txt = "　".join(e.get("eq", "") for e in sec["equations"])
                                     pt_col.append(ft.Text("方程式：" + eq_txt, size=11,
                                                           color="#7AA2F7", selectable=True))
-                                sec_tiles.append(ft.ExpansionTile(
+                                _t1 = ft.ExpansionTile(
                                     title=ft.Text(f"{sec.get('section','')}", size=13, color="#D7DBEA"),
                                     controls=[ft.Container(ft.Column(pt_col, spacing=4), padding=ft.Padding(left=8, right=8, top=0, bottom=6))],
                                     tile_padding=ft.Padding(left=10, right=10, top=4, bottom=4),
-                                    controls_padding=ft.Padding(left=4, right=4, top=0, bottom=4)))
+                                    controls_padding=ft.Padding(left=4, right=4, top=0, bottom=4))
+                            _nav_tiles.append(_t1)
+                            sec_tiles.append(_t1)
                             if sec_tiles:
                                 book_tiles.append(ft.ExpansionTile(
                                     title=ft.Text(chap.get("name", ""), size=14,
@@ -9347,6 +9373,12 @@ def main(page: ft.Page):
                         "🧪 三年总览", icon=ft.Icons.MAP,
                         on_click=lambda e: _switch_overview()))
                 _seg = ft.Row(_seg_items, spacing=8)
+                _expand_row = ft.Row([
+                    ft.ElevatedButton("⤢ 全部展开", icon=ft.Icons.UNFOLD_MORE,
+                                      on_click=lambda e: _toggle_all(True)),
+                    ft.ElevatedButton("⤡ 全部收起", icon=ft.Icons.UNFOLD_LESS,
+                                      on_click=lambda e: _toggle_all(False)),
+                ], spacing=8)
 
                 def _note_card(n):
                     txt = (n.get("content") or "").strip()
@@ -9431,6 +9463,7 @@ def main(page: ft.Page):
                     ]),
                     search,
                     _seg,
+                    _expand_row,
                     ft.Divider(height=1, color="#262B3D"),
                     body,
                     _graph_box,

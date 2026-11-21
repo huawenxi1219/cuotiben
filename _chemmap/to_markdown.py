@@ -13,7 +13,7 @@ def clean(s):
     return str(s).replace("\n", " ").strip()
 
 
-out = ["---", "markmap:", "  colorFreezeLevel: 2", "  maxWidth: 320", "---", "",
+out = ["---", "markmap:", "  colorFreezeLevel: 2", "  maxWidth: 320\n  initialExpandLevel: -1", "---", "",
        "# 高中化学 · 章末知识体系", ""]
 
 for book in tree["books"]:
