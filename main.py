@@ -7354,9 +7354,15 @@ def main(page: ft.Page):
                                         page.close(detail_dlg)
                                         subj_ask = item_data.get("subject", "总AI")
                                         orig_val2 = item_data.get("original", "") or item_data.get("question", "")
+                                        _imgs = (item_data.get("question_media")
+                                                 or item_data.get("original_media")
+                                                 or [])
+                                        if not str(orig_val2).strip():
+                                            orig_val2 = "（题干在下面的图片里）"
+                                        _marks = "".join(f"\n【图】{p}" for p in _imgs[:3])
                                         prompt = f"""我在复习这道错题，请你用适合我的方式讲讲：
 
-📝 原题：{orig_val2}
+📝 原题：{orig_val2}{_marks}
 ❌ 我错在：{item_data.get('mistake', '')}
 ✅ 标准答案：{item_data.get('answer', '')}
 💡 我的理解：{item_data.get('idea', '')}
@@ -9264,10 +9270,46 @@ def main(page: ft.Page):
 
                                 _ne = sum(1 for e2 in errs if _hit(e2))
                                 _nn = sum(1 for n2 in notes if _hit(n2))
-                                _badge = (f"   📕{_ne}" if _ne else "") + (f"  📓{_nn}" if _nn else "")
+
+                                def _show_chap_errors(ev, _chap=chap, _kws=list(_kws)):
+                                    rows = []
+                                    hit_items = []
+                                    for e2 in errs:
+                                        blob = " ".join(str(e2.get(x, "")) for x in
+                                                        ("original", "mistake", "idea", "answer"))
+                                        blob += " " + " ".join(str(x) for x in (e2.get("tags") or []))
+                                        if any(k in blob for k in _kws if len(k) >= 3):
+                                            hit_items.append(e2)
+                                    if not hit_items:
+                                        rows.append(ft.Text("这一章还没有错题", color="#8B93A7"))
+                                    for e2 in hit_items[:20]:
+                                        rows.append(ft.Text(
+                                            f"#{e2.get('no', '?')}  " +
+                                            ((e2.get("original") or e2.get("question") or "（无题干）")[:40]) +
+                                            f"   [{e2.get('status') or '未解决'}]",
+                                            size=12, color="#C9CFE0"))
+                                    dlgx = ft.AlertDialog(
+                                        title=ft.Text(f"{_chap.get('name','')} 的错题（{len(hit_items)} 道）"),
+                                        content=ft.Container(
+                                            content=ft.Column(rows, spacing=6,
+                                                              scroll=ft.ScrollMode.AUTO),
+                                            width=_dlg_w(page, 340), height=_dlg_h(page, 420)),
+                                        actions=[
+                                            ft.TextButton("去错题本", on_click=lambda e3: (
+                                                page.close(dlgx),
+                                                open_function_page(subject, "错题本"))),
+                                            ft.TextButton("关闭", on_click=lambda e3: page.close(dlgx))])
+                                    page.open(dlgx)
+                                    page.update()
+
+                                _badge_ctrl = ft.TextButton(
+                                    text=(f"📕{_ne}" if _ne else "") + (f"  📓{_nn}" if _nn else ""),
+                                    on_click=_show_chap_errors if _ne else None,
+                                    style=ft.ButtonStyle(padding=ft.Padding(4, 0, 4, 0))) if (_ne or _nn) else None
                                 book_tiles.append(ft.ExpansionTile(
-                                    title=ft.Text(chap.get("name", "") + _badge, size=14,
+                                    title=ft.Text(chap.get("name", ""), size=14,
                                                   weight=ft.FontWeight.W_600, color="#C9CFE0"),
+                                    trailing=_badge_ctrl,
                                     controls=sec_tiles,
                                     tile_padding=ft.Padding(left=10, right=10, top=6, bottom=6)))
                         if book_tiles:
