@@ -1430,6 +1430,75 @@ def save_ai_config(config):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
+def _plain_ai(s):
+    """把 AI 输出里的 LaTeX / Markdown 痕迹转成能正常显示的文本。"""
+    if not isinstance(s, str) or not s:
+        return s
+    import re as _re
+    out = s
+
+    # 常见 LaTeX 命令 → Unicode
+    table = {
+        r"\times": "×", r"\div": "÷", r"\cdot": "·", r"\pm": "±", r"\mp": "∓",
+        r"\leq": "≤", r"\le": "≤", r"\geq": "≥", r"\ge": "≥", r"\neq": "≠", r"\ne": "≠",
+        r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝", r"\infty": "∞",
+        r"\rightarrow": "→", r"\to": "→", r"\leftarrow": "←", r"\Rightarrow": "⇒",
+        r"\Leftrightarrow": "⇌", r"\rightleftharpoons": "⇌", r"\uparrow": "↑", r"\downarrow": "↓",
+        r"\because": "∵", r"\therefore": "∴", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
+        r"\alpha": "α", r"\beta": "β", r"\gamma": "γ", r"\delta": "δ", r"\Delta": "Δ",
+        r"\theta": "θ", r"\lambda": "λ", r"\mu": "μ", r"\pi": "π", r"\rho": "ρ",
+        r"\sigma": "σ", r"\Sigma": "Σ", r"\omega": "ω", r"\phi": "φ", r"\varphi": "φ",
+        r"\sum": "Σ", r"\int": "∫", r"\partial": "∂", r"\degree": "°", r"\circ": "°",
+        r"\quad": " ", r"\qquad": "  ", r"\,": " ", r"\;": " ", r"\!": "",
+        r"\left": "", r"\right": "", r"\displaystyle": "", r"\limits": "",
+        r"\ldots": "…", r"\cdots": "…", r"\dots": "…",
+    }
+    for k, v in table.items():
+        out = out.replace(k, v)
+
+    # \frac{a}{b} → (a)/(b)；\sqrt{x} → √(x)
+    out = _re.sub(r"\\d?frac\{([^{}]*)\}\{([^{}]*)\}", r"(\1)/(\2)", out)
+    out = _re.sub(r"\\d?frac\{([^{}]*)\}\{([^{}]*)\}", r"(\1)/(\2)", out)
+    out = _re.sub(r"\\sqrt\[(\d)\]\{([^{}]*)\}", r"\1√(\2)", out)
+    out = _re.sub(r"\\sqrt\{([^{}]*)\}", r"√(\1)", out)
+    out = _re.sub(r"\\text\{([^{}]*)\}", r"\1", out)
+    out = _re.sub(r"\\mathrm\{([^{}]*)\}", r"\1", out)
+    out = _re.sub(r"\\mathbf\{([^{}]*)\}", r"\1", out)
+
+    # 上标/下标：^{2} → ²，_{2} → ₂（只处理常见的数字与正负）
+    sup = {"0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵",
+           "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", "n": "ⁿ"}
+    sub = {"0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅",
+           "6": "₆", "7": "₇", "8": "₈", "9": "₉", "+": "₊", "-": "₋"}
+
+    def _sup(m):
+        body = m.group(1)
+        return "".join(sup.get(c, c) for c in body) if all(c in sup for c in body) else "^" + body
+
+    def _sub(m):
+        body = m.group(1)
+        return "".join(sub.get(c, c) for c in body) if all(c in sub for c in body) else "_" + body
+
+    out = _re.sub(r"\^\{([^{}]*)\}", _sup, out)
+    out = _re.sub(r"_\{([^{}]*)\}", _sub, out)
+    # 不带花括号的单个上/下标：x^2 → x²，H_2 → H₂
+    out = _re.sub(r"\^([0-9+\-])", lambda m: sup.get(m.group(1), m.group(0)), out)
+    out = _re.sub(r"_([0-9])", lambda m: sub.get(m.group(1), m.group(0)), out)
+
+    # 行内/块级公式定界符
+    out = _re.sub(r"\$\$([^$]*)\$\$", r"\1", out)
+    out = _re.sub(r"\$([^$\n]*)\$", r"\1", out)
+    out = out.replace(r"\(", "").replace(r"\)", "")
+    out = out.replace(r"\[", "").replace(r"\]", "")
+
+    # Markdown 痕迹：加粗/斜体/反引号/标题井号
+    out = out.replace("**", "").replace("__", "")
+    out = _re.sub(r"(?m)^#{1,6}\s*", "", out)
+    out = out.replace("`", "")
+
+    return out
+
+
 def _install_deepseek_post_shim():
     """DeepSeek 默认开启思考，会把小 max_tokens 全吃掉导致 content 为空。
     这里统一兜底：非流式请求自动 reasoning_effort=none 且 max_tokens 至少 1200。
@@ -4699,6 +4768,9 @@ def main(page: ft.Page):
 5. 最后才是完整解法
 禁止：无视他的思路，直接甩标准答案的解法。
 
+【格式要求】不要使用 LaTeX（不要出现 $、\frac、\sqrt、\times 这类写法）。
+数学式直接用普通字符和 Unicode 符号：² ³ √ ≤ ≥ ≠ ≈ Δ π θ → ⇌ ↑ ↓ ℃。化学式用 H₂SO₄ 这种下标写法。
+
 【讲概念必须按这个结构】
 1. 先用一句大白话说清它是什么。
 2. 给一个具体例子（数字或生活场景），不要只给定义。
@@ -5334,8 +5406,8 @@ def main(page: ft.Page):
                     if msg["role"] == "user":
                         chat_history_display.controls.append(make_user_bubble(msg["content"], animate=False))
                     else:
-                        clean_text, chart_html = extract_chart_block(msg["content"])
-                        bubble_row, content_col = make_ai_bubble(clean_text if clean_text else msg["content"], animate=False)
+                        clean_text, chart_html = extract_chart_block(_plain_ai(msg["content"]))
+                        bubble_row, content_col = make_ai_bubble(clean_text if clean_text else _plain_ai(msg["content"]), animate=False)
                         if chart_html and content_col:
                             def make_view(h=chart_html):
                                 def view(e):
@@ -5745,6 +5817,7 @@ def main(page: ft.Page):
                     page.update()
 
                     last_update_t = {"t": 0.0}
+                    _plain_final = {"v": ""}
                     def on_chunk(text):
                         if gen_token["id"] != my_gen:
                             return  # 旧代次的流式回调直接丢弃
@@ -5760,7 +5833,7 @@ def main(page: ft.Page):
                         last_update_t["t"] = now
                         try:
                             if content_ref.get("stream"):
-                                content_ref["stream"].value = text if text else "▌"
+                                content_ref["stream"].value = _plain_ai(text) if text else "▌"
                             page.update()
                         except Exception:
                             pass
@@ -5792,7 +5865,11 @@ def main(page: ft.Page):
                             print(f"[CHAT] 响应结束 用时 {time.time() - _wait['t0']:.1f}s")
                             was_stopped["v"] = bool(stop_flag)
                             if final_accum is not None:
-                                ai_response["text"] = final_accum
+                                ai_response["text"] = _plain_ai(final_accum)
+                                try:
+                                    _plain_final["v"] = _plain_ai(final_accum)
+                                except BaseException:
+                                    pass
                         finally:
                             _wait["stop"] = True
                             if gen_token["id"] == my_gen:
@@ -5812,6 +5889,7 @@ def main(page: ft.Page):
                         content_ref["raw"] = ai_response["text"]
                         try:
                             final_text = ai_response["text"] if ai_response["text"] else "（无回应）"
+                            final_text = _plain_ai(final_text)
                             clean_text, chart_html = extract_chart_block(final_text)
                             display_text = clean_text if clean_text else "（无回应）"
                             if content_ref.get("md") and content_ref.get("col"):
