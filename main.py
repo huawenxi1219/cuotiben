@@ -9043,9 +9043,10 @@ def main(page: ft.Page):
                                   value="6")
                 _dr = ft.Dropdown(label="范围", width=150, dense=True,
                                   options=[ft.dropdown.Option("", "全部"),
+                                           ft.dropdown.Option("unprinted", "未打印"),
                                            ft.dropdown.Option("7", "最近7天"),
                                            ft.dropdown.Option("30", "最近30天")],
-                                  value="")
+                                  value="unprinted")
                 _bk = ft.Switch(label="演算留白", value=False)
                 _md = ft.Dropdown(label="版本", width=170, dense=True,
                                   options=[ft.dropdown.Option("remind", "提醒卡（不重做）"),
@@ -9074,7 +9075,9 @@ def main(page: ft.Page):
                     if s != "全部":
                         errs = [e for e in errs if e.get("subject") == s]
                     d = str(_dr.value or "").strip()
-                    if d.isdigit():
+                    if d == "unprinted":
+                        errs = [e for e in errs if not e.get("printed")]
+                    elif d.isdigit():
                         cutoff = time.time() * 1000 - int(d) * 86400000
                         errs = [e for e in errs if (e.get("timestamp") or 0) >= cutoff]
                     errs = sorted(errs, key=lambda e: e.get("timestamp") or 0, reverse=True)
@@ -9114,7 +9117,9 @@ def main(page: ft.Page):
                     im2.save(buf, format="PNG", optimize=True)
                     _prev.content = ft.Image(src_base64=_b64.b64encode(buf.getvalue()).decode("ascii"),
                                              fit=ft.ImageFit.CONTAIN)
-                    _info.value = f"第 {st['idx'] + 1} / {len(st['pages'])} 页 · {im.width}×{im.height}px（A4 300dpi）"
+                    _un = sum(1 for it in (st.get("errs") or []) if not it.get("printed"))
+                    _info.value = (f"第 {st['idx'] + 1} / {len(st['pages'])} 页 · "
+                                   f"{im.width}×{im.height}px（A4 300dpi） · 本批 {len(st.get('errs') or [])} 道（未打印 {_un}）")
                     page.update()
 
                 def _regen(e=None):
@@ -9141,6 +9146,33 @@ def main(page: ft.Page):
                     st["idx"] = max(0, min(st["idx"] + delta, len(st["pages"]) - 1))
                     _show()
 
+                def _mark_printed(items):
+                    """导出成功后，把这些错题标成已打印。"""
+                    try:
+                        ids = {str(it.get("event_id") or "") for it in (items or [])}
+                        if not ids:
+                            return
+                        data = load_jsonl(ERRORS_FILE)
+                        for it in data:
+                            if str(it.get("event_id") or "") in ids:
+                                it["printed"] = True
+                                it["printed_at"] = time.strftime("%Y-%m-%d %H:%M")
+                        save_jsonl(ERRORS_FILE, data)
+                    except BaseException as _be:
+                        _diag_log(_be, "mark_printed")
+
+                def _reset_printed(ev=None):
+                    try:
+                        data = load_jsonl(ERRORS_FILE)
+                        for it in data:
+                            it.pop("printed", None)
+                            it.pop("printed_at", None)
+                        save_jsonl(ERRORS_FILE, data)
+                        show_toast("已全部标为未打印", "green")
+                        _regen()
+                    except BaseException as ex:
+                        show_toast(f"操作失败：{str(ex)[:40]}", "red")
+
                 def _save_pdf(e):
                     if not getattr(e, "path", ""):
                         return
@@ -9155,7 +9187,8 @@ def main(page: ft.Page):
                                                         ink_saver=bool(_ink.value))
                         with open(p, "wb") as f:
                             f.write(_pages_to_pdf(_all))
-                        show_toast(f"✅ 已导出 PDF：{os.path.basename(p)}", "green")
+                        _mark_printed(st.get("errs") or [])
+                        show_toast(f"✅ 已导出 PDF：{os.path.basename(p)}（已标记打印）", "green")
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
 
@@ -9169,7 +9202,8 @@ def main(page: ft.Page):
                                               bind_left_mm=int(_bind.value or 0))
                         with open(p3, "wb") as f:
                             f.write(data)
-                        show_toast("✅ 已导出 Word（用 WPS/Word 打开即可打印）", "green")
+                        _mark_printed(st.get("errs") or _collect())
+                        show_toast("✅ 已导出 Word（已标记打印）", "green")
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
 
@@ -9217,7 +9251,9 @@ def main(page: ft.Page):
                     _head,
                     ft.Text("排好后导出 PDF，直接发给打印机 App 即可", size=12, color=C_TEXT2),
                     ft.Row([_subj, _md, _pp, _dr, _bk], spacing=10, wrap=True),
-                    ft.Row([_bind, _ink], spacing=10, wrap=True),
+                    ft.Row([_bind, _ink,
+                            ft.TextButton("↺ 全部标为未打印", on_click=_reset_printed)],
+                           spacing=10, wrap=True),
                     ft.Row([_lookup, _lookup_txt], spacing=10, wrap=True),
                     _info,
                     ft.Row([
