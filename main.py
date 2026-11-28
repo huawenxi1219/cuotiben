@@ -9,6 +9,10 @@ try:
 except BaseException:
     _render_error_pages = None
     _pages_to_pdf = None
+try:
+    from rtf_export import errors_to_rtf as _errors_to_rtf
+except BaseException:
+    _errors_to_rtf = None
 import io
 import json
 import os
@@ -9054,6 +9058,12 @@ def main(page: ft.Page):
                                              ["全部", "数学", "语文", "英语", "物理", "化学",
                                               "生物", "历史", "政治", "地理"]],
                                     value="全部")
+                _bind = ft.Dropdown(label="装订边", width=130, dense=True,
+                                    options=[ft.dropdown.Option("0", "不留"),
+                                             ft.dropdown.Option("10", "10mm"),
+                                             ft.dropdown.Option("25", "25mm")],
+                                    value="25")
+                _ink = ft.Switch(label="省墨（纯黑/无底纹）", value=True)
                 _lookup = ft.TextField(label="按编号查（如 001）", width=170, dense=True)
                 _lookup_txt = ft.Text("", size=12, color=C_TEXT2)
                 _busy = {"v": False}
@@ -9080,11 +9090,16 @@ def main(page: ft.Page):
                     st["mode"] = _md.value or "question"
                     _mode = "question" if st["mode"] == "both" else st["mode"]
                     if _mode == "remind":
-                        st["pages"] = _render_error_pages(errs, mode="remind")
+                        st["pages"] = _render_error_pages(errs, mode="remind",
+                                                          bind_left_mm=int(_bind.value or 0),
+                                                          ink_saver=bool(_ink.value))
                         _show()
                         return
+                    _bm = int(_bind.value or 0)
                     st["pages"] = _render_error_pages(errs, per_page=int(_pp.value or 6),
-                                                      blank=bool(_bk.value), mode=_mode)
+                                                      blank=bool(_bk.value), mode=_mode,
+                                                      bind_left_mm=_bm,
+                                                      ink_saver=bool(_ink.value))
                     if not keep_idx:
                         st["idx"] = 0
                     st["idx"] = max(0, min(st["idx"], len(st["pages"]) - 1))
@@ -9135,10 +9150,26 @@ def main(page: ft.Page):
                         if st.get("mode") == "both":
                             _all += _render_error_pages(st.get("errs") or [],
                                                         per_page=int(_pp.value or 6),
-                                                        blank=False, mode="answer")
+                                                        blank=False, mode="answer",
+                                                        bind_left_mm=int(_bind.value or 0),
+                                                        ink_saver=bool(_ink.value))
                         with open(p, "wb") as f:
                             f.write(_pages_to_pdf(_all))
                         show_toast(f"✅ 已导出 PDF：{os.path.basename(p)}", "green")
+                    except Exception as ex:
+                        show_toast(f"导出失败：{str(ex)[:50]}", "red")
+
+                def _save_rtf(e):
+                    if not getattr(e, "path", ""):
+                        return
+                    try:
+                        p3 = e.path if str(e.path).lower().endswith(".rtf") else str(e.path) + ".rtf"
+                        data = _errors_to_rtf(st.get("errs") or _collect(),
+                                              with_answer=(st.get("mode") == "answer"),
+                                              bind_left_mm=int(_bind.value or 0))
+                        with open(p3, "wb") as f:
+                            f.write(data)
+                        show_toast("✅ 已导出 Word（用 WPS/Word 打开即可打印）", "green")
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
 
@@ -9152,9 +9183,10 @@ def main(page: ft.Page):
                     except Exception as ex:
                         show_toast(f"导出失败：{str(ex)[:50]}", "red")
 
-                for w in (_pp, _dr, _md, _subj):
+                for w in (_pp, _dr, _md, _subj, _bind):
                     w.on_change = _regen
                 _bk.on_change = _regen
+                _ink.on_change = _regen
 
                 def _do_lookup(e=None):
                     q = (_lookup.value or "").strip()
@@ -9185,6 +9217,7 @@ def main(page: ft.Page):
                     _head,
                     ft.Text("排好后导出 PDF，直接发给打印机 App 即可", size=12, color=C_TEXT2),
                     ft.Row([_subj, _md, _pp, _dr, _bk], spacing=10, wrap=True),
+                    ft.Row([_bind, _ink], spacing=10, wrap=True),
                     ft.Row([_lookup, _lookup_txt], spacing=10, wrap=True),
                     _info,
                     ft.Row([
@@ -9195,6 +9228,11 @@ def main(page: ft.Page):
                                               dialog_title="保存错题卡", file_name="池鱼错题卡.pdf",
                                               file_type=ft.FilePickerFileType.CUSTOM,
                                               allowed_extensions=["pdf"])),
+                        ft.ElevatedButton("📝 导出 Word", icon=ft.Icons.DESCRIPTION,
+                                          on_click=lambda e: _use_picker(page, _save_rtf).save_file(
+                                              dialog_title="保存 Word 文件", file_name="错题卡.rtf",
+                                              file_type=ft.FilePickerFileType.CUSTOM,
+                                              allowed_extensions=["rtf"])),
                         ft.ElevatedButton("🖼 导出本页 PNG", icon=ft.Icons.IMAGE,
                                           on_click=lambda e: _use_picker(page, _save_png).save_file(
                                               dialog_title="保存图片", file_name="错题卡.png",

@@ -88,7 +88,7 @@ for n in ast.walk(tree):
             imports.add(a.name.split(".")[0])
     elif isinstance(n, ast.ImportFrom) and n.module:
         imports.add(n.module.split(".")[0])
-local = {"mindmap_render", "a4_render", "flet", "os", "sys", "json", "re", "time", "io", "random",
+local = {"mindmap_render", "a4_render", "rtf_export", "structures", "flet", "os", "sys", "json", "re", "time", "io", "random",
          "threading", "zipfile", "shutil", "base64", "math", "traceback", "subprocess", "datetime",
          "string", "html", "collections", "itertools", "urllib", "http", "typing", "csv", "hashlib", "uuid"}
 third = {i for i in imports if i not in local and not i.startswith("_")}
